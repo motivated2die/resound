@@ -168,6 +168,7 @@ func Run() int {
 	a.lib = library.Open(config.Dir(), audio.SupportedExtensions)
 	a.lib.Logf = logx.Printf
 	defer a.lib.Close()
+	a.migrateVolumeScale()
 	a.playback.init()
 	a.ptt.init()
 	defer a.engine.Close()

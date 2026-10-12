@@ -17,9 +17,12 @@ type Config struct {
 	MonitorDeviceID string `json:"monitorDeviceId"`
 	// CableDeviceID is the output others hear (e.g. "CABLE Input"). "" = off.
 	CableDeviceID string `json:"cableDeviceId"`
-	// Volumes in percent, 0-100.
+	// Volumes in percent, 0-100, on the loudness curve (audio.Gain).
 	MonitorVolume int `json:"monitorVolume"`
 	CableVolume   int `json:"cableVolume"`
+	// VolumeScale is the scale the volumes were saved on: 0 = the linear
+	// scale of versions before 0.9 (converted once at start), 1 = the curve.
+	VolumeScale int `json:"volumeScale,omitempty"`
 	// MicDeviceID is the user's real microphone (capture endpoint ID).
 	// "" = pick the default recording device automatically.
 	MicDeviceID string `json:"micDeviceId"`
@@ -58,7 +61,7 @@ type Config struct {
 
 // Default returns the configuration used on first start.
 func Default() Config {
-	return Config{MonitorVolume: 50, CableVolume: 100, ServerPort: 8080, PushToTalkWhilePlaying: true, MuteMicWhilePlaying: true}
+	return Config{MonitorVolume: 80, CableVolume: 100, VolumeScale: 1, ServerPort: 8080, PushToTalkWhilePlaying: true, MuteMicWhilePlaying: true}
 }
 
 // Dir returns %LOCALAPPDATA%\Resound.
@@ -79,6 +82,7 @@ func Load() Config {
 	if err != nil {
 		return cfg
 	}
+	cfg.VolumeScale = 0 // a saved config without it is on the old linear scale
 	if err := json.Unmarshal(data, &cfg); err != nil {
 		return Default()
 	}

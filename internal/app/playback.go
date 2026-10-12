@@ -333,8 +333,8 @@ func (a *App) setVolume(role string, v int, done bool) {
 }
 
 func (a *App) applyVolumes() {
-	a.engine.SetVolume(audio.RoleMonitor, float32(a.cfg.MonitorVolume)/100)
-	a.engine.SetVolume(audio.RoleCable, float32(a.cfg.CableVolume)/100)
+	a.engine.SetVolume(audio.RoleMonitor, audio.Gain(a.cfg.MonitorVolume))
+	a.engine.SetVolume(audio.RoleCable, audio.Gain(a.cfg.CableVolume))
 }
 
 // --- home page playback status ---
@@ -422,4 +422,25 @@ func (a *App) tickPlayback() bool {
 		a.watching = false
 	}
 	return keep
+}
+
+// migrateVolumeScale converts volumes saved on the linear scale of versions
+// before 0.9 to the loudness curve (audio.Gain), so everything sounds as
+// loud as before: the two defaults and every per-sound volume. Runs once;
+// again only after restoring a backup from such a version.
+func (a *App) migrateVolumeScale() {
+	if a.cfg.VolumeScale != 0 {
+		return
+	}
+	before := [2]int{a.cfg.MonitorVolume, a.cfg.CableVolume}
+	a.cfg.MonitorVolume = audio.FromLinear(a.cfg.MonitorVolume)
+	a.cfg.CableVolume = audio.FromLinear(a.cfg.CableVolume)
+	n, err := a.lib.MapVolumes(audio.FromLinear)
+	if err != nil {
+		logx.Printf("volumes: saving the converted sound volumes: %v", err)
+	}
+	a.cfg.VolumeScale = 1
+	a.save()
+	logx.Printf("volumes: converted to the loudness curve: you hear %d%% → %d%%, others hear %d%% → %d%%, %d sound(s)",
+		before[0], a.cfg.MonitorVolume, before[1], a.cfg.CableVolume, n)
 }

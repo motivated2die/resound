@@ -151,9 +151,9 @@ func (a *App) homePage() []ui.Row {
 
 func (a *App) volumeSliders() []ui.Row {
 	return []ui.Row{
-		ui.Slider("vol-monitor", "You hear", fmt.Sprintf("%d%%", a.cfg.MonitorVolume), a.cfg.MonitorVolume, 100, 10,
+		ui.Slider("vol-monitor", "You hear", fmt.Sprintf("%d%%", a.cfg.MonitorVolume), a.cfg.MonitorVolume, 100, 5,
 			func(v int, done bool) { a.setVolume(audio.RoleMonitor, v, done) }),
-		ui.Slider("vol-cable", "Others hear", fmt.Sprintf("%d%%", a.cfg.CableVolume), a.cfg.CableVolume, 100, 10,
+		ui.Slider("vol-cable", "Others hear", fmt.Sprintf("%d%%", a.cfg.CableVolume), a.cfg.CableVolume, 100, 5,
 			func(v int, done bool) { a.setVolume(audio.RoleCable, v, done) }),
 	}
 }

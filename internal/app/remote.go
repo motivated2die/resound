@@ -82,10 +82,10 @@ func (r remotePlayer) Play(soundID uint64, preview bool) (server.Started, error)
 	}
 	opts := audio.PlayOptions{Volume: map[string]float32{}}
 	if snd.LocalVolume != nil {
-		opts.Volume[audio.RoleMonitor] = float32(*snd.LocalVolume) / 100
+		opts.Volume[audio.RoleMonitor] = audio.Gain(*snd.LocalVolume)
 	}
 	if snd.RemoteVolume != nil {
-		opts.Volume[audio.RoleCable] = float32(*snd.RemoteVolume) / 100
+		opts.Volume[audio.RoleCable] = audio.Gain(*snd.RemoteVolume)
 	}
 	if preview {
 		opts.Roles = []string{audio.RoleMonitor}
@@ -112,10 +112,10 @@ func (r remotePlayer) SetSoundVolume(soundID uint64, local, remote *int) {
 	a := r.a
 	vol := map[string]float32{}
 	if local != nil {
-		vol[audio.RoleMonitor] = float32(*local) / 100
+		vol[audio.RoleMonitor] = audio.Gain(*local)
 	}
 	if remote != nil {
-		vol[audio.RoleCable] = float32(*remote) / 100
+		vol[audio.RoleCable] = audio.Gain(*remote)
 	}
 	for _, v := range a.engine.Voices() {
 		if meta, ok := a.playback.voice(v.ID); ok && meta.soundID == soundID {
