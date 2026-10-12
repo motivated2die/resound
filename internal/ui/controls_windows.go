@@ -318,37 +318,108 @@ func (n navToolRow) paint(c *canvas, r rect, st rowState) {
 // --- Brand header ----------------------------------------------------------------
 
 type brandRow struct {
-	logo            *Image
-	title, subtitle string
-	progress        func() float64
+	logo                     *Image
+	title, version, subtitle string
+	progress                 func() float64
+	update                   *BrandUpdate
 }
 
-// Brand is the home page header: the app logo, a letter-spaced title and a
-// status line. logo may be nil. progress, if set, is read on every paint
-// and drawn as a thin bar under the status line (0..1; negative = none), so
-// Popup.Repaint animates it without rebuilding the rows.
-func Brand(logo *Image, title, subtitle string, progress func() float64) Row {
-	return brandRow{logo, title, subtitle, progress}
+// BrandUpdate is the badge in the Brand header's top right corner: an
+// accent dot with a short label, e.g. when an update is available.
+type BrandUpdate struct {
+	Label   string // e.g. "Update"
+	Tip     string // tooltip
+	OnClick func()
 }
 
-const brandLogoL = 36
+// Brand is the home page header: the app logo, a letter-spaced title with
+// the version after it (may be empty) and a status line. logo and update
+// may be nil. progress, if set, is read on every paint and drawn as a thin
+// bar under the status line (0..1; negative = none), so Popup.Repaint
+// animates it without rebuilding the rows.
+func Brand(logo *Image, title, version, subtitle string, progress func() float64, update *BrandUpdate) Row {
+	return brandRow{logo, title, version, subtitle, progress, update}
+}
 
-func (brandRow) height() int                   { return 58 }
-func (brandRow) segments(*canvas, rect) []rect { return nil }
-func (brandRow) click(int)                     {}
-func (brandRow) keepsOpen() bool               { return true }
-func (b brandRow) paint(c *canvas, r rect, _ rowState) {
+const (
+	brandLogoL  = 36
+	brandDotL   = 4 // radius of the update dot
+	brandBadgeH = 24
+)
+
+func (brandRow) height() int { return 58 }
+
+// titleBand is the upper half of the text area, where the title sits.
+func (b brandRow) titleBand(c *canvas, r rect) rect {
 	in := inset(c, r)
 	left := in.Left
 	if b.logo != nil {
+		left += c.px(brandLogoL) + c.px(11)
+	}
+	return rect{left, r.Top + c.px(6), in.Right, r.Top + r.h()/2 + c.px(3)}
+}
+
+// badge is the update badge's box at the right end of the title band.
+func (b brandRow) badge(c *canvas, r rect) rect {
+	band := b.titleBand(c, r)
+	w := c.px(8) + 2*c.px(brandDotL) + c.px(6) + c.textWidth(b.update.Label, fontCaption) + c.px(10)
+	cy := band.Top + band.h()/2
+	h := c.px(brandBadgeH)
+	return rect{band.Right - w, cy - h/2, band.Right, cy - h/2 + h}
+}
+
+func (b brandRow) segments(c *canvas, r rect) []rect {
+	if b.update == nil {
+		return nil
+	}
+	return []rect{b.badge(c, r)}
+}
+
+func (b brandRow) click(int) {
+	if b.update != nil && b.update.OnClick != nil {
+		b.update.OnClick()
+	}
+}
+func (brandRow) keepsOpen() bool { return true }
+
+func (b brandRow) tip(_ *canvas, _ rect, seg int) string {
+	if seg == 0 && b.update != nil {
+		return b.update.Tip
+	}
+	return ""
+}
+
+func (b brandRow) paint(c *canvas, r rect, st rowState) {
+	in := inset(c, r)
+	if b.logo != nil {
 		size := c.px(brandLogoL)
 		c.image(b.logo, in.Left, r.Top+(r.h()-size)/2, brandLogoL)
-		left += size + c.px(11)
 	}
+	band := b.titleBand(c, r)
+	left := band.Left
 	mid := r.Top + r.h()/2
+	if b.update != nil {
+		badge := b.badge(c, r)
+		band.Right = badge.Left - c.px(6)
+		switch {
+		case st.press == 0:
+			c.roundRect(badge, badge.h(), colRowPress)
+		case st.hover == 0:
+			c.roundRect(badge, badge.h(), colRowHover)
+		}
+		dot := c.px(brandDotL)
+		cx, cy := badge.Left+c.px(8)+dot, badge.Top+badge.h()/2
+		c.circle(cx, cy, dot, colAccent)
+		c.text(b.update.Label, rect{cx + dot + c.px(6), badge.Top, badge.Right, badge.Bottom}, fontCaption, colAccent, dtLeft)
+	}
 	procSetTextCharExtra.Call(c.dc, uintptr(c.px(2))) // tracking for the capitals
-	c.text(b.title, rect{left, r.Top + c.px(6), in.Right, mid + c.px(3)}, fontTitle, colText, dtLeft)
+	titleW := c.textWidth(b.title, fontTitle)         // includes the tracking
+	c.text(b.title, band, fontTitle, colText, dtLeft)
 	procSetTextCharExtra.Call(c.dc, 0)
+	if b.version != "" {
+		vx := band.Left + titleW + c.px(6)
+		c.text(b.version, rect{vx, band.Top + c.px(3), band.Right, band.Bottom}, fontCaption, colCaption, dtLeft)
+	}
 	c.text(b.subtitle, rect{left, mid + c.px(3), in.Right, r.Bottom - c.px(6)}, fontCaption, colCaption, dtLeft)
 	if b.progress == nil {
 		return

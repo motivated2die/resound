@@ -45,6 +45,9 @@ type Config struct {
 	// complete, so it continues there after a restart (e.g. the one
 	// VB-CABLE's install needs). 0 = the welcome page.
 	SetupStep int `json:"setupStep,omitempty"`
+	// NoUpdateCheck turns off the automatic check for new releases on
+	// GitHub ("Check now" still works).
+	NoUpdateCheck bool `json:"noUpdateCheck,omitempty"`
 }
 
 // Default returns the configuration used on first start.

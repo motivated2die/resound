@@ -123,6 +123,26 @@ Uninstalling deletes `%LOCALAPPDATA%\Resound`, which is the same config and pair
 - Delete the Start Menu `Resound.lnk`.
 - Optionally, as admin: `netsh advfirewall firewall delete rule name=Resound`.
 
+## Testing updates locally
+
+The in-app update ([ARCHITECTURE.md](ARCHITECTURE.md#install-update-uninstall)) normally asks GitHub. `cmd/devupdate` stands in for GitHub's release API, so the whole flow can be tested without publishing anything:
+
+```powershell
+.\scripts\build-release.ps1 -Version 0.7.0     # the "old" version: Desktop\Resound-0.7.0
+.\scripts\build-release.ps1 -Version 0.9.9     # the "new" version: Desktop\Resound-0.9.9
+
+# Terminal 1: offer 0.9.9 as the latest release
+go run ./cmd/devupdate -exe $HOME\Desktop\Resound-0.9.9\Resound.exe -version 0.9.9 -slow 5s
+
+# Terminal 2: install 0.7.0 with the check pointed at devupdate
+$env:RESOUND_UPDATE_API = "http://127.0.0.1:8090"
+& $HOME\Desktop\Resound-0.7.0\Resound.exe
+```
+
+Check, within about 10 s: the home page's header shows `v0.7.0` and a dot with "Update", which opens App & startup with "New version v0.9.9". "Update now" shows the download progress; then Resound quits and restarts as 0.9.9 with "Resound is updated", and `debug.log` shows the `update: …` lines. Variants: `-bad-checksum` (refused; the old version keeps running), `-status 404` ("Up to date": no release yet), `-status 403` (the rate-limit error). Without `RESOUND_UPDATE_API`, the app asks the real GitHub.
+
+`go test ./internal/update` covers the version comparison, the checksum and the allowed hosts against a fake GitHub.
+
 ## Debugging
 
 - **Log:** `%LOCALAPPDATA%\Resound\debug.log` (panel → Settings → Diagnostics → Open log).
