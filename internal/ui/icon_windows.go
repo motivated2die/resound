@@ -85,15 +85,11 @@ type glowKey struct {
 // glowCache holds the rendered glows per DPI scale (UI thread only).
 var glowCache = map[glowKey]*dib{}
 
-// glows draws the background glows of a panel of w×h pixels (see
-// glow.go): the edge glow at the right edge a fixed distance above the
-// bottom, and the corner glow in the top left corner. Both ignore scrolling.
-func (c *canvas) glows(w, h int32) {
-	// Right edge: the box holds the left half of the light.
-	rx, ry := c.px(edgeGlow.radiusXL), c.px(edgeGlow.radiusYL)
-	c.glow(edgeGlow, rx, 2*ry, float64(rx), float64(ry), w-rx, h-c.px(glowBottomL)-ry)
-	// Top left corner: the box holds the light's bottom right quarter.
-	rx, ry = c.px(cornerGlow.radiusXL), c.px(cornerGlow.radiusYL)
+// glows draws the panel's background glow (see glow.go) in the top left
+// corner, whatever the scroll position. The box holds the light's bottom
+// right quarter.
+func (c *canvas) glows() {
+	rx, ry := c.px(cornerGlow.radiusXL), c.px(cornerGlow.radiusYL)
 	c.glow(cornerGlow, rx, ry, 0, 0, 0, 0)
 }
 

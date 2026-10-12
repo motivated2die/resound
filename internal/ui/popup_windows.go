@@ -420,7 +420,7 @@ func (p *Popup) paint() {
 
 	c := p.canvas(mem)
 	c.fill(rect{0, 0, p.width, p.height}, colBackground)
-	c.glows(p.width, p.height)
+	c.glows()
 	for i, s := range p.slots {
 		r := p.rowRect(i)
 		if r.Bottom < 0 || r.Top > p.height {
