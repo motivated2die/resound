@@ -14,6 +14,7 @@ import (
 	"github.com/motivated2die/resound/assets"
 	"github.com/motivated2die/resound/internal/audio"
 	"github.com/motivated2die/resound/internal/config"
+	"github.com/motivated2die/resound/internal/input"
 	"github.com/motivated2die/resound/internal/install"
 	"github.com/motivated2die/resound/internal/library"
 	"github.com/motivated2die/resound/internal/logx"
@@ -89,6 +90,9 @@ type App struct {
 	fwFailed bool
 
 	update updater // check for and install new releases (update.go)
+
+	hotkeys   *input.Watcher // pause and stop keys (hotkeys.go); nil while none is set
+	hotkeyErr string
 }
 
 // Run starts the host (or the elevated routing helper) and blocks until it
@@ -210,6 +214,7 @@ func Run() int {
 	a.startServer()
 
 	a.startUpdateChecks()
+	a.applyHotkeys()
 
 	a.updateTooltip()
 	logx.Printf("ready")
@@ -223,6 +228,7 @@ func Run() int {
 	}
 	a.tray.Run()
 
+	a.closeHotkeys()
 	a.releasePlayback() // never leave the mic muted or a key held behind
 	a.releaseAllPTT()
 	a.save()

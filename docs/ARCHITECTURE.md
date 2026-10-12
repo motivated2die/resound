@@ -25,7 +25,7 @@ internal/audio/    WASAPI outputs, mixer, progressive decoding
 internal/wincom/   Core Audio COM plumbing and go-wca fixes
 internal/routing/  VB-Cable detection, mic mute, "Listen to this device" (elevated helper)
 internal/vbcable/  automatic VB-Cable install (download, signature check, silent setup, resume after restart)
-internal/input/    push-to-talk via SendInput, key presets
+internal/input/    push-to-talk via SendInput, key presets, pause/stop hotkeys (keyboard hook)
 internal/library/  sound folders → tabs/sounds with stable IDs
 internal/server/   phone API, PIN/QR auth, embedded web app (web/)
 internal/install/  install/update/uninstall, autostart, firewall
@@ -66,7 +66,7 @@ Helper roles run before the single-instance mutex (`Local\Resound.SingleInstance
 | `wincom` | Core Audio COM plumbing: COM threads, endpoint enumeration/lookup, and fixes for go-wca bugs |
 | `routing` | VB-Cable detection, mic mute, the undocumented "Listen" properties, the elevated apply command |
 | `vbcable` | Automatic VB-Cable install: download, signature check, silent elevated setup, default-device snapshot/restore, the pending-install state across the restart |
-| `input` | `SendInput` key and mouse presses with scan codes, key names, quick-pick presets |
+| `input` | `SendInput` key and mouse presses with scan codes, key names, quick-pick presets; hotkeys: the portable `Matcher` (tested) and the `Watcher` keyboard hook (`hook_windows.go`) |
 | `library` | Sound index (`library.json`): folders → tabs → sounds with stable IDs, rename/move matching (`reconcile.go`), per-sound settings and phone layouts, background indexer (`indexer.go`) |
 | `server` | HTTP API (Soundux Remote compatible), auth (PIN, sessions, QR pairing), LAN addresses, embedded `web/` |
 | `install` | Drop-in install/update, Installed-apps entry, Start Menu shortcut, autostart, uninstall, firewall helper |
@@ -89,6 +89,7 @@ Platform-specific files use the `_windows.go` suffix. `mixer.go`, `source.go`, `
 - **Server.** Standard `net/http` goroutines. Read-only queries go straight to the thread-safe `library` and `engine`. Anything that changes app state goes through `onUI`. Decoding happens on the HTTP goroutine, never on the UI thread.
 - **Engine events** (first buffer, finished, output failed) go into a 256-slot channel without blocking the render thread. `pumpEvents` forwards them to the UI thread.
 - **Dialogs** (`ui.TryConfirm`) run on their own locked thread with their own message loop. They work in processes without a tray.
+- **Hotkey hook.** While a pause or stop key is set, `input.Watcher` runs a low-level keyboard hook on its own locked thread with its own message loop. The callback only updates the `Matcher` and posts events to the UI thread (`Tray.Post`): Windows silently drops hooks whose callback is slow.
 - **Elevated helpers** are separate processes started through `elevate.Run`, waited on from a goroutine, with results posted back.
 
 ## Audio pipeline
@@ -119,7 +120,15 @@ While sounds play for others (any non-preview play), `holdPlayback` does two thi
 
 Push-to-talk uses **reasons** (`playback`, `talk`). The keys go down when the first reason appears and up when the last one goes away. Talk-through adds `talk` before pausing the sounds, so the key never bounces during the hand-over.
 
-Pause and talk-through pause the active voices and release the mic and PTT. Resuming holds them again, but only if the voices still exist.
+Pause, talk-through and a held pause key pause the active voices and release the mic and PTT. Resuming holds them again, but only if the voices still exist. Only one of the three owns the pause at a time; the others wait until it ends.
+
+**Hotkeys** (`app/hotkeys.go`, `input/hotkeys.go`, `input/hook_windows.go`): keyboard combinations that work anywhere, e.g. inside a game.
+- **Pause keys** pause while held (`setHoldPause`): sounds pause, the mic is unmuted and push-to-talk released, so the user can talk on another channel. Releasing the key resumes them and presses push-to-talk again.
+- **Stop keys** run `stopAll` once per press.
+- Several combinations per action, recorded in the panel like the push-to-talk key (keyboard keys only). A combination is active while all its keys are down; left and right modifiers count as the same key. A key can't be both a pause and a stop key, or Resound's push-to-talk key.
+- **Watching.** A low-level keyboard hook (`WH_KEYBOARD_LL`), installed only while at least one hotkey is set. It observes without swallowing anything, so the game still gets the key; `RegisterHotKey` would swallow it. Resound's own `SendInput` presses carry a marker in `dwExtraInfo` and are ignored. Keys the hook believes held are checked with `GetAsyncKeyState` every 250 ms, so a release lost to the secure desktop (UAC, Ctrl+Alt+Del) can't leave the sounds paused. Only "pause/stop key" events are logged, never keys.
+- Like `SendInput`, the hook gets no keys while a program running as administrator has the focus.
+- A sound started while a pause key is held plays normally (and holds push-to-talk).
 
 ## Routing (Windows side of VB-Cable)
 

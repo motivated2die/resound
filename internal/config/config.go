@@ -45,6 +45,12 @@ type Config struct {
 	// complete, so it continues there after a restart (e.g. the one
 	// VB-CABLE's install needs). 0 = the welcome page.
 	SetupStep int `json:"setupStep,omitempty"`
+	// PauseHotkeys are key combinations that, while held anywhere in
+	// Windows, pause playback and let go of push-to-talk and the mic.
+	// StopHotkeys stop all sounds when pressed. Each is a list of
+	// virtual-key combinations, like PushToTalkKeys.
+	PauseHotkeys [][]uint16 `json:"pauseHotkeys,omitempty"`
+	StopHotkeys  [][]uint16 `json:"stopHotkeys,omitempty"`
 	// NoUpdateCheck turns off the automatic check for new releases on
 	// GitHub ("Check now" still works).
 	NoUpdateCheck bool `json:"noUpdateCheck,omitempty"`

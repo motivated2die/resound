@@ -31,9 +31,11 @@ type playbackState struct {
 	// paused holds the voices paused by the play/pause toggle; talk the
 	// voices paused by talk-through. wasHolding remembers that mic/PTT were
 	// held for them, so resuming holds them again.
-	paused, talk           []uint64
-	pausedActive, talkLive bool
-	wasHolding             bool
+	// hold the voices paused while a pause hotkey is held (hotkeys.go).
+	// Only one of the three pauses is active at a time.
+	paused, talk, hold               []uint64
+	pausedActive, talkLive, holdLive bool
+	wasHolding                       bool
 
 	vmu    sync.Mutex
 	voices map[uint64]voiceMeta
@@ -129,8 +131,8 @@ func (a *App) stopAll() {
 // It returns true when playback is now paused.
 func (a *App) togglePause() bool {
 	pb := &a.playback
-	if pb.talkLive {
-		return pb.pausedActive // talk-through owns the pause right now
+	if pb.talkLive || pb.holdLive {
+		return pb.pausedActive // talk-through or a pause key owns the pause right now
 	}
 	if !pb.pausedActive {
 		pb.paused = a.pauseActive()
@@ -149,7 +151,7 @@ func (a *App) togglePause() bool {
 func (a *App) setTalkThrough(on bool) {
 	pb := &a.playback
 	switch {
-	case on && !pb.talkLive && !pb.pausedActive:
+	case on && !pb.talkLive && !pb.pausedActive && !pb.holdLive:
 		a.setPTT(pttTalk, true)
 		pb.talk = a.pauseActive()
 		pb.talkLive = true
@@ -159,6 +161,27 @@ func (a *App) setTalkThrough(on bool) {
 		a.setPTT(pttTalk, false)
 		pb.talk, pb.talkLive = nil, false
 		logx.Printf("talk-through off")
+	}
+}
+
+// setHoldPause pauses playback and lets go of the mic and push-to-talk
+// while a pause hotkey is held, so the user can talk on another channel
+// (often the game's other push-to-talk key). Releasing it resumes both.
+func (a *App) setHoldPause(on bool) {
+	pb := &a.playback
+	switch {
+	case on && !pb.holdLive && !pb.talkLive && !pb.pausedActive:
+		pb.hold = a.pauseActive()
+		pb.holdLive = true
+		if len(pb.hold) > 0 {
+			logx.Printf("hotkey: paused %d voice(s) while the pause key is held", len(pb.hold))
+		}
+	case !on && pb.holdLive:
+		if len(pb.hold) > 0 {
+			logx.Printf("hotkey: pause key released, resuming")
+		}
+		a.resume(pb.hold)
+		pb.hold, pb.holdLive = nil, false
 	}
 }
 

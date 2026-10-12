@@ -38,7 +38,8 @@ Resound changes Windows settings only when you ask it to, and tells you before i
 - installing VB-Cable (with Windows' permission prompt), and restoring your default audio devices if VB-Cable's setup changed them;
 - turning on "Listen to this device" for your microphone so it reaches the virtual cable (with Windows' permission prompt);
 - a Windows Firewall rule that lets your phone connect (with Windows' permission prompt);
-- muting your microphone and pressing your push-to-talk key while a sound plays, if you turn these on.
+- muting your microphone and pressing your push-to-talk key while a sound plays, if you turn these on;
+- watching the keyboard for your pause and stop keys, only while you have set at least one. Resound looks only for those keys; it doesn't record, store or send anything you type.
 
 ## Contact
 

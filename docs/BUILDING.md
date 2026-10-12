@@ -141,6 +141,8 @@ $env:RESOUND_UPDATE_API = "http://127.0.0.1:8090"
 
 Check, within about 10 s: the home page's header shows `v0.7.0` and a dot with "Update", which opens App & startup with "New version v0.9.9". "Update now" shows the download progress; then Resound quits and restarts as 0.9.9 with "Resound is updated", and `debug.log` shows the `update: …` lines. Variants: `-bad-checksum` (refused; the old version keeps running), `-status 404` ("Up to date": no release yet), `-status 403` (the rate-limit error). Without `RESOUND_UPDATE_API`, the app asks the real GitHub.
 
+`go test ./internal/input` covers the hotkey matching. The real keyboard hook has a live test that injects F24 (a key no keyboard has) into the desktop, so it only runs on request: `$env:RESOUND_HOOK_TEST="1"; go test -run WatcherLive -v ./internal/input`.
+
 `go test ./internal/update` covers the version comparison, the checksum and the allowed hosts against a fake GitHub.
 
 ## Debugging
@@ -157,6 +159,7 @@ Check, within about 10 s: the home page's header shows `v0.7.0` and a dot with "
 | Others don't hear the voice | Settings → Voice chat step 3; `input: … listen=… target=…` lines |
 | Phone can't connect | `server: reachable at …` lines; Phone remote → "Allow phones through the firewall" |
 | Game ignores push-to-talk | `push-to-talk down/up` lines; games running as admin don't see input from normal apps |
+| Pause/stop key does nothing | `hotkeys: watching …` at start, `hotkey: …` lines when pressed; inside a game running as admin, Resound sees no keys |
 | Port 8080 busy | Phone remote page shows the error; change `serverPort` in `config.json` |
 
 ## Release checklist

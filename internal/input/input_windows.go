@@ -42,6 +42,10 @@ const (
 	mouseeventfXUp        = 0x0100
 
 	mapvkVKToVSCEx = 4
+
+	// sendMarker tags Resound's own presses (dwExtraInfo), so the hotkey
+	// hook can tell them from the user's ("RSND").
+	sendMarker = 0x52534E44
 )
 
 // keyboardInput and mouseInput mirror INPUT with KEYBDINPUT / MOUSEINPUT
@@ -105,7 +109,7 @@ func Release(c Combo) error {
 func send(vk uint16, down bool) error {
 	switch vk {
 	case VKMiddle, VKXButton1, VKXButton2:
-		in := mouseInput{Type: inputMouse}
+		in := mouseInput{Type: inputMouse, ExtraInfo: sendMarker}
 		switch {
 		case vk == VKMiddle && down:
 			in.Flags = mouseeventfMiddleDown
@@ -121,7 +125,7 @@ func send(vk uint16, down bool) error {
 		return sendInput(unsafe.Pointer(&in), unsafe.Sizeof(in))
 	}
 
-	in := keyboardInput{Type: inputKeyboard, VK: vk}
+	in := keyboardInput{Type: inputKeyboard, VK: vk, ExtraInfo: sendMarker}
 	scan, extended := scanCode(vk)
 	if scan != 0 {
 		in.Scan = scan
