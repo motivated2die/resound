@@ -31,13 +31,11 @@ The full license texts are in each module's source (`go mod download`, then the 
 | [driver.js](https://github.com/kamranahmedse/driver.js) | MIT | `internal/server/web/vendor/driverjs/` |
 | [SortableJS](https://github.com/SortableJS/Sortable) 1.15.6 | MIT | `internal/server/web/vendor/sortablejs/` |
 | [NoSleep.js](https://github.com/richtr/NoSleep.js) 0.12.0 | MIT | `internal/server/web/vendor/nosleep/` |
+| [emoji-picker-element](https://github.com/nolanlawson/emoji-picker-element) 1.29.1 | Apache-2.0 | `internal/server/web/vendor/emoji-picker-element/` |
+| [emoji-picker-element-data](https://github.com/nolanlawson/emoji-picker-element-data) 1.8.0 (English, Emojibase shortcodes) | Apache-2.0; built from [Emojibase](https://emojibase.dev) data (MIT) with names and keywords from [Unicode CLDR](https://cldr.unicode.org) (Unicode License v3) | `internal/server/web/vendor/emoji-picker-element-data/` |
+| [Material Symbols](https://github.com/google/material-design-icons) (Outlined) SVG icons by Google | Apache-2.0 | `internal/server/web/assets/icons/` |
 
-Loaded by the phone's browser from public CDNs (not included in Resound; see [PRIVACY.md](PRIVACY.md)):
-
-| Component | License |
-|---|---|
-| [Material Symbols](https://github.com/google/material-design-icons) (Google Fonts) | Apache-2.0 |
-| [emoji-picker-element](https://github.com/nolanlawson/emoji-picker-element) and its emoji data ([Emojibase](https://emojibase.dev)) | Apache-2.0, MIT |
+Each folder contains the component's license file(s) and a README naming the exact source. The phone remote loads nothing from outside Resound.
 
 ## Icons
 

@@ -3,7 +3,9 @@
 package server
 
 import (
+	"crypto/sha256"
 	"embed"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"io/fs"
@@ -16,8 +18,7 @@ import (
 	"github.com/motivated2die/resound/internal/library"
 )
 
-// The remote's web files. Copy the Soundux Remote front end
-// (src/helper/webserver/html/*) into internal/server/web/.
+// The remote's web files (internal/server/web/, see its README).
 //
 //go:embed all:web
 var webFiles embed.FS
@@ -166,9 +167,17 @@ func publicPath(p string) bool {
 	return false
 }
 
+// contentSecurityPolicy keeps the remote self-contained: browsers refuse to
+// load anything from another host. Inline scripts and styles stay allowed
+// for login.html; NoSleep plays a data: video to keep the screen on.
+const contentSecurityPolicy = "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; " +
+	"img-src 'self' data: blob:; media-src 'self' data: blob:; connect-src 'self'; font-src 'self'; " +
+	"object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
+
 func (s *Server) middleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		h := w.Header()
+		h.Set("Content-Security-Policy", contentSecurityPolicy)
 		h.Set("X-Content-Type-Options", "nosniff")
 		h.Set("Referrer-Policy", "no-referrer")
 		h.Set("X-Frame-Options", "DENY")
@@ -244,12 +253,45 @@ func (s *Server) routes(mux *http.ServeMux) {
 		return
 	}
 	files := http.FileServerFS(s.web)
+	etags := contentETags(s.web, s.logf)
 	mux.Handle("GET /", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/" || strings.HasSuffix(r.URL.Path, ".html") {
 			w.Header().Set("Cache-Control", "no-cache")
 		}
+		name := strings.TrimPrefix(r.URL.Path, "/")
+		if name == "" {
+			name = "index.html"
+		}
+		if tag, ok := etags[name]; ok {
+			w.Header().Set("ETag", tag) // FileServer answers If-None-Match with 304
+		}
 		files.ServeHTTP(w, r)
 	}))
+}
+
+// contentETags hashes every web file once. Embedded files have no
+// modification time, so without an ETag browsers could never revalidate
+// them. The emoji picker even needs one: it would otherwise download its
+// data on every page load and checksum it with crypto.subtle, which
+// browsers only offer on HTTPS, not on the LAN address phones use.
+func contentETags(web fs.FS, logf func(string, ...any)) map[string]string {
+	tags := map[string]string{}
+	err := fs.WalkDir(web, ".", func(path string, d fs.DirEntry, err error) error {
+		if err != nil || d.IsDir() {
+			return err
+		}
+		data, err := fs.ReadFile(web, path)
+		if err != nil {
+			return err
+		}
+		sum := sha256.Sum256(data)
+		tags[path] = `"` + hex.EncodeToString(sum[:8]) + `"`
+		return nil
+	})
+	if err != nil && logf != nil {
+		logf("server: hashing web files: %v", err)
+	}
+	return tags
 }
 
 func missingWebApp(w http.ResponseWriter, r *http.Request) {

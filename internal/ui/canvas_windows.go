@@ -98,6 +98,53 @@ func (c *canvas) roundRect(r rect, radius int32, color uint32) {
 	procDeleteObject.Call(b)
 }
 
+var (
+	procGradientFill       = windows.NewLazySystemDLL("msimg32.dll").NewProc("GradientFill")
+	procCreateRoundRectRgn = gdi32.NewProc("CreateRoundRectRgn")
+	procSelectClipRgn      = gdi32.NewProc("SelectClipRgn")
+)
+
+// hGradient fills r with a horizontal gradient from one colour on the left
+// to another on the right, clipped to the rounded rectangle clip (the shape
+// roundRect draws with that radius).
+func (c *canvas) hGradient(r rect, left, right uint32, clip rect, radius int32) {
+	c.hGradientStops(r, []uint32{left, right}, clip, radius)
+}
+
+// hGradientStops is hGradient through evenly spaced colour stops (at least
+// two), e.g. to approximate an eased curve with short linear pieces.
+func (c *canvas) hGradientStops(r rect, stops []uint32, clip rect, radius int32) {
+	n := len(stops) - 1
+	if r.w() <= 0 || r.h() <= 0 || n < 1 {
+		return
+	}
+	rgn, _, _ := procCreateRoundRectRgn.Call(uintptr(clip.Left), uintptr(clip.Top), uintptr(clip.Right+1), uintptr(clip.Bottom+1), uintptr(radius), uintptr(radius))
+	if rgn != 0 {
+		procSelectClipRgn.Call(c.dc, rgn)
+		defer func() {
+			procSelectClipRgn.Call(c.dc, 0)
+			procDeleteObject.Call(rgn)
+		}()
+	}
+	type triVertex struct {
+		X, Y                    int32
+		Red, Green, Blue, Alpha uint16
+	}
+	vertex := func(x, y int32, col uint32) triVertex {
+		return triVertex{X: x, Y: y, Red: uint16(col&0xFF) << 8, Green: uint16(col>>8&0xFF) << 8, Blue: uint16(col>>16&0xFF) << 8}
+	}
+	// One GRADIENT_RECT (upper left, lower right vertex) per piece.
+	v := make([]triVertex, 0, 2*n)
+	mesh := make([]uint32, 0, 2*n)
+	for i := range n {
+		x0 := r.Left + r.w()*int32(i)/int32(n)
+		x1 := r.Left + r.w()*int32(i+1)/int32(n)
+		mesh = append(mesh, uint32(len(v)), uint32(len(v)+1))
+		v = append(v, vertex(x0, r.Top, stops[i]), vertex(x1, r.Bottom, stops[i+1]))
+	}
+	procGradientFill.Call(c.dc, uintptr(unsafe.Pointer(&v[0])), uintptr(len(v)), uintptr(unsafe.Pointer(&mesh[0])), uintptr(n), 0 /* GRADIENT_FILL_RECT_H */)
+}
+
 // ring draws a circle outline of the given width, optionally with a filled dot.
 func (c *canvas) circle(cx, cy, radius int32, color uint32) {
 	b, _, _ := procCreateSolidBrush.Call(uintptr(color))

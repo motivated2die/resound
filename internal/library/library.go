@@ -306,6 +306,34 @@ func (l *Library) ResetAppearance() error {
 	return l.saver.schedule()
 }
 
+// MapVolumes replaces every custom per-sound volume v with fn(v), including
+// those of missing sounds, and returns how many sounds it changed.
+func (l *Library) MapVolumes(fn func(int) int) (int, error) {
+	l.mu.Lock()
+	n := 0
+	for _, r := range l.sounds {
+		changed := false
+		for _, p := range []*int{r.Settings.LocalVolume, r.Settings.RemoteVolume} {
+			if p != nil {
+				if v := fn(*p); v != *p {
+					*p, changed = v, true
+				}
+			}
+		}
+		if changed {
+			n++
+		}
+	}
+	if n > 0 {
+		l.revision++
+	}
+	l.mu.Unlock()
+	if n == 0 {
+		return 0, nil
+	}
+	return n, l.saver.schedule()
+}
+
 // Layout returns the phone layout stored under key (a tab ID or FavoritesKey).
 func (l *Library) Layout(key string) Layout {
 	l.mu.RLock()

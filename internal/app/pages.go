@@ -151,9 +151,9 @@ func (a *App) homePage() []ui.Row {
 
 func (a *App) volumeSliders() []ui.Row {
 	return []ui.Row{
-		ui.Slider("vol-monitor", "You hear", fmt.Sprintf("%d%%", a.cfg.MonitorVolume), a.cfg.MonitorVolume, 100, 10,
+		ui.Slider("vol-monitor", "You hear", fmt.Sprintf("%d%%", a.cfg.MonitorVolume), a.cfg.MonitorVolume, 100, 5,
 			func(v int, done bool) { a.setVolume(audio.RoleMonitor, v, done) }),
-		ui.Slider("vol-cable", "Others hear", fmt.Sprintf("%d%%", a.cfg.CableVolume), a.cfg.CableVolume, 100, 10,
+		ui.Slider("vol-cable", "Others hear", fmt.Sprintf("%d%%", a.cfg.CableVolume), a.cfg.CableVolume, 100, 5,
 			func(v int, done bool) { a.setVolume(audio.RoleCable, v, done) }),
 	}
 }
@@ -367,6 +367,8 @@ func (a *App) keysSummary() (string, ui.Tone) {
 func (a *App) keysPage() []ui.Row {
 	rows := []ui.Row{ui.Header("Push-to-talk", a.back), a.pttIntro()}
 	rows = append(rows, a.pttRows()...)
+	rows = append(rows, a.hotkeyRows(capturePause)...)
+	rows = append(rows, a.hotkeyRows(captureStop)...)
 	return append(rows, ui.Spacer(4))
 }
 
@@ -475,7 +477,7 @@ func (a *App) micRows() []ui.Row {
 
 func (a *App) pttRows() []ui.Row {
 	var rows []ui.Row
-	if a.ptt.capturing {
+	if a.ptt.capturing && a.ptt.target == capturePTT {
 		got := "…"
 		if len(a.ptt.captured) > 0 {
 			got = a.ptt.captured.String() + " …"

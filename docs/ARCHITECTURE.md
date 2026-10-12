@@ -25,7 +25,7 @@ internal/audio/    WASAPI outputs, mixer, progressive decoding
 internal/wincom/   Core Audio COM plumbing and go-wca fixes
 internal/routing/  VB-Cable detection, mic mute, "Listen to this device" (elevated helper)
 internal/vbcable/  automatic VB-Cable install (download, signature check, silent setup, resume after restart)
-internal/input/    push-to-talk via SendInput, key presets
+internal/input/    push-to-talk via SendInput, key presets, pause/stop hotkeys (keyboard hook)
 internal/library/  sound folders → tabs/sounds with stable IDs
 internal/server/   phone API, PIN/QR auth, embedded web app (web/)
 internal/install/  install/update/uninstall, autostart, firewall
@@ -66,7 +66,7 @@ Helper roles run before the single-instance mutex (`Local\Resound.SingleInstance
 | `wincom` | Core Audio COM plumbing: COM threads, endpoint enumeration/lookup, and fixes for go-wca bugs |
 | `routing` | VB-Cable detection, mic mute, the undocumented "Listen" properties, the elevated apply command |
 | `vbcable` | Automatic VB-Cable install: download, signature check, silent elevated setup, default-device snapshot/restore, the pending-install state across the restart |
-| `input` | `SendInput` key and mouse presses with scan codes, key names, quick-pick presets |
+| `input` | `SendInput` key and mouse presses with scan codes, key names, quick-pick presets; hotkeys: the portable `Matcher` (tested) and the `Watcher` keyboard hook (`hook_windows.go`) |
 | `library` | Sound index (`library.json`): folders → tabs → sounds with stable IDs, rename/move matching (`reconcile.go`), per-sound settings and phone layouts, background indexer (`indexer.go`) |
 | `server` | HTTP API (Soundux Remote compatible), auth (PIN, sessions, QR pairing), LAN addresses, embedded `web/` |
 | `install` | Drop-in install/update, Installed-apps entry, Start Menu shortcut, autostart, uninstall, firewall helper |
@@ -89,6 +89,7 @@ Platform-specific files use the `_windows.go` suffix. `mixer.go`, `source.go`, `
 - **Server.** Standard `net/http` goroutines. Read-only queries go straight to the thread-safe `library` and `engine`. Anything that changes app state goes through `onUI`. Decoding happens on the HTTP goroutine, never on the UI thread.
 - **Engine events** (first buffer, finished, output failed) go into a 256-slot channel without blocking the render thread. `pumpEvents` forwards them to the UI thread.
 - **Dialogs** (`ui.TryConfirm`) run on their own locked thread with their own message loop. They work in processes without a tray.
+- **Hotkey hook.** While a pause or stop key is set, `input.Watcher` runs a low-level keyboard hook on its own locked thread with its own message loop. The callback only updates the `Matcher` and posts events to the UI thread (`Tray.Post`): Windows silently drops hooks whose callback is slow.
 - **Elevated helpers** are separate processes started through `elevate.Run`, waited on from a goroutine, with results posted back.
 
 ## Audio pipeline
@@ -96,6 +97,7 @@ Platform-specific files use the `_windows.go` suffix. `mixer.go`, `source.go`, `
 - **Outputs.** There are two roles: `monitor` ("You hear", empty ID = system default) and `cable` ("Others hear", off when not set).
   - Each role is one long-lived shared-mode WASAPI stream with a 20 ms requested buffer (22 ms measured), opened in about 10 ms.
   - The stream writes the device's mix format: 32-bit float or 16/24/32-bit integer, 1–8 channels. Stereo goes to front left/right, mono gets (L+R)/2.
+- **Volume curve** (`audio/volume.go`). Volume percentages (the panel's sliders, per-sound volumes) become gain through `audio.Gain`: (percent/100)³ up to 100%, so loudness changes evenly along the slider (75% ≈ −7.5 dB, 50% ≈ −18 dB, 25% ≈ −36 dB). Per-sound boosts above 100% stay linear (200% = +6 dB). Configs from before 0.9 (no `volumeScale` in `config.json`) were saved on a linear scale; `migrateVolumeScale` converts the defaults and every per-sound volume once to the percentage with the same loudness (50% → 79%).
 - **Mixer.** Sums voices into stereo float32 and hard-clips.
   - A voice has a gain that either scales the role volume or, for per-sound custom volume, replaces it.
   - The same voice ID is queued on both mixers, so the two copies start in the same device period. Pause and stop address both copies by ID.
@@ -119,7 +121,15 @@ While sounds play for others (any non-preview play), `holdPlayback` does two thi
 
 Push-to-talk uses **reasons** (`playback`, `talk`). The keys go down when the first reason appears and up when the last one goes away. Talk-through adds `talk` before pausing the sounds, so the key never bounces during the hand-over.
 
-Pause and talk-through pause the active voices and release the mic and PTT. Resuming holds them again, but only if the voices still exist.
+Pause, talk-through and a held pause key pause the active voices and release the mic and PTT. Resuming holds them again, but only if the voices still exist. Only one of the three owns the pause at a time; the others wait until it ends.
+
+**Hotkeys** (`app/hotkeys.go`, `input/hotkeys.go`, `input/hook_windows.go`): keyboard combinations that work anywhere, e.g. inside a game.
+- **Pause keys** pause while held (`setHoldPause`): sounds pause, the mic is unmuted and push-to-talk released, so the user can talk on another channel. Releasing the key resumes them and presses push-to-talk again.
+- **Stop keys** run `stopAll` once per press.
+- Several combinations per action, recorded in the panel like the push-to-talk key (keyboard keys only). A combination is active while all its keys are down; left and right modifiers count as the same key. A key can't be both a pause and a stop key, or Resound's push-to-talk key.
+- **Watching.** A low-level keyboard hook (`WH_KEYBOARD_LL`), installed only while at least one hotkey is set. It observes without swallowing anything, so the game still gets the key; `RegisterHotKey` would swallow it. Resound's own `SendInput` presses carry a marker in `dwExtraInfo` and are ignored. Keys the hook believes held are checked with `GetAsyncKeyState` every 250 ms, so a release lost to the secure desktop (UAC, Ctrl+Alt+Del) can't leave the sounds paused. Only "pause/stop key" events are logged, never keys.
+- Like `SendInput`, the hook gets no keys while a program running as administrator has the focus.
+- A sound started while a pause key is held plays normally (and holds push-to-talk).
 
 ## Routing (Windows side of VB-Cable)
 
@@ -183,6 +193,9 @@ Failures (no network, declined UAC, bad signature) leave the manual "Install man
   - QR codes are single-use and valid for 10 minutes. Re-pairing replaces the phone's old session.
   - There are no CORS headers (same-origin only), and the PIN and tokens are never logged.
 - **Web app.** `internal/server/web/` is embedded with `go:embed all:web`. Without `index.html`, a placeholder page is served.
+  - **Self-contained.** Every script, style, icon and the emoji data are embedded; a `Content-Security-Policy` (`default-src 'self'`, plus `data:` for NoSleep's video and inline code for `login.html`) makes the browser refuse anything from another host. `TestWebSelfContained` fails on any URL in our own web files.
+  - **Icons** are Material Symbols SVGs (`web/assets/icons/`), painted in the text colour through a CSS mask: `<span class="icon" data-icon="name">`, switched with `el.dataset.icon`. `TestWebIcons` checks that every name used has its SVG and CSS rule.
+  - **ETags.** Embedded files have no modification time, so each gets a content-hash `ETag` at start-up and browsers revalidate with `304`. The vendored emoji picker relies on it: without an ETag it re-downloads its 440 KB data on every load and checksums it with `crypto.subtle`, which browsers only offer over HTTPS.
 
 ## UI framework
 
@@ -191,7 +204,7 @@ Failures (no network, declined UAC, bad signature) leave the manual "Install man
 - **Size and shadow.** The panel is 340 logical pixels wide and at least 560 high (`popupMinL`), so switching pages doesn't make it jump. Short pages leave the rest empty, or give it to their first `Flex` row, which keeps the footer after it (Settings / Quit, Continue) at the bottom. Taller pages grow the panel up to the work area and then scroll. The drop shadow is a click-through layered window placed directly beneath the panel (`shadow_windows.go`). It shows a blurred, lowered, translucent black rounded rectangle computed in Go (`shadow.go`, three box blurs), so it is equally strong on Windows 10 and 11 and whether or not the panel has focus. `CS_DROPSHADOW` and DWM's frame shadow were too faint.
 - **Row types:** Brand (logo, letter-spaced title, status), Title, Header (back button), WizardHeader (back button and progress dots), Section, Text, Paragraph (word-wrapped), Flex (fills a short page), DropZone (dashed drop field, clickable), Button / ClosingButton, Buttons (side by side, each with an optional icon and optionally closing), Nav, NavTool (Nav with an icon button on its left), Radio, Toggle, Slider, Stepper, Step, Item, Dropdown, QRCode, Separator, Spacer. Nav tiles are as wide as buttons.
 - **Icons and images.** SVG icons in `internal/ui/icons/` (Tabler, Font Awesome; added with `scripts/add-icon.ps1`) are embedded and rasterized in pure Go (oksvg/rasterx) as anti-aliased alpha masks at the exact device-pixel size. They are tinted with the row's color and drawn with `AlphaBlend` from a premultiplied 32-bit DIB section, cached per name, size and color. Images (`ui.NewImage`, the logo) are scaled with Catmull-Rom and drawn the same way. GDI's own shapes have no anti-aliasing; text does (ClearType). See `internal/ui/icons/README.md`.
-- **Slider.** − and + move to the previous/next multiple of the step; clicking or dragging the track sets the value. The popup captures the mouse while dragging and re-finds the row by id after each re-render. `onChange(value, done)` fires on every move with `done=false` and once with `done=true` on release or a button click, so the app applies volumes live but saves `config.json` once.
+- **Slider.** A thick track with a vertical pill as the knob. − and + move to the previous/next multiple of the step (5% for the volumes); clicking or dragging the track sets the value. The popup captures the mouse while dragging and re-finds the row by id after each re-render. `onChange(value, done)` fires on every move with `done=false` and once with `done=true` on release or a button click, so the app applies volumes live but saves `config.json` once.
 - **Pages.** Three layers, each built from shared row builders (`folderRows`, `libraryActions`, `monitorDropdown`, `volumeSliders`, `cableRows`, `pairRows`, …):
   - **Guided setup** (`wizard.go`): shown until `config.SetupComplete`. Welcome, then five skippable steps: sounds, speakers (output, volumes, test chime), voice chat (VB-Cable; one button selects CABLE Input and routes the mic), push-to-talk key, phone pairing. Configs from before the setup existed (folders or a cable set) count as complete. Settings → "Run the guided setup again" restarts it.
   - **Home**: everyday use. Logo and status, problems (failed output, voice chat incomplete), the library tile with a refresh button and what the refresh found (folders are added on the library page), the output device and volume sliders, test chime / stop, the phone remote, Settings and Quit.
@@ -282,7 +295,7 @@ Ordered by impact on reliability. None blocks normal use. Fixed in 0.6: concurre
 7. **Output failure releases holds for both outputs.** `EventOutputFailed` clears all held voices, releasing the mic and PTT even if the other output is still playing.
 8. **Plain HTTP on the LAN.** Session cookies travel unencrypted; acceptable on a home network. HTTPS would also allow the browser's Wake Lock and service workers.
 9. **Elevation with a different admin account.** When a standard user approves UAC with another account, the helper's log goes to that account's `%LOCALAPPDATA%`.
-10. **Front end** (planned): talk-through button bounces, 250 ms polling instead of live updates, and two remaining CDN dependencies: the Material Symbols font (Google Fonts) and the emoji picker with its emoji data (jsDelivr). NoSleep and SortableJS are vendored in `web/vendor/`.
+10. **Front end** (planned): talk-through button bounces, 250 ms polling instead of live updates.
 11. **No live file watching.** Changes on disk are picked up by the 5 s rescan on phone requests, the panel's "Rescan", and the check on every play. Fix if needed: `ReadDirectoryChangesW`.
 12. **ReFS and network drives** may not provide stable file IDs; renames there are matched by fingerprint instead, which needs the file to have been indexed before it moved.
 13. **VB-Cable's silent install is not officially documented.** `-i -h` is the switch named on VB-Audio's forum; should a future setup ignore it, its dialogs show (it is started visibly for that reason). The pack's readme asks for the author's agreement before integrating it into another installer, while the newer licensing page allows it under the donationware conditions. Get a written confirmation from VB-Audio before a public release.

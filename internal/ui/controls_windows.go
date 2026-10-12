@@ -4,6 +4,8 @@ package ui
 // guided-setup header. Like all rows they are immutable values rebuilt on
 // every render; sliders keep their drag attached by id (see dragger).
 
+import "math"
+
 // --- Slider ------------------------------------------------------------------
 
 type sliderRow struct {
@@ -23,21 +25,34 @@ func Slider(id, label, valueText string, value, maxValue, step int, onChange fun
 		max: max(1, maxValue), step: max(1, step), onChange: onChange}
 }
 
-const sliderBtnL = 28 // logical size of the − / + buttons
+// Logical sizes: the − / + buttons (the track is as tall), the knob (a thin
+// vertical line over the track's height) and the label line above the track.
+// The fill's brightness depends on the distance from the knob: a glow that
+// fades over about sliderFadeL (3× that, it is gone) on top of a tint of
+// the accent that darkens from sliderTintNear next to the knob to
+// sliderTintFar a whole track width away.
+const (
+	sliderBtnL     = 32
+	sliderKnobWL   = 3
+	sliderCaptionL = 24
+	sliderFadeL    = 16
+	sliderTintNear = 0.22
+	sliderTintFar  = 0.08
+)
 
-func (sliderRow) height() int { return 56 }
+func (sliderRow) height() int { return 64 }
 
 // geometry returns the − button, the track's hit area, the + button and the
 // track's value range (x of 0 and of max).
 func (s sliderRow) geometry(c *canvas, r rect) (minus, track, plus rect, x0, x1 int32) {
 	in := inset(c, r)
 	size := c.px(sliderBtnL)
-	top := r.Top + c.px(24)
+	top := r.Top + c.px(sliderCaptionL+2)
 	minus = rect{in.Left, top, in.Left + size, top + size}
 	plus = rect{in.Right - size, top, in.Right, top + size}
-	track = rect{minus.Right + c.px(4), top, plus.Left - c.px(4), top + size}
-	knob := c.px(9)
-	return minus, track, plus, track.Left + knob, track.Right - knob
+	track = rect{minus.Right + c.px(6), top, plus.Left - c.px(6), top + size}
+	half := c.px(sliderKnobWL) / 2 // the knob reaches the track's ends
+	return minus, track, plus, track.Left + half, track.Right - half
 }
 
 func (s sliderRow) segments(c *canvas, r rect) []rect {
@@ -74,7 +89,7 @@ func (s sliderRow) dragTo(c *canvas, r rect, x int32, done bool) {
 
 func (s sliderRow) paint(c *canvas, r rect, st rowState) {
 	in := inset(c, r)
-	caption := rect{in.Left, r.Top + c.px(2), in.Right, r.Top + c.px(22)}
+	caption := rect{in.Left, r.Top + c.px(2), in.Right, r.Top + c.px(sliderCaptionL)}
 	c.text(s.label, rect{caption.Left, caption.Top, caption.Right - c.px(60), caption.Bottom}, fontBody, colText, dtLeft)
 	c.text(s.value, rect{caption.Right - c.px(60), caption.Top, caption.Right, caption.Bottom}, fontBold, colText, dtRight)
 
@@ -94,21 +109,43 @@ func (s sliderRow) paint(c *canvas, r rect, st rowState) {
 		c.text(b.glyph, b.box, fontBold, colText, dtCenter)
 	}
 
-	cy := track.Top + track.h()/2
-	thick := max(2, c.px(4))
+	// The track: as tall as the buttons, filled from its left end to the
+	// knob, full accent at the knob and darker with every pixel to the left.
+	// No part of the fill is flat: where a flat colour meets a ramp, the
+	// eye sees a dark seam (Mach banding). Measured from the knob, the
+	// whole gradient moves with it.
+	radius := c.px(8)
+	c.roundRect(track, radius, colControl)
 	kx := x0 + int32(int64(x1-x0)*int64(s.pos)/int64(s.max))
-	c.roundRect(rect{x0, cy - thick/2, x1, cy - thick/2 + thick}, thick, colControl)
-	if kx > x0 {
-		c.roundRect(rect{x0, cy - thick/2, kx, cy - thick/2 + thick}, thick, colAccent)
+	if fill := (rect{track.Left, track.Top, kx, track.Bottom}); s.pos > 0 && fill.w() > 0 {
+		n := max(8, int(fill.w()/max(1, c.px(3)))) // pieces of about 3 px
+		stops := make([]uint32, n+1)
+		fade, span := float64(c.px(sliderFadeL)), float64(track.w())
+		for i := range stops {
+			d := float64(fill.w()) * float64(n-i) / float64(n) // distance from the knob
+			tint := sliderTintNear - (sliderTintNear-sliderTintFar)*min(1, d/span)
+			stops[i] = mix(colControl, colAccent, tint+(1-tint)*math.Exp(-d/fade))
+		}
+		c.hGradientStops(fill, stops, track, radius)
 	}
-	knob, knobCol := c.px(7), colText
-	switch {
-	case st.press == 1:
-		knob, knobCol = c.px(8), colAccent
-	case st.hover == 1:
-		knob = c.px(8)
+	// The knob: a thin line over the whole height (clipped to the rounded
+	// ends), accent while dragged.
+	kw, knobCol := c.px(sliderKnobWL), colText
+	if st.press == 1 {
+		knobCol = colAccent
+	} else if st.hover == 1 {
+		kw = c.px(sliderKnobWL + 1)
 	}
-	c.circle(kx, cy, knob, knobCol)
+	c.hGradient(rect{kx - kw/2, track.Top, kx - kw/2 + kw, track.Bottom}, knobCol, knobCol, track, radius)
+}
+
+// mix blends two COLORREFs: t = 0 gives a, 1 gives b.
+func mix(a, b uint32, t float64) uint32 {
+	ch := func(shift uint) uint32 {
+		x, y := float64(a>>shift&0xFF), float64(b>>shift&0xFF)
+		return uint32(x+(y-x)*t+0.5) << shift
+	}
+	return ch(0) | ch(8) | ch(16)
 }
 
 // --- Buttons -----------------------------------------------------------------

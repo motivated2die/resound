@@ -17,7 +17,7 @@ None of this is sent anywhere. Uninstalling Resound deletes this folder.
 
 ## Network connections
 
-**Your phone and your PC.** Resound runs a small web server on your PC (port 8080 by default) so your phone can control it over your local network. Only browsers that paired with your PIN or QR code can use it. The connection is plain HTTP inside your network and never goes through the internet or a third party.
+**Your phone and your PC.** Resound runs a small web server on your PC (port 8080 by default) so your phone can control it over your local network. Only browsers that paired with your PIN or QR code can use it. The connection is plain HTTP inside your network and never goes through the internet or a third party. Everything the remote's page needs (icons, the emoji picker and its emoji list) comes from Resound itself, and the page tells the browser not to load anything from elsewhere, so your phone contacts no other server while you use it.
 
 **Connections Resound makes itself:**
 
@@ -29,11 +29,6 @@ None of this is sent anywhere. Uninstalling Resound deletes this folder.
 
 Links in Resound (VB-Audio's website and donation page, this project's pages) open in your browser only when you click them.
 
-**Connections your phone's browser makes for the remote's page.** The remote page loads two components from public content delivery networks, so these services see your phone's IP address and a normal browser request:
-
-- the Material Symbols icon font from Google Fonts (`fonts.googleapis.com`, `fonts.gstatic.com`), see [Google's privacy policy](https://policies.google.com/privacy);
-- the emoji picker and its emoji data from jsDelivr (`cdn.jsdelivr.net`), see [jsDelivr's privacy policy](https://www.jsdelivr.com/terms/privacy-policy-jsdelivr-net).
-
 ## Changes to your system
 
 Resound changes Windows settings only when you ask it to, and tells you before it does:
@@ -43,7 +38,8 @@ Resound changes Windows settings only when you ask it to, and tells you before i
 - installing VB-Cable (with Windows' permission prompt), and restoring your default audio devices if VB-Cable's setup changed them;
 - turning on "Listen to this device" for your microphone so it reaches the virtual cable (with Windows' permission prompt);
 - a Windows Firewall rule that lets your phone connect (with Windows' permission prompt);
-- muting your microphone and pressing your push-to-talk key while a sound plays, if you turn these on.
+- muting your microphone and pressing your push-to-talk key while a sound plays, if you turn these on;
+- watching the keyboard for your pause and stop keys, only while you have set at least one. Resound looks only for those keys; it doesn't record, store or send anything you type.
 
 ## Contact
 

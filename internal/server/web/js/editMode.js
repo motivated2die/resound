@@ -28,9 +28,9 @@ const editMode = (() => {
         // --- NEW CODE END ---
 
         // Change icon based on state
-        const editIcon = editButton?.querySelector('.material-symbols-outlined');
+        const editIcon = editButton?.querySelector('.icon');
         if (editIcon) {
-            editIcon.textContent = isEditModeActive ? 'done' : 'edit';
+            editIcon.dataset.icon = isEditModeActive ? 'done' : 'edit';
         }
 
         // Update cursor for sound cards only if the container exists

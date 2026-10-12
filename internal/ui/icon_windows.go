@@ -77,6 +77,39 @@ func (c *canvas) blit(d *dib, x, y int32) {
 	procDeleteDC.Call(src)
 }
 
+type glowKey struct {
+	spec  glowSpec
+	scale int32 // one logical pixel's size, for the cache only
+}
+
+// glowCache holds the rendered glows per DPI scale (UI thread only).
+var glowCache = map[glowKey]*dib{}
+
+// glows draws the background glows of a panel of w×h pixels (see
+// glow.go): the edge glow at the right edge a fixed distance above the
+// bottom, and the corner glow in the top left corner. Both ignore scrolling.
+func (c *canvas) glows(w, h int32) {
+	// Right edge: the box holds the left half of the light.
+	rx, ry := c.px(edgeGlow.radiusXL), c.px(edgeGlow.radiusYL)
+	c.glow(edgeGlow, rx, 2*ry, float64(rx), float64(ry), w-rx, h-c.px(glowBottomL)-ry)
+	// Top left corner: the box holds the light's bottom right quarter.
+	rx, ry = c.px(cornerGlow.radiusXL), c.px(cornerGlow.radiusYL)
+	c.glow(cornerGlow, rx, ry, 0, 0, 0, 0)
+}
+
+// glow draws a bw×bh box of g's light centred at (cx, cy) inside the box,
+// with the box's top left corner at (x, y).
+func (c *canvas) glow(g glowSpec, bw, bh int32, cx, cy float64, x, y int32) {
+	key := glowKey{g, c.px(100)}
+	d, ok := glowCache[key]
+	if !ok {
+		rx, ry := float64(c.px(g.radiusXL)), float64(c.px(g.radiusYL))
+		d = newDIB(glowPixels(int(bw), int(bh), cx, cy, rx, ry, colAccent, g), bw, bh)
+		glowCache[key] = d
+	}
+	c.blit(d, x, y)
+}
+
 // icon draws an embedded icon of logical size sizeL, centred in box, in
 // color. Unknown icons draw nothing (go test checks all of them render).
 func (c *canvas) icon(name Icon, box rect, sizeL int, color uint32) {

@@ -27,13 +27,13 @@ const layoutManager = (() => {
         const nextModeIndex = (currentModeIndex + 1) % layoutModes.length;
         const nextMode = layoutModes[nextModeIndex];
 
-        const layoutIcon = layoutButton?.querySelector('.material-symbols-outlined');
+        const layoutIcon = layoutButton?.querySelector('.icon');
         if (layoutIcon) {
             switch (nextMode) {
-                case 'grid-3': layoutIcon.textContent = 'view_module'; break;
-                case 'grid-2': layoutIcon.textContent = 'view_comfy'; break;
-                case 'list': layoutIcon.textContent = 'view_list'; break;
-                default: layoutIcon.textContent = 'view_module';
+                case 'grid-3': layoutIcon.dataset.icon = 'view_module'; break;
+                case 'grid-2': layoutIcon.dataset.icon = 'view_comfy'; break;
+                case 'list': layoutIcon.dataset.icon = 'view_list'; break;
+                default: layoutIcon.dataset.icon = 'view_module';
             }
         }
          // console.log(`Layout mode applied: ${layoutMode}`);

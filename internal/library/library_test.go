@@ -406,3 +406,36 @@ func TestMarkChanged(t *testing.T) {
 		t.Fatal("MarkChanged kept the hash")
 	}
 }
+
+// MapVolumes converts every custom volume and saves the result.
+func TestMapVolumes(t *testing.T) {
+	root := t.TempDir()
+	touch(t, filepath.Join(root, "a.mp3"), time.Now())
+	touch(t, filepath.Join(root, "b.mp3"), time.Now())
+	lib := open(t, t.TempDir())
+	lib.Scan([]string{root})
+	a, b := ID(filepath.Join(root, "a.mp3")), ID(filepath.Join(root, "b.mp3"))
+	local, remote := 50, 150
+	if _, _, err := lib.Update(a, func(s *SoundSettings) { s.LocalVolume, s.RemoteVolume = &local, &remote }); err != nil {
+		t.Fatal(err)
+	}
+
+	n, err := lib.MapVolumes(func(v int) int {
+		if v < 100 {
+			return v + 1
+		}
+		return v
+	})
+	if err != nil || n != 1 {
+		t.Fatalf("MapVolumes = %d, %v; want 1 sound changed", n, err)
+	}
+	again := reopen(t, lib)
+	again.Scan([]string{root})
+	s, _, _ := again.Sound(a)
+	if s.LocalVolume == nil || *s.LocalVolume != 51 || s.RemoteVolume == nil || *s.RemoteVolume != 150 {
+		t.Fatalf("volumes after reopening: %+v", s)
+	}
+	if s, _, _ := again.Sound(b); s.LocalVolume != nil || s.RemoteVolume != nil {
+		t.Fatalf("a sound without custom volumes got some: %+v", s)
+	}
+}

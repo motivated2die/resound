@@ -8,7 +8,7 @@ const screenWakeLock = (() => {
         const toggleLabel = document.getElementById('wake-lock-toggle-label');
         const toggleContainer = document.getElementById('wake-lock-toggle-label-container');
         if (indicator) {
-            indicator.textContent = 'disabled_visible';
+            indicator.querySelector('.icon').dataset.icon = 'disabled_visible';
             indicator.title = 'Wake Lock library failed to load';
             indicator.classList.add('failed');
             indicator.style.cursor = 'default';
@@ -86,17 +86,17 @@ const screenWakeLock = (() => {
         if (wakeLockIndicator) {
             wakeLockIndicator.classList.remove('active', 'failed');
             if (enableFailed) {
-                wakeLockIndicator.textContent = 'disabled_visible';
+                wakeLockIndicator.querySelector('.icon').dataset.icon = 'disabled_visible';
                 wakeLockIndicator.title = 'Screen Lock Prevention Failed/Unavailable';
                 wakeLockIndicator.classList.add('failed');
                 wakeLockIndicator.style.cursor = 'default';
             } else if (isEnabled) {
-                wakeLockIndicator.textContent = 'visibility';
+                wakeLockIndicator.querySelector('.icon').dataset.icon = 'visibility';
                 wakeLockIndicator.title = 'Screen Lock Prevention Active (Click to disable)';
                 wakeLockIndicator.classList.add('active');
                 wakeLockIndicator.style.cursor = 'pointer';
             } else {
-                wakeLockIndicator.textContent = 'visibility_off';
+                wakeLockIndicator.querySelector('.icon').dataset.icon = 'visibility_off';
                 wakeLockIndicator.title = 'Screen Lock Prevention Inactive (Click to enable)';
                 wakeLockIndicator.style.cursor = 'pointer';
             }

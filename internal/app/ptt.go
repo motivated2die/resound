@@ -23,8 +23,12 @@ type pttState struct {
 	pressed input.Combo // keys currently held down by Resound
 
 	capturing bool
+	target    captureTarget // what the recorded key is for
 	captured  input.Combo
 	down      map[uint16]bool
+
+	hotkeyNote string        // why the last recorded hotkey wasn't added
+	noteFor    captureTarget // the section hotkeyNote belongs to
 
 	sendIn int // seconds until "send to game" taps the key; 0 = idle
 }
@@ -89,9 +93,12 @@ func (a *App) setPTTKeys(keys input.Combo) {
 	a.render()
 }
 
-func (a *App) startPTTCapture() {
+func (a *App) startPTTCapture() { a.startCapture(capturePTT) }
+
+// startCapture records the next key or combination pressed over the panel.
+func (a *App) startCapture(t captureTarget) {
 	p := &a.ptt
-	p.capturing = true
+	p.capturing, p.target, p.hotkeyNote = true, t, ""
 	p.captured = nil
 	clear(p.down)
 	a.render()
@@ -106,8 +113,9 @@ func (a *App) togglePTTWhilePlaying() {
 	a.render()
 }
 
-// onPanelKey records the push-to-talk combination: every key or mouse
-// button pressed until the first one is released. Esc cancels.
+// onPanelKey records a combination: every key or mouse button pressed
+// until the first one is released. Hotkeys take keyboard keys only. Esc
+// cancels.
 func (a *App) onPanelKey(ev ui.KeyEvent) bool {
 	p := &a.ptt
 	if !p.capturing {
@@ -120,6 +128,9 @@ func (a *App) onPanelKey(ev ui.KeyEvent) bool {
 		}
 		return true
 	}
+	if p.target != capturePTT && input.IsMouse(ev.VK) {
+		return true
+	}
 	if ev.Down {
 		if !p.down[ev.VK] {
 			p.down[ev.VK] = true
@@ -130,7 +141,11 @@ func (a *App) onPanelKey(ev ui.KeyEvent) bool {
 	}
 	if len(p.captured) > 0 {
 		p.capturing = false
-		a.setPTTKeys(slices.Clone(p.captured))
+		if p.target == capturePTT {
+			a.setPTTKeys(slices.Clone(p.captured))
+		} else {
+			a.addHotkey(p.target, p.captured)
+		}
 	}
 	return true
 }
