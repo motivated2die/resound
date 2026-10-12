@@ -73,7 +73,7 @@ func (a *App) wizardNext(done bool) ui.Row {
 
 func (a *App) wizardWelcome() []ui.Row {
 	return []ui.Row{
-		ui.Brand(a.logo, "RESOUND", "Guided setup · about 2 minutes", nil),
+		ui.Brand(a.logo, "RESOUND", "", "Guided setup · about 2 minutes", nil, nil),
 		ui.Paragraph("Welcome! Play sounds into games and voice chat, controlled from your phone. "+
 			"You hear them on your speakers; the others hear them through your microphone.", ui.ToneNormal),
 		ui.Paragraph("Five short steps: add your sounds, check your speakers, connect voice chat, set your push-to-talk key and pair your phone.", ui.ToneMuted),

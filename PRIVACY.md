@@ -23,6 +23,8 @@ None of this is sent anywhere. Uninstalling Resound deletes this folder.
 
 | When | To | What is sent |
 |---|---|---|
+| Shortly after Resound starts, then every 12 hours (turn off under Settings → App & startup → "Check for updates automatically") | `api.github.com` (GitHub) | A request for this project's latest release, to see whether a newer version exists. It carries Resound's version in the user agent and nothing else. GitHub sees your IP address, see [GitHub's privacy statement](https://docs.github.com/site-policy/privacy-policies/github-general-privacy-statement) |
+| You choose "Update now" | `github.com` and GitHub's download servers (`*.githubusercontent.com`) | A normal download request for the new release's `Resound.exe` and `SHA256SUMS.txt` |
 | You choose "Install VB-Cable" | `download.vb-audio.com` (VB-Audio Software) | A normal download request for the VB-Cable driver package. As with any download, VB-Audio's server sees your IP address. See [VB-Audio's website](https://vb-audio.com) for their policies |
 
 Links in Resound (VB-Audio's website and donation page, this project's pages) open in your browser only when you click them.
@@ -37,6 +39,7 @@ Links in Resound (VB-Audio's website and donation page, this project's pages) op
 Resound changes Windows settings only when you ask it to, and tells you before it does:
 
 - installing itself for your user (Installed apps entry, Start Menu shortcut), and starting with Windows only if you turn that on;
+- updating itself when you choose "Update now";
 - installing VB-Cable (with Windows' permission prompt), and restoring your default audio devices if VB-Cable's setup changed them;
 - turning on "Listen to this device" for your microphone so it reaches the virtual cable (with Windows' permission prompt);
 - a Windows Firewall rule that lets your phone connect (with Windows' permission prompt);

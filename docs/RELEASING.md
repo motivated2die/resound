@@ -30,7 +30,7 @@ Resound uses [semantic versioning](https://semver.org): `MAJOR.MINOR.PATCH`, and
 | New features (settings and data stay compatible) | MINOR | 0.7.1 → 0.8.0 |
 | Incompatible changes; or "1.0, it's stable now" | MAJOR | 0.9.3 → 1.0.0 |
 
-- **Pre-releases** add a suffix: `v0.8.0-rc.1`, `v0.8.0-rc.2`, then `v0.8.0`. `rc` means release candidate; `-beta.1` works too. They become GitHub pre-releases, which the "latest release" link and the future auto-update skip, so you can hand them to testers safely.
+- **Pre-releases** add a suffix: `v0.8.0-rc.1`, `v0.8.0-rc.2`, then `v0.8.0`. `rc` means release candidate; `-beta.1` works too. They become GitHub pre-releases, which the "latest release" link and the in-app update skip, so you can hand them to testers safely.
 - **A version is used once.** Once a release with a version is published, never publish different files under that number again; release the next PATCH instead.
 - The version in the source (`app.Version = "0.6.0-dev"` in `internal/app/app.go`, and `winres/winres.json`) is only the default for development builds. Release builds take the version from the tag. You don't edit any file to make a release.
 
@@ -103,7 +103,7 @@ If a job fails, open it to read the log. See [Fixing mistakes](#fixing-mistakes)
 2. Optionally download `Resound.exe`, run it on a test PC, and check that its hash matches the notes.
 3. **Publish release.**
 
-Done: the release is public, and `https://github.com/motivated2die/resound/releases/latest` points at it (for pre-releases: not).
+Done: the release is public, and `https://github.com/motivated2die/resound/releases/latest` points at it (for pre-releases: not). Installed copies show the update dot at their next start or within 12 hours, and update with one click. **Publishing is what ships an update to every user**, so only publish an exe you have tested.
 
 ### Release candidates
 
@@ -174,9 +174,10 @@ Before tagging (step 2), with the locally built exe, ideally on a clean user acc
 3. Install: the welcome notice appears; Start Menu and Installed apps show the new version.
 4. The guided setup: all five steps, and skipping them.
 5. Phone pairing by QR code; a sound plays to both outputs; push-to-talk works.
-6. Update over the previous release: settings, library and pairing are kept, and "updated" is shown.
+6. Update over the previous release: settings, library and pairing are kept, and "updated" is shown. Also the in-app update from the previous version, with `cmd/devupdate` offering this exe ([BUILDING.md](BUILDING.md#testing-updates-locally)).
 7. Uninstall.
 
 After publishing:
 
 8. The release page shows `Resound.exe` and `SHA256SUMS.txt`, and `releases/latest` points at it (not for pre-releases).
+9. An installed previous version shows the update dot (Settings → App & startup → "Check now") and updates to it.

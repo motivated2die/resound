@@ -10,6 +10,9 @@ import (
 )
 
 func (a *App) appSummary() (string, ui.Tone) {
+	if a.update.latest != nil {
+		return "v" + Version + " · update to v" + a.update.latest.Version, ui.ToneWarning
+	}
 	if a.portable {
 		return "v" + Version + " · portable", ui.ToneMuted
 	}
@@ -26,8 +29,9 @@ func (a *App) appPage() []ui.Row {
 		ui.Text("Version", Version, ui.ToneNormal),
 		ui.Text("Mode", mode, ui.ToneNormal),
 		ui.Toggle("Start with Windows", install.AutoStartEnabled(), a.toggleAutoStart),
-		ui.Separator(),
 	}
+	rows = append(rows, a.updateRows()...)
+	rows = append(rows, ui.Separator())
 	if a.portable {
 		return append(rows,
 			ui.Text("Development builds never install themselves.", "", ui.ToneMuted),

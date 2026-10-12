@@ -12,11 +12,12 @@ Resound lives in the system tray and is a single small program: no runtime to in
 - **Mic mute and push-to-talk.** While a sound plays, Resound can mute your real microphone and hold your game's push-to-talk key. "Talk through" lets you speak over a sound.
 - **Guided setup.** A short first-run setup covers sounds, speakers, voice chat, push-to-talk and the phone. It can install VB-Cable for you (downloaded from VB-Audio, signature checked).
 - **Backup and restore** of all settings in one click.
+- **One-click updates.** Resound shows a dot next to its name when a new release is out, and updates itself without touching your settings.
 
 ## Download and install
 
 1. Download **Resound.exe** from the [latest release](https://github.com/motivated2die/resound/releases/latest).
-2. Run it. Resound installs itself for your Windows user (`%LOCALAPPDATA%\Programs\Resound`), adds a Start Menu entry and starts. Running a newer download later updates it and keeps your settings.
+2. Run it. Resound installs itself for your Windows user (`%LOCALAPPDATA%\Programs\Resound`), adds a Start Menu entry and starts. When a new release is out, Resound shows a dot next to its name; Settings → App & startup → "Update now" updates it and keeps your settings. Running a newer download by hand does the same.
 3. Click the tray icon and follow the guided setup.
 
 **"Windows protected your PC"?** Releases are not code-signed yet (see [Code signing policy](#code-signing-policy)), so Windows SmartScreen may warn about the download. Choose **More info → Run anyway**. To make sure the file is the one published here, compare its SHA-256 with the one in the release notes:

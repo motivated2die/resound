@@ -87,6 +87,8 @@ type App struct {
 	fwBusy   bool   // waiting for the elevated firewall helper
 	fwResult string // last firewall helper result
 	fwFailed bool
+
+	update updater // check for and install new releases (update.go)
 }
 
 // Run starts the host (or the elevated routing helper) and blocks until it
@@ -207,6 +209,8 @@ func Run() int {
 	logx.Printf("startup: starting remote server")
 	a.startServer()
 
+	a.startUpdateChecks()
+
 	a.updateTooltip()
 	logx.Printf("ready")
 	switch {
@@ -257,6 +261,7 @@ func (a *App) save() {
 
 func (a *App) quit() {
 	a.cancelCableDownload()
+	a.cancelUpdate()
 	if a.srv != nil {
 		a.srv.Close() // before the UI thread stops answering server calls
 	}

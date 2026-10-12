@@ -108,7 +108,7 @@ func (a *App) homePage() []ui.Row {
 	if text, ok := a.playingStatus(); ok {
 		status = text
 	}
-	rows := []ui.Row{ui.Brand(a.logo, "RESOUND", status, a.playbackProgress)}
+	rows := []ui.Row{ui.Brand(a.logo, "RESOUND", "v"+Version, status, a.playbackProgress, a.brandUpdate())}
 	for _, is := range issues {
 		p := is.page
 		rows = append(rows, ui.Nav(is.label, is.detail, is.tone, func() { a.openPage(p) }))

@@ -19,6 +19,7 @@ Resound is a Windows tray app that plays sounds into a virtual audio cable (so o
 ```
 cmd/resound/     entry point
 cmd/devremote/     phone remote with the real library but no audio, for front-end work on any OS
+cmd/devupdate/     stand-in for GitHub's release API, for testing the in-app update locally
 internal/app/      app state, panel pages, playback holds, push-to-talk, server bridge
 internal/audio/    WASAPI outputs, mixer, progressive decoding
 internal/wincom/   Core Audio COM plumbing and go-wca fixes
@@ -28,6 +29,7 @@ internal/input/    push-to-talk via SendInput, key presets
 internal/library/  sound folders → tabs/sounds with stable IDs
 internal/server/   phone API, PIN/QR auth, embedded web app (web/)
 internal/install/  install/update/uninstall, autostart, firewall
+internal/update/   latest GitHub release, version comparison, checked download
 internal/backup/   settings backups (zip), restore, backup index
 internal/elevate/  one-shot elevated helper runs (UAC)
 internal/ui/       tray, panel, rows, dropdown, tooltips, dialogs (Win32 + GDI)
@@ -68,6 +70,7 @@ Helper roles run before the single-instance mutex (`Local\Resound.SingleInstance
 | `library` | Sound index (`library.json`): folders → tabs → sounds with stable IDs, rename/move matching (`reconcile.go`), per-sound settings and phone layouts, background indexer (`indexer.go`) |
 | `server` | HTTP API (Soundux Remote compatible), auth (PIN, sessions, QR pairing), LAN addresses, embedded `web/` |
 | `install` | Drop-in install/update, Installed-apps entry, Start Menu shortcut, autostart, uninstall, firewall helper |
+| `update` | The latest published full release on GitHub, semver comparison, download of `Resound.exe` checked against the release's `SHA256SUMS.txt` (portable, unit-tested against a fake GitHub) |
 | `elevate` | Runs this exe with `runas` and returns its exit code |
 | `ui` | Tray icon, popup panel, rows, dropdown, tooltips, dialogs, file/folder pickers (Win32 + GDI); embedded SVG icons and images (`icon.go`, `icons/`) |
 | `assets` | The logo PNG embedded for the panel header (`assets.go`) |
@@ -214,6 +217,14 @@ Failures (no network, declined UAC, bad signature) leave the manual "Install man
 - **Update detection:** a version string in `installed_version.txt`. A different string means an update.
 - **Replacing a running exe:** the old one is renamed to `.old`, and a later start deletes it.
 - **Uninstall:** the exe deletes itself through a delayed hidden `cmd.exe`.
+- **In-app update** (`app/update.go`, package `update`):
+  1. **Check.** 10 s after start, then every 12 hours (unless turned off; "Check now" always works): `GET https://api.github.com/repos/motivated2die/resound/releases/latest`. GitHub's "latest" is the newest *published, non-pre-release* release, so drafts and `-rc` releases are never offered; a tag with a pre-release suffix is ignored too. Unauthenticated, GitHub allows 60 requests per hour per IP address, far more than needed.
+  2. **Compare.** Semver on the numbers; a full release beats a pre-release or dev build of the same numbers (`0.8.0` > `0.8.0-dev`). A newer release shows a dot and "Update" in the home page's header (next to the version), and "update to vX" on Settings → App & startup.
+  3. **Download** ("Update now" on App & startup): `SHA256SUMS.txt`, then `Resound.exe` into `%LOCALAPPDATA%\Resound\update\`, over HTTPS from `github.com`/`*.githubusercontent.com` only (also after redirects), size-limited, with its SHA-256 compared to the sums file.
+  4. **Start** the downloaded exe. It is a normal non-portable copy outside the install folder, so `install.Ensure` takes over exactly as for a manual download: it asks this instance to quit (`wmQuitApp`, which releases the mic and keys and saves), replaces the installed exe and starts it with `--welcome=update`. If this instance is still running a minute later, the panel shows an error and the update can be retried. The next start removes the `update\` folder.
+  - Development builds check and show updates but don't install them.
+  - `RESOUND_UPDATE_API` replaces the API base for tests (`cmd/devupdate`). It must be HTTPS or HTTP to localhost, and assets are then only fetched from that host.
+  - The checksum comes from the same release as the exe, so it catches broken downloads, not a compromised GitHub account. Code signing (RELEASING.md) will allow an Authenticode check on top.
 - **Portable builds never install.** A build is portable when a `go.mod` sits next to the exe or one folder up, a `portable` file sits next to it, or `RESOUND_PORTABLE=1` is set.
 
 ## Data files (`%LOCALAPPDATA%\Resound`)
@@ -225,6 +236,7 @@ Failures (no network, declined UAC, bad signature) leave the manual "Install man
 | `sounds.json.migrated` | Per-sound settings of earlier versions, kept after migration |
 | `remote.json` | PIN and session token hashes |
 | `installed_version.txt` | Version of the installed copy |
+| `update\` | A downloaded update, only until the updated copy has started |
 | `vbcable-install.json` | A VB-Cable install waiting for the Windows restart (removed after it) |
 | `vbcable\` | The downloaded VB-Cable pack, only while its setup runs |
 | `backups\` | Backup zips (`Resound-backup-<date>_<time>.zip`) and `index.json`, which also lists backups saved elsewhere |
