@@ -1,0 +1,11 @@
+# Build output
+/resound.exe
+/resound-debug.exe
+/bin/
+*.exe~
+
+# go-winres generated resources (regenerate with `go-winres make`)
+/cmd/resound/rsrc_windows_*.syso
+
+# Release builds (scripts/build-release.ps1 -Out dist)
+/dist/

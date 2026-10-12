@@ -1,0 +1,10 @@
+# Keep LF everywhere, also on Windows checkouts (core.autocrlf=true, which is
+# the default on GitHub's Windows runners), so gofmt and builds see the same
+# bytes on every machine.
+* text=auto eol=lf
+
+*.png binary
+*.ico binary
+*.syso binary
+*.exe binary
+*.zip binary

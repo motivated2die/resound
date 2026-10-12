@@ -1,0 +1,399 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+
+    <!-- PWA Essential Meta Tags -->
+    <meta name="theme-color" content="#1c1d22">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+
+    <!-- Manifest and Icons -->
+    <link rel="manifest" href="/manifest.json">
+    <link rel="icon" href="/assets/favicon.ico" sizes="any">
+    <link rel="icon" type="image/png" sizes="192x192" href="/assets/resound-192.png">
+    <link rel="apple-touch-icon" href="/assets/resound-192.png">
+
+    <title>Resound · Sign in</title>
+
+    <style>
+        /* Same palette as the desktop panel (see css/styles.css). */
+        :root {
+            --v-primary-base: #50dea8;
+            --v-primary-lighten1: #7ae8bf;
+            --on-primary: #102a20;
+            --v-secondary-base: #3a3d46;
+            --v-secondary-darken1: #2a2c33;
+            --v-background-dark: #1c1d22;
+            --v-surface-dark: #25272d;
+            --text-primary: #ececf0;
+            --text-secondary: #9a9ca6;
+            --text-caption: #7e818c;
+            --error-color: #f2416f;
+            --border-radius: 10px;
+            --transition: all 0.2s ease;
+        }
+
+        /* This helps with iOS PWA status bar appearance */
+        @supports (padding-top: env(safe-area-inset-top)) {
+            body {
+                padding-top: env(safe-area-inset-top);
+                padding-bottom: env(safe-area-inset-bottom);
+                padding-left: env(safe-area-inset-left);
+                padding-right: env(safe-area-inset-right);
+            }
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: "Segoe UI", system-ui, -apple-system, Roboto, sans-serif;
+            background-color: var(--v-background-dark);
+            color: var(--text-primary);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .login-container {
+            width: 100%;
+            max-width: 350px;
+            background-color: var(--v-surface-dark);
+            border-radius: 14px;
+            padding: 30px;
+            box-shadow: 0 12px 36px rgba(0, 0, 0, 0.45);
+            text-align: center;
+        }
+
+        .logo {
+            width: 72px;
+            height: 72px;
+            margin-bottom: 16px;
+        }
+
+        h1 {
+            font-size: 22px;
+            font-weight: 600;
+            letter-spacing: 0.12em;
+            margin-bottom: 10px;
+        }
+
+        .subtitle {
+            color: var(--text-secondary);
+            margin-bottom: 30px;
+            font-size: 14px;
+        }
+
+        form {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .pin-input-container {
+            display: flex;
+            justify-content: space-between;
+            gap: 3%;
+        }
+
+        .pin-digit {
+            width: 50%;
+            height: 60px;
+            background-color: var(--v-secondary-darken1);
+            border: 2px solid transparent;
+            border-radius: var(--border-radius);
+            text-align: center;
+            font-size: 24px;
+            color: var(--text-primary);
+            transition: var(--transition);
+            /* Remove spinners for number input */
+            -moz-appearance: textfield;
+        }
+        .pin-digit::-webkit-outer-spin-button,
+        .pin-digit::-webkit-inner-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+
+        .pin-digit:focus {
+            border-color: var(--v-primary-base);
+            outline: none;
+        }
+
+        button {
+            background-color: var(--v-primary-base);
+            color: var(--on-primary);
+            border: none;
+            border-radius: var(--border-radius);
+            padding: 15px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: var(--transition);
+            margin-top: 10px;
+            height: 50px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        button:disabled {
+            background-color: var(--v-secondary-base);
+            color: var(--text-secondary);
+            cursor: not-allowed;
+            opacity: 0.6;
+        }
+
+        button:not(:disabled):hover {
+            background-color: var(--v-primary-lighten1);
+        }
+
+        .error-message {
+            color: var(--error-color);
+            font-size: 14px;
+            min-height: 20px;
+        }
+
+        #stored-token {
+            display: none;
+        }
+
+        /* Loading spinner */
+        .loader {
+            display: none;
+            width: 24px;
+            height: 24px;
+            border: 3px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            border-top-color: var(--on-primary);
+            animation: spin 1s ease-in-out infinite;
+            margin: 0 auto;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        button.loading .loader {
+            display: inline-block;
+        }
+
+        button.loading span {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="login-container">
+        <img src="assets/resound-192.png" alt="" class="logo">
+        <h1>RESOUND</h1>
+        <p class="subtitle">Enter the PIN from your PC: click the Resound tray icon, then open Phone remote. Or scan the QR code shown there.</p>
+
+        <form id="login-form">
+            <div class="pin-input-container">
+                <input type="tel" class="pin-digit" maxlength="1" pattern="[0-9]" inputmode="numeric" required autofocus>
+                <input type="tel" class="pin-digit" maxlength="1" pattern="[0-9]" inputmode="numeric" required>
+                <input type="tel" class="pin-digit" maxlength="1" pattern="[0-9]" inputmode="numeric" required>
+                <input type="tel" class="pin-digit" maxlength="1" pattern="[0-9]" inputmode="numeric" required>
+                <input type="tel" class="pin-digit" maxlength="1" pattern="[0-9]" inputmode="numeric" required>
+                <input type="tel" class="pin-digit" maxlength="1" pattern="[0-9]" inputmode="numeric" required>
+            </div>
+
+            <button type="submit" id="login-button" disabled>
+                <span>Unlock Remote</span>
+                <div class="loader"></div>
+
+            </button>
+            <p class="subtitle" style="color: var(--text-caption); font-size: 13px;">This device stays signed in.</p>
+        </form>
+
+        <div class="error-message" id="error-message"></div>
+        <input type="hidden" id="stored-token">
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // Check for existing session token
+            const checkSession = async () => {
+                try {
+                    const response = await fetch('/api/auth/check', {
+                        method: 'GET',
+                        credentials: 'include' // Important: sends cookies with the request
+                    });
+
+                    if (response.ok) {
+                        // Token is valid, redirect to main app
+                        window.location.href = '/index.html';
+                    }
+                } catch (error) {
+                    console.log('No valid session or error checking session:', error);
+                }
+            };
+
+            // Check session on page load
+            checkSession();
+
+            // PIN input handling
+            const pinDigits = document.querySelectorAll('.pin-digit');
+            const loginButton = document.getElementById('login-button');
+            const errorMessage = document.getElementById('error-message');
+            const loginForm = document.getElementById('login-form');
+
+            const isAllFilled = () => Array.from(pinDigits).every(digit => digit.value.length === 1);
+
+            pinDigits.forEach((digit, index) => {
+                digit.addEventListener('input', (e) => {
+                    // Ensure only numbers are entered
+                    digit.value = digit.value.replace(/[^0-9]/g, '');
+
+                    if (digit.value.length === 1) {
+                        if (index < pinDigits.length - 1) {
+                            pinDigits[index + 1].focus();
+                        }
+                    }
+
+                    // Enable button if all digits are filled
+                    loginButton.disabled = !isAllFilled();
+                });
+
+                digit.addEventListener('keydown', (e) => {
+                    if (e.key === 'Backspace') {
+                        // If current input is empty, move focus to previous and clear it
+                        if (!digit.value && index > 0) {
+                            pinDigits[index - 1].focus();
+                            pinDigits[index - 1].value = '';
+                            loginButton.disabled = true;
+                            e.preventDefault(); // Prevent double backspace effect
+                        } else if (digit.value.length === 1) {
+                            // If current input has value, just clear it
+                            // Default backspace behavior will clear the input
+                            loginButton.disabled = true;
+                        }
+                    } else if (e.key >= '0' && e.key <= '9') {
+                        // If the input already has a value, replace it and move focus
+                        if (digit.value.length === 1 && index < pinDigits.length - 1) {
+                           // Allow the input event to handle focus change
+                           // but ensure the next input gets the new value
+                           // This makes pasting work better
+                           pinDigits[index + 1].focus();
+                           // Set a tiny timeout to allow the current input to update first
+                           setTimeout(() => {
+                               if(pinDigits[index + 1].value === '') {
+                                  pinDigits[index + 1].value = e.key;
+                                  pinDigits[index + 1].dispatchEvent(new Event('input')); // Trigger input event
+                               }
+                           }, 0);
+                           // Prevent default input if moving focus
+                           e.preventDefault();
+                           digit.value = e.key; // Manually update current digit
+                           digit.dispatchEvent(new Event('input')); // Trigger input event
+                        }
+                    } else if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && e.key !== 'Tab') {
+                        // Prevent non-numeric characters
+                        e.preventDefault();
+                    }
+                });
+
+                digit.addEventListener('paste', (e) => {
+                    e.preventDefault();
+                    const pasteData = (e.clipboardData || window.clipboardData).getData('text').replace(/[^0-9]/g, '');
+                    if (!pasteData) return;
+
+                    let currentDigit = index;
+                    for (let i = 0; i < pasteData.length && currentDigit < pinDigits.length; i++) {
+                        pinDigits[currentDigit].value = pasteData[i];
+                        pinDigits[currentDigit].dispatchEvent(new Event('input')); // Trigger input event for validation
+                        currentDigit++;
+                    }
+                    if (currentDigit < pinDigits.length) {
+                        pinDigits[currentDigit].focus();
+                    } else {
+                        pinDigits[pinDigits.length - 1].focus(); // Focus last if paste filled everything
+                    }
+                    loginButton.disabled = !isAllFilled();
+                });
+            });
+
+            // Handle form submission
+            loginForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                if (loginButton.disabled) return; // Prevent submission if disabled
+
+                // Get PIN from inputs
+                const pin = Array.from(pinDigits).map(digit => digit.value).join('');
+
+                // Show loading state
+                loginButton.classList.add('loading');
+                loginButton.disabled = true; // Disable while processing
+                errorMessage.textContent = '';
+
+                try {
+                    const response = await fetch('/api/auth/login', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        credentials: 'include', // Important for cookies
+                        body: JSON.stringify({ pin })
+                    });
+
+                    // Check if response is JSON before parsing
+                    const contentType = response.headers.get("content-type");
+                    let data = {};
+                    if (contentType && contentType.indexOf("application/json") !== -1) {
+                         data = await response.json();
+                    } else {
+                        // Handle non-JSON responses if necessary
+                        console.error("Received non-JSON response:", await response.text());
+                        throw new Error("Unexpected server response");
+                    }
+
+
+                    if (response.ok && data.success) {
+                        // Login successful, redirect to app
+                        window.location.href = '/index.html';
+                    } else {
+                        // Show error message
+                        errorMessage.textContent = data.error || 'Invalid PIN. Please try again.';
+
+                        // Clear all PIN fields
+                        pinDigits.forEach(digit => {
+                            digit.value = '';
+                        });
+
+                        // Focus first field
+                        pinDigits[0].focus();
+
+                        // Re-enable button (still disabled due to empty fields)
+                        loginButton.disabled = true; // Keep disabled as inputs are now empty
+                    }
+                } catch (error) {
+                    console.error('Error:', error);
+                    errorMessage.textContent = 'Connection error or invalid response. Please try again.';
+                    loginButton.disabled = true; // Keep disabled on error
+                } finally {
+                    // Hide loading state only if not redirecting
+                    if (!errorMessage.textContent.startsWith("Connection error")) {
+                       // If login failed, remove loading and re-evaluate disabled state
+                       loginButton.classList.remove('loading');
+                       loginButton.disabled = !isAllFilled();
+                    } else {
+                        // On connection error, keep spinner and disabled state
+                        loginButton.classList.remove('loading'); // remove spinner on error
+                    }
+                }
+            });
+        });
+    </script>
+</body>
+</html>

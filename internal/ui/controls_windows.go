@@ -1,0 +1,405 @@
+package ui
+
+// Composite controls: sliders, button groups, wrapped paragraphs and the
+// guided-setup header. Like all rows they are immutable values rebuilt on
+// every render; sliders keep their drag attached by id (see dragger).
+
+// --- Slider ------------------------------------------------------------------
+
+type sliderRow struct {
+	id, label, value string
+	pos, max, step   int
+	onChange         func(value int, done bool)
+}
+
+// Slider is a labelled value with a draggable track between − and +
+// buttons. The buttons move to the previous/next multiple of step; clicking
+// or dragging the track sets the value directly. onChange gets done=false
+// while the mouse moves and done=true for button clicks and on release, so
+// callers can apply every change but save only once. Values run from 0 to
+// maxValue. id must be unique on the page and stable across re-renders.
+func Slider(id, label, valueText string, value, maxValue, step int, onChange func(value int, done bool)) Row {
+	return sliderRow{id: id, label: label, value: valueText, pos: max(0, min(value, maxValue)),
+		max: max(1, maxValue), step: max(1, step), onChange: onChange}
+}
+
+const sliderBtnL = 28 // logical size of the − / + buttons
+
+func (sliderRow) height() int { return 56 }
+
+// geometry returns the − button, the track's hit area, the + button and the
+// track's value range (x of 0 and of max).
+func (s sliderRow) geometry(c *canvas, r rect) (minus, track, plus rect, x0, x1 int32) {
+	in := inset(c, r)
+	size := c.px(sliderBtnL)
+	top := r.Top + c.px(24)
+	minus = rect{in.Left, top, in.Left + size, top + size}
+	plus = rect{in.Right - size, top, in.Right, top + size}
+	track = rect{minus.Right + c.px(4), top, plus.Left - c.px(4), top + size}
+	knob := c.px(9)
+	return minus, track, plus, track.Left + knob, track.Right - knob
+}
+
+func (s sliderRow) segments(c *canvas, r rect) []rect {
+	minus, track, plus, _, _ := s.geometry(c, r)
+	return []rect{minus, track, plus}
+}
+
+func (s sliderRow) click(seg int) {
+	if s.onChange == nil {
+		return
+	}
+	switch seg {
+	case 0:
+		s.onChange(max(0, (s.pos-1)/s.step*s.step), true)
+	case 2:
+		s.onChange(min(s.max, (s.pos/s.step+1)*s.step), true)
+	}
+}
+func (sliderRow) keepsOpen() bool { return true }
+
+func (s sliderRow) dragID() string   { return "slider:" + s.id }
+func (s sliderRow) dragSegment() int { return 1 }
+func (s sliderRow) dragTo(c *canvas, r rect, x int32, done bool) {
+	_, _, _, x0, x1 := s.geometry(c, r)
+	v := s.pos
+	if x1 > x0 {
+		v = int((int64(x-x0)*int64(s.max) + int64(x1-x0)/2) / int64(x1-x0))
+		v = max(0, min(v, s.max))
+	}
+	if s.onChange != nil && (v != s.pos || done) {
+		s.onChange(v, done)
+	}
+}
+
+func (s sliderRow) paint(c *canvas, r rect, st rowState) {
+	in := inset(c, r)
+	caption := rect{in.Left, r.Top + c.px(2), in.Right, r.Top + c.px(22)}
+	c.text(s.label, rect{caption.Left, caption.Top, caption.Right - c.px(60), caption.Bottom}, fontBody, colText, dtLeft)
+	c.text(s.value, rect{caption.Right - c.px(60), caption.Top, caption.Right, caption.Bottom}, fontBold, colText, dtRight)
+
+	minus, track, plus, x0, x1 := s.geometry(c, r)
+	for _, b := range []struct {
+		box   rect
+		glyph string
+		seg   int
+	}{{minus, "−", 0}, {plus, "+", 2}} {
+		bg := colControl
+		if st.press == b.seg {
+			bg = shade(bg, -18)
+		} else if st.hover == b.seg {
+			bg = shade(bg, 14)
+		}
+		c.roundRect(b.box, c.px(8), bg)
+		c.text(b.glyph, b.box, fontBold, colText, dtCenter)
+	}
+
+	cy := track.Top + track.h()/2
+	thick := max(2, c.px(4))
+	kx := x0 + int32(int64(x1-x0)*int64(s.pos)/int64(s.max))
+	c.roundRect(rect{x0, cy - thick/2, x1, cy - thick/2 + thick}, thick, colControl)
+	if kx > x0 {
+		c.roundRect(rect{x0, cy - thick/2, kx, cy - thick/2 + thick}, thick, colAccent)
+	}
+	knob, knobCol := c.px(7), colText
+	switch {
+	case st.press == 1:
+		knob, knobCol = c.px(8), colAccent
+	case st.hover == 1:
+		knob = c.px(8)
+	}
+	c.circle(kx, cy, knob, knobCol)
+}
+
+// --- Buttons -----------------------------------------------------------------
+
+// Action is one button of a Buttons row.
+type Action struct {
+	Label    string
+	Icon     Icon // optional, drawn before the label
+	Style    ButtonStyle
+	Disabled bool
+	// Closes closes the panel before OnClick runs, e.g. for actions that
+	// open a dialog or another window.
+	Closes  bool
+	OnClick func()
+}
+
+type buttonsRow struct{ actions []Action }
+
+// Buttons puts several buttons side by side in one row, equally wide.
+func Buttons(actions ...Action) Row { return buttonsRow{actions} }
+
+func (buttonsRow) height() int { return 38 }
+
+func (b buttonsRow) boxes(c *canvas, r rect) []rect {
+	in := inset(c, r)
+	n := int32(max(1, len(b.actions)))
+	gap := c.px(8)
+	w := (in.w() - gap*(n-1)) / n
+	out := make([]rect, len(b.actions))
+	for i := range b.actions {
+		left := in.Left + int32(i)*(w+gap)
+		out[i] = rect{left, r.Top + c.px(3), left + w, r.Bottom - c.px(3)}
+	}
+	if len(out) > 0 {
+		out[len(out)-1].Right = in.Right // absorb rounding
+	}
+	return out
+}
+
+// segments keeps one entry per action so indexes match; a disabled
+// button's empty rectangle can never be hit.
+func (b buttonsRow) segments(c *canvas, r rect) []rect {
+	boxes := b.boxes(c, r)
+	for i, a := range b.actions {
+		if a.Disabled {
+			boxes[i] = rect{}
+		}
+	}
+	return boxes
+}
+
+func (b buttonsRow) click(seg int) {
+	if seg >= 0 && seg < len(b.actions) && b.actions[seg].OnClick != nil {
+		b.actions[seg].OnClick()
+	}
+}
+func (buttonsRow) keepsOpen() bool { return true }
+func (b buttonsRow) keepsOpenAt(seg int) bool {
+	return seg < 0 || seg >= len(b.actions) || !b.actions[seg].Closes
+}
+
+func (b buttonsRow) paint(c *canvas, r rect, st rowState) {
+	for i, box := range b.boxes(c, r) {
+		a := b.actions[i]
+		paintButton(c, box, a.Label, a.Icon, a.Style, a.Disabled, st.hover == i, st.press == i)
+	}
+}
+
+// --- Paragraph ---------------------------------------------------------------
+
+type paragraphRow struct {
+	text string
+	tone Tone
+}
+
+// Paragraph is word-wrapped text of any length; the row grows to fit it.
+func Paragraph(text string, tone Tone) Row { return paragraphRow{text, tone} }
+
+func (paragraphRow) height() int                   { return 22 }
+func (paragraphRow) segments(*canvas, rect) []rect { return nil }
+func (paragraphRow) click(int)                     {}
+func (paragraphRow) keepsOpen() bool               { return true }
+func (p paragraphRow) measure(c *canvas, width int32) int32 {
+	h := c.wrapHeight(p.text, width-2*c.px(padX), fontBody)
+	if h == 0 {
+		return c.px(p.height())
+	}
+	return h + c.px(8)
+}
+func (p paragraphRow) paint(c *canvas, r rect, _ rowState) {
+	in := inset(c, r)
+	c.textWrapped(p.text, rect{in.Left, r.Top + c.px(3), in.Right, r.Bottom}, fontBody, p.tone.color())
+}
+
+// --- Guided-setup header -----------------------------------------------------
+
+type wizardHeaderRow struct {
+	title       string
+	step, total int
+	onBack      func()
+}
+
+// WizardHeader is the top row of a guided-setup page: a back button (when
+// onBack is set), the title, and progress dots for step of total (1-based).
+func WizardHeader(title string, step, total int, onBack func()) Row {
+	return wizardHeaderRow{title, step, total, onBack}
+}
+
+func (wizardHeaderRow) height() int { return 46 }
+func (h wizardHeaderRow) segments(c *canvas, r rect) []rect {
+	if h.onBack == nil {
+		return nil
+	}
+	return []rect{backButton(c, r)}
+}
+func (h wizardHeaderRow) click(int) {
+	if h.onBack != nil {
+		h.onBack()
+	}
+}
+func (wizardHeaderRow) keepsOpen() bool { return true }
+func (h wizardHeaderRow) paint(c *canvas, r rect, st rowState) {
+	in := inset(c, r)
+	left := in.Left
+	if h.onBack != nil {
+		back := backButton(c, r)
+		paintBack(c, back, st)
+		left = back.Right + c.px(8)
+	}
+	// Dots: done and current in the accent colour, the current one wider.
+	dot, gap, wide := c.px(8), c.px(5), c.px(18)
+	x := in.Right
+	for i := h.total; i >= 1; i-- {
+		w, col := dot, colControl
+		if i <= h.step {
+			col = colAccent
+		}
+		if i == h.step {
+			w = wide
+		}
+		cy := r.Top + r.h()/2
+		if w == dot {
+			c.circle(x-dot/2, cy, dot/2, col) // RoundRect turns tiny dots into diamonds
+		} else {
+			c.roundRect(rect{x - w, cy - dot/2, x, cy - dot/2 + dot}, dot, col)
+		}
+		x -= w + gap
+	}
+	c.text(h.title, headerTitle(c, r, left, x-c.px(8)), fontTitle, colText, dtLeft)
+}
+
+// --- Nav with a tool button ----------------------------------------------------
+
+type navToolRow struct {
+	nav     navRow
+	icon    Icon
+	toolTip string
+	onTool  func()
+}
+
+// NavTool is a Nav with a square icon button on its left, such as a
+// refresh button beside the library. tip is the button's tooltip; a nil
+// onTool shows the button disabled.
+func NavTool(icon Icon, tip string, onTool func(), label, detail string, tone Tone, onClick func()) Row {
+	return navToolRow{navRow{label, detail, tone, onClick}, icon, tip, onTool}
+}
+
+func (navToolRow) height() int { return 38 }
+
+func (n navToolRow) geometry(c *canvas, r rect) (box, tool rect) {
+	full := navBox(c, r)
+	tool = rect{full.Left, full.Top, full.Left + full.h(), full.Bottom}
+	return rect{tool.Right + c.px(8), full.Top, full.Right, full.Bottom}, tool
+}
+
+func (n navToolRow) segments(c *canvas, r rect) []rect {
+	box, tool := n.geometry(c, r)
+	if n.onTool == nil {
+		tool = rect{}
+	}
+	return []rect{box, tool}
+}
+
+func (n navToolRow) click(seg int) {
+	switch {
+	case seg == 0 && n.nav.onClick != nil:
+		n.nav.onClick()
+	case seg == 1 && n.onTool != nil:
+		n.onTool()
+	}
+}
+func (navToolRow) keepsOpen() bool { return true }
+
+func (n navToolRow) tip(_ *canvas, _ rect, seg int) string {
+	if seg == 1 {
+		return n.toolTip
+	}
+	return ""
+}
+
+func (n navToolRow) paint(c *canvas, r rect, st rowState) {
+	box, tool := n.geometry(c, r)
+	n.nav.paintIn(c, box, st.hover == 0, st.press == 0)
+	paintButton(c, tool, "", n.icon, ButtonNormal, n.onTool == nil, st.hover == 1, st.press == 1)
+}
+
+// --- Brand header ----------------------------------------------------------------
+
+type brandRow struct {
+	logo            *Image
+	title, subtitle string
+	progress        func() float64
+}
+
+// Brand is the home page header: the app logo, a letter-spaced title and a
+// status line. logo may be nil. progress, if set, is read on every paint
+// and drawn as a thin bar under the status line (0..1; negative = none), so
+// Popup.Repaint animates it without rebuilding the rows.
+func Brand(logo *Image, title, subtitle string, progress func() float64) Row {
+	return brandRow{logo, title, subtitle, progress}
+}
+
+const brandLogoL = 36
+
+func (brandRow) height() int                   { return 58 }
+func (brandRow) segments(*canvas, rect) []rect { return nil }
+func (brandRow) click(int)                     {}
+func (brandRow) keepsOpen() bool               { return true }
+func (b brandRow) paint(c *canvas, r rect, _ rowState) {
+	in := inset(c, r)
+	left := in.Left
+	if b.logo != nil {
+		size := c.px(brandLogoL)
+		c.image(b.logo, in.Left, r.Top+(r.h()-size)/2, brandLogoL)
+		left += size + c.px(11)
+	}
+	mid := r.Top + r.h()/2
+	procSetTextCharExtra.Call(c.dc, uintptr(c.px(2))) // tracking for the capitals
+	c.text(b.title, rect{left, r.Top + c.px(6), in.Right, mid + c.px(3)}, fontTitle, colText, dtLeft)
+	procSetTextCharExtra.Call(c.dc, 0)
+	c.text(b.subtitle, rect{left, mid + c.px(3), in.Right, r.Bottom - c.px(6)}, fontCaption, colCaption, dtLeft)
+	if b.progress == nil {
+		return
+	}
+	if p := b.progress(); p >= 0 {
+		h := max(2, c.px(3))
+		bar := rect{left, r.Bottom - c.px(5), in.Right, r.Bottom - c.px(5) + h}
+		c.roundRect(bar, h, colControl)
+		if fill := int32(float64(bar.w()) * min(p, 1)); fill > 0 {
+			c.roundRect(rect{bar.Left, bar.Top, bar.Left + max(fill, h), bar.Bottom}, h, colAccent)
+		}
+	}
+}
+
+// --- Drop zone -------------------------------------------------------------------
+
+type dropZoneRow struct {
+	title, hint string
+	onClick     func()
+}
+
+// DropZone is a dashed field that invites dragging files or folders onto
+// the panel (see Popup.SetPinned); clicking it runs onClick, e.g. a picker.
+func DropZone(title, hint string, onClick func()) Row { return dropZoneRow{title, hint, onClick} }
+
+func (dropZoneRow) height() int { return 100 }
+func (d dropZoneRow) box(c *canvas, r rect) rect {
+	in := inset(c, r)
+	return rect{in.Left, r.Top + c.px(4), in.Right, r.Bottom - c.px(4)}
+}
+func (d dropZoneRow) segments(c *canvas, r rect) []rect { return []rect{d.box(c, r)} }
+func (d dropZoneRow) click(int) {
+	if d.onClick != nil {
+		d.onClick()
+	}
+}
+func (dropZoneRow) keepsOpen() bool { return true }
+func (d dropZoneRow) paint(c *canvas, r rect, st rowState) {
+	box := d.box(c, r)
+	border := colMuted
+	switch {
+	case st.press == 0:
+		c.roundRect(box, c.px(12), colRowPress)
+		border = colAccent
+	case st.hover == 0:
+		c.roundRect(box, c.px(12), colRowHover)
+		border = colAccent
+	}
+	c.dashedFrame(box, c.px(12), border)
+	iconBox := rect{box.Left, box.Top + c.px(12), box.Right, box.Top + c.px(40)}
+	c.icon(IconFolderPlus, iconBox, 24, colAccent)
+	c.text(d.title, rect{box.Left, iconBox.Bottom + c.px(2), box.Right, iconBox.Bottom + c.px(22)}, fontBold, colText, dtCenter)
+	c.text(d.hint, rect{box.Left, iconBox.Bottom + c.px(22), box.Right, iconBox.Bottom + c.px(40)}, fontCaption, colMuted, dtCenter)
+}

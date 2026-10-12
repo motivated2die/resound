@@ -1,0 +1,191 @@
+# Builds a release when a version tag (v1.2.3 or v1.2.3-rc.1) is pushed, and
+# creates a DRAFT GitHub release with Resound.exe and SHA256SUMS.txt.
+# Nothing is public until the draft is published by hand.
+# How to cut a release: docs/RELEASING.md.
+#
+# Code signing (SignPath) is built in but stays off until the repository
+# variable SIGNPATH_ORGANIZATION_ID is set; then the sign job runs and the
+# release gets the signed exe. Until then releases are unsigned.
+name: Release
+
+on:
+  push:
+    tags: ['v*.*.*']
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: windows-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      prerelease: ${{ steps.version.outputs.prerelease }}
+      artifact-id: ${{ steps.upload.outputs.artifact-id }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0 # full history: needed to check the tag is on main
+
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+
+      - name: Read the version from the tag
+        id: version
+        shell: pwsh
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          if (-not ($env:TAG -match '^v(\d+\.\d+\.\d+)(-[0-9A-Za-z.-]+)?$')) {
+            throw "Tag '$env:TAG' is not a version tag like v1.2.3 or v1.2.3-rc.1"
+          }
+          $version = $env:TAG.Substring(1)
+          $prerelease = if ($Matches[2]) { 'true' } else { 'false' }
+          git merge-base --is-ancestor $env:GITHUB_SHA origin/main
+          if ($LASTEXITCODE) { throw "Tag '$env:TAG' points at a commit that is not on main. Release from main only." }
+          "version=$version" >> $env:GITHUB_OUTPUT
+          "prerelease=$prerelease" >> $env:GITHUB_OUTPUT
+          Write-Host "Building version $version (pre-release: $prerelease)"
+
+      - name: Install go-winres
+        run: go install github.com/tc-hib/go-winres@v0.3.3
+
+      - name: Build (vet, test, resources, exe)
+        shell: pwsh
+        run: ./scripts/build-release.ps1 -Version '${{ steps.version.outputs.version }}' -Out dist
+
+      - name: Upload the unsigned exe
+        id: upload
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: Resound-unsigned
+          path: dist/Resound.exe
+          if-no-files-found: error
+
+  sign:
+    needs: build
+    if: vars.SIGNPATH_ORGANIZATION_ID != ''
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+    steps:
+      # Waits until an approver approves the request in SignPath.
+      - name: Sign with SignPath
+        uses: signpath/github-action-submit-signing-request@f6d04783b4569d051e0c80105fe66e82819d0092 # v3
+        with:
+          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
+          project-slug: ${{ vars.SIGNPATH_PROJECT_SLUG }}
+          signing-policy-slug: ${{ vars.SIGNPATH_SIGNING_POLICY_SLUG }}
+          github-artifact-id: ${{ needs.build.outputs.artifact-id }}
+          wait-for-completion: true
+          output-artifact-directory: signed
+
+      - name: Upload the signed exe
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: Resound-signed
+          path: signed/Resound.exe
+          if-no-files-found: error
+
+  release:
+    needs: [build, sign]
+    # Runs after a successful build when signing either succeeded or is off.
+    if: ${{ !cancelled() && needs.build.result == 'success' && needs.sign.result != 'failure' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # create the release
+      id-token: write # build provenance attestation
+      attestations: write
+      artifact-metadata: write
+    env:
+      TAG: ${{ github.ref_name }}
+      VERSION: ${{ needs.build.outputs.version }}
+      PRERELEASE: ${{ needs.build.outputs.prerelease }}
+      SIGNED: ${{ needs.sign.result == 'success' }}
+      ATTESTED: ${{ !github.event.repository.private }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0 # tags and history for the release notes
+
+      - name: Download the exe
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: ${{ needs.sign.result == 'success' && 'Resound-signed' || 'Resound-unsigned' }}
+          path: dist
+
+      - name: Checksums
+        id: sums
+        run: |
+          cd dist
+          sha256sum Resound.exe > SHA256SUMS.txt
+          cat SHA256SUMS.txt
+          echo "sha256=$(cut -d' ' -f1 SHA256SUMS.txt)" >> "$GITHUB_OUTPUT"
+
+      # Proves the exe was built by this workflow from this commit
+      # (gh attestation verify). Free for public repositories only.
+      - name: Attest build provenance
+        if: env.ATTESTED == 'true'
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-path: dist/Resound.exe
+
+      - name: Release notes
+        env:
+          SHA256: ${{ steps.sums.outputs.sha256 }}
+        run: |
+          # The previous tag: for a stable release the previous stable one,
+          # so the notes cover everything since the last full release.
+          if [ "$PRERELEASE" = "true" ]; then exclude='^$'; else exclude='-'; fi
+          prev=$(git tag --list 'v*.*.*' --sort=-v:refname --merged "$TAG^" | grep -v -e "$exclude" | head -n1 || true)
+          range="${prev:+$prev..}$TAG"
+          {
+            echo "## What's changed"
+            echo
+            git log --no-merges --pretty='- %s (%h)' "$range"
+            echo
+            echo "## Install or update"
+            echo
+            echo "Download **Resound.exe** and run it. It installs itself for your Windows user (no admin rights needed) and replaces an older version, keeping your settings."
+            if [ "$SIGNED" != "true" ]; then
+              echo
+              echo "This build is **not code-signed** yet, so Windows SmartScreen may say \"Windows protected your PC\". Choose **More info → Run anyway**. You can check the download against the SHA-256 below first."
+            fi
+            echo
+            echo "## Verify"
+            echo
+            echo "SHA-256 of Resound.exe: \`$SHA256\`"
+            echo
+            echo '```powershell'
+            echo '(Get-FileHash .\Resound.exe -Algorithm SHA256).Hash'
+            if [ "$ATTESTED" = "true" ]; then
+              echo "gh attestation verify .\\Resound.exe --repo $GITHUB_REPOSITORY"
+            fi
+            echo '```'
+            if [ -n "$prev" ]; then
+              echo
+              echo "**Full changelog:** https://github.com/$GITHUB_REPOSITORY/compare/$prev...$TAG"
+            fi
+          } > notes.md
+          cat notes.md
+
+      - name: Create or update the draft release
+        run: |
+          flags=()
+          [ "$PRERELEASE" = "true" ] && flags+=(--prerelease)
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            # Re-run of this workflow: replace the files and notes.
+            gh release upload "$TAG" dist/Resound.exe dist/SHA256SUMS.txt --clobber
+            gh release edit "$TAG" --notes-file notes.md
+          else
+            gh release create "$TAG" dist/Resound.exe dist/SHA256SUMS.txt \
+              --draft --verify-tag --title "Resound $VERSION" --notes-file notes.md "${flags[@]}"
+          fi
