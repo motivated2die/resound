@@ -2,9 +2,10 @@ package ui
 
 import "math"
 
-// The panel's background glows: soft accent-coloured light, as if blurred
-// dots sat just outside the panel. They belong to the window, not the
-// content: they stay in place when the page scrolls or the panel grows.
+// The panel's background glow: soft accent-coloured light in the top left
+// corner, as if a blurred dot sat just outside the panel. It belongs to the
+// window, not the content: it stays in place when the page scrolls or the
+// panel grows.
 
 // glowSpec describes one glow in logical (96-DPI) pixels.
 type glowSpec struct {
@@ -13,16 +14,8 @@ type glowSpec struct {
 	falloff            float64 // how quickly it fades; higher is a tighter light
 }
 
-var (
-	// edgeGlow shines in from the right edge, a fixed distance above the
-	// bottom (glowBottomL), so it keeps its place when the panel grows.
-	edgeGlow = glowSpec{radiusXL: 230, radiusYL: 220, strength: 0.16, falloff: 3}
-	// cornerGlow is a smaller, tighter light in the top left corner.
-	cornerGlow = glowSpec{radiusXL: 150, radiusYL: 140, strength: 0.14, falloff: 5.5}
-)
-
-// glowBottomL is the edge glow's centre, above the panel's bottom edge.
-const glowBottomL = 170
+// cornerGlow is the light in the top left corner.
+var cornerGlow = glowSpec{radiusXL: 150, radiusYL: 140, strength: 0.18, falloff: 5.5}
 
 // glowPixels renders a w×h box of accent-coloured light centred at (cx, cy)
 // pixels (which may be on the box's edge or corner) with radii rx, ry, as
