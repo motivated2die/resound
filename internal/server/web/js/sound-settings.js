@@ -309,7 +309,7 @@ function setupButtonActions() {
                     if (data.success && data.playingId) {
                         currentPreviewId = data.playingId;
                         previewButton.setAttribute('data-state', 'stop');
-                        previewButton.querySelector('.material-symbols-outlined').textContent = 'stop_circle';
+                        previewButton.querySelector('.icon').dataset.icon = 'stop_circle';
                         previewButton.querySelector('.button-text').textContent = 'Stop';
                     }
                 }).catch(err => console.error("Error starting preview:", err));
@@ -317,7 +317,7 @@ function setupButtonActions() {
                 stopPreviewSound(currentPreviewId);
                 currentPreviewId = null;
                 previewButton.setAttribute('data-state', 'preview');
-                previewButton.querySelector('.material-symbols-outlined').textContent = 'volume_up';
+                previewButton.querySelector('.icon').dataset.icon = 'volume_up';
                 previewButton.querySelector('.button-text').textContent = 'Preview';
             }
         });
@@ -603,7 +603,7 @@ function resetMenuState() {
     // Reset Buttons and Slider
     if (previewButton) {
         previewButton.setAttribute('data-state', 'preview');
-        previewButton.querySelector('.material-symbols-outlined').textContent = 'volume_up';
+        previewButton.querySelector('.icon').dataset.icon = 'volume_up';
         previewButton.querySelector('.button-text').textContent = 'Preview';
     }
     stopPreviewSound(currentPreviewId); currentPreviewId = null;

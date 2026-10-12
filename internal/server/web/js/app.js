@@ -571,7 +571,7 @@ async function handleTalkThroughEnd(event) {
 
 function updatePlayPauseButtonIcon() {
     if (!playPauseToggleButton) return;
-    const icon = playPauseToggleButton.querySelector('.material-symbols-outlined');
+    const icon = playPauseToggleButton.querySelector('.icon');
     if (icon) {
         const isCurrentlyPlaying = state.isAnythingPlayingUnpaused;
         // Visibility: Show if anything is actively playing OR if sounds are tracked but potentially paused
@@ -581,8 +581,8 @@ function updatePlayPauseButtonIcon() {
         // Icon: Show 'pause' if playing, 'play' otherwise (even if sounds are paused)
         const iconName = isCurrentlyPlaying ? 'pause' : 'play_arrow';
         const label = isCurrentlyPlaying ? 'Pause All Sounds' : 'Resume Paused Sounds';
-        if (icon.textContent !== iconName) {
-             icon.textContent = iconName;
+        if (icon.dataset.icon !== iconName) {
+             icon.dataset.icon = iconName;
         }
         playPauseToggleButton.setAttribute('aria-label', label);
     }
@@ -690,13 +690,13 @@ function disarmAllResetButtons(keep = null) {
 }
 
 function getLongPressLabel(button) {
-    const label = button.querySelector('span:not(.material-symbols-outlined)');
+    const label = button.querySelector('span:not(.icon)');
     return (label ? label.textContent : button.textContent).trim();
 }
 
 // setLongPressLabel changes only the label, keeping the button's icon.
 function setLongPressLabel(button, text) {
-    const label = button.querySelector('span:not(.material-symbols-outlined)');
+    const label = button.querySelector('span:not(.icon)');
     if (label) label.textContent = text; else button.textContent = text;
 }
 
@@ -889,11 +889,10 @@ function createTabElement(name, id, iconName = null) {
 
     if (iconName) {
         const icon = document.createElement('span');
-        icon.className = 'material-symbols-outlined';
-        icon.textContent = iconName;
-         if (String(id) === 'favorites') {
-             icon.style.fontVariationSettings = "'FILL' 1"; // colour comes from .tab / .tab.active
-         }
+        icon.className = 'icon';
+        icon.setAttribute('aria-hidden', 'true');
+        // The favorites tab always shows the filled heart; colour comes from .tab / .tab.active
+        icon.dataset.icon = String(id) === 'favorites' && iconName === 'favorite' ? 'favorite-fill' : iconName;
         tabElement.appendChild(icon);
         tabElement.setAttribute('aria-label', name || 'Favorites');
     }
@@ -1163,8 +1162,8 @@ function updateSoundCardDisplay(soundId, cardElement = null, tabId = state.curre
     card.dataset.favorite = isFavorite ? 'true' : 'false'; // Set dataset attribute
     if (isFavorite && String(tabId) !== 'favorites') { // every card there is a favorite
         const favIcon = document.createElement('span');
-        favIcon.className = 'indicator-icon material-symbols-outlined favorite-indicator';
-        favIcon.textContent = 'favorite';
+        favIcon.className = 'indicator-icon icon favorite-indicator';
+        favIcon.dataset.icon = 'favorite-fill';
         indicators.appendChild(favIcon);
     }
 
@@ -1173,8 +1172,8 @@ function updateSoundCardDisplay(soundId, cardElement = null, tabId = state.curre
      card.dataset.customVolume = hasCustomVolume ? 'true' : 'false'; // Set dataset attribute
     if (hasCustomVolume) {
         const volIcon = document.createElement('span');
-        volIcon.className = 'indicator-icon material-symbols-outlined volume-indicator';
-        volIcon.textContent = 'volume_up';
+        volIcon.className = 'indicator-icon icon volume-indicator';
+        volIcon.dataset.icon = 'volume_up';
         indicators.appendChild(volIcon);
     }
 

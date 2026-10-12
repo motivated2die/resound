@@ -183,6 +183,9 @@ Failures (no network, declined UAC, bad signature) leave the manual "Install man
   - QR codes are single-use and valid for 10 minutes. Re-pairing replaces the phone's old session.
   - There are no CORS headers (same-origin only), and the PIN and tokens are never logged.
 - **Web app.** `internal/server/web/` is embedded with `go:embed all:web`. Without `index.html`, a placeholder page is served.
+  - **Self-contained.** Every script, style, icon and the emoji data are embedded; a `Content-Security-Policy` (`default-src 'self'`, plus `data:` for NoSleep's video and inline code for `login.html`) makes the browser refuse anything from another host. `TestWebSelfContained` fails on any URL in our own web files.
+  - **Icons** are Material Symbols SVGs (`web/assets/icons/`), painted in the text colour through a CSS mask: `<span class="icon" data-icon="name">`, switched with `el.dataset.icon`. `TestWebIcons` checks that every name used has its SVG and CSS rule.
+  - **ETags.** Embedded files have no modification time, so each gets a content-hash `ETag` at start-up and browsers revalidate with `304`. The vendored emoji picker relies on it: without an ETag it re-downloads its 440 KB data on every load and checksums it with `crypto.subtle`, which browsers only offer over HTTPS.
 
 ## UI framework
 
@@ -282,7 +285,7 @@ Ordered by impact on reliability. None blocks normal use. Fixed in 0.6: concurre
 7. **Output failure releases holds for both outputs.** `EventOutputFailed` clears all held voices, releasing the mic and PTT even if the other output is still playing.
 8. **Plain HTTP on the LAN.** Session cookies travel unencrypted; acceptable on a home network. HTTPS would also allow the browser's Wake Lock and service workers.
 9. **Elevation with a different admin account.** When a standard user approves UAC with another account, the helper's log goes to that account's `%LOCALAPPDATA%`.
-10. **Front end** (planned): talk-through button bounces, 250 ms polling instead of live updates, and two remaining CDN dependencies: the Material Symbols font (Google Fonts) and the emoji picker with its emoji data (jsDelivr). NoSleep and SortableJS are vendored in `web/vendor/`.
+10. **Front end** (planned): talk-through button bounces, 250 ms polling instead of live updates.
 11. **No live file watching.** Changes on disk are picked up by the 5 s rescan on phone requests, the panel's "Rescan", and the check on every play. Fix if needed: `ReadDirectoryChangesW`.
 12. **ReFS and network drives** may not provide stable file IDs; renames there are matched by fingerprint instead, which needs the file to have been indexed before it moved.
 13. **VB-Cable's silent install is not officially documented.** `-i -h` is the switch named on VB-Audio's forum; should a future setup ignore it, its dialogs show (it is started visibly for that reason). The pack's readme asks for the author's agreement before integrating it into another installer, while the newer licensing page allows it under the donationware conditions. Get a written confirmation from VB-Audio before a public release.

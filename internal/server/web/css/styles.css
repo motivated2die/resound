@@ -221,7 +221,51 @@ body {
   /* Default order (before buttons) */
 }
 
-.edit-mode-info .material-symbols-outlined {
+/* --- Icons ---
+   Material Symbols SVGs in assets/icons/ (see its README), painted in the
+   text colour through a mask. 1em square: font-size sets the size, as with
+   the icon font they replace. */
+.icon {
+  display: inline-block;
+  flex-shrink: 0;
+  width: 1em;
+  height: 1em;
+  font-size: 24px;
+  vertical-align: middle;
+  -webkit-mask: var(--icon) center / contain no-repeat;
+  mask: var(--icon) center / contain no-repeat;
+}
+
+.icon[data-icon] {
+  background-color: currentColor;
+}
+
+.icon[data-icon="add_reaction"] { --icon: url("../assets/icons/add_reaction.svg"); }
+.icon[data-icon="close"] { --icon: url("../assets/icons/close.svg"); }
+.icon[data-icon="delete"] { --icon: url("../assets/icons/delete.svg"); }
+.icon[data-icon="delete_sweep"] { --icon: url("../assets/icons/delete_sweep.svg"); }
+.icon[data-icon="disabled_visible"] { --icon: url("../assets/icons/disabled_visible.svg"); }
+.icon[data-icon="done"] { --icon: url("../assets/icons/done.svg"); }
+.icon[data-icon="edit"] { --icon: url("../assets/icons/edit.svg"); }
+.icon[data-icon="favorite"] { --icon: url("../assets/icons/favorite.svg"); }
+.icon[data-icon="favorite-fill"] { --icon: url("../assets/icons/favorite-fill.svg"); }
+.icon[data-icon="help"] { --icon: url("../assets/icons/help.svg"); }
+.icon[data-icon="mic"] { --icon: url("../assets/icons/mic.svg"); }
+.icon[data-icon="pause"] { --icon: url("../assets/icons/pause.svg"); }
+.icon[data-icon="play_arrow"] { --icon: url("../assets/icons/play_arrow.svg"); }
+.icon[data-icon="restart_alt"] { --icon: url("../assets/icons/restart_alt.svg"); }
+.icon[data-icon="school"] { --icon: url("../assets/icons/school.svg"); }
+.icon[data-icon="settings"] { --icon: url("../assets/icons/settings.svg"); }
+.icon[data-icon="stop_circle"] { --icon: url("../assets/icons/stop_circle.svg"); }
+.icon[data-icon="view_comfy"] { --icon: url("../assets/icons/view_comfy.svg"); }
+.icon[data-icon="view_list"] { --icon: url("../assets/icons/view_list.svg"); }
+.icon[data-icon="view_module"] { --icon: url("../assets/icons/view_module.svg"); }
+.icon[data-icon="visibility"] { --icon: url("../assets/icons/visibility.svg"); }
+.icon[data-icon="visibility_off"] { --icon: url("../assets/icons/visibility_off.svg"); }
+.icon[data-icon="volume_down"] { --icon: url("../assets/icons/volume_down.svg"); }
+.icon[data-icon="volume_up"] { --icon: url("../assets/icons/volume_up.svg"); }
+
+.edit-mode-info .icon {
   font-size: 16px;
 }
 
@@ -305,7 +349,7 @@ body {
   background-color: rgba(0, 0, 0, 0.2);
 }
 
-.icon-button.top-bar-button .material-symbols-outlined {
+.icon-button.top-bar-button .icon {
   font-size: 20px;
 }
 
@@ -642,15 +686,9 @@ span.sound-text {
   pointer-events: none;
 }
 
-/* Qualified so it beats the Material Symbols stylesheet (loaded later). */
 .sound-indicators .indicator-icon {
   font-size: 14px;
   color: rgba(255, 255, 255, 0.6);
-}
-
-.sound-indicators .indicator-icon.favorite-indicator {
-  /* grey like the custom-volume icon */
-  font-variation-settings: "FILL" 1;
 }
 
 /* Sound Card Custom Colors */
@@ -735,7 +773,7 @@ nav#tabs-container::-webkit-scrollbar {
   text-transform: uppercase;
 }
 
-.tab .material-symbols-outlined {
+.tab .icon {
   font-size: 20px;
 }
 
@@ -750,9 +788,8 @@ nav#tabs-container::-webkit-scrollbar {
   background-color: rgba(var(--accent-rgb), 0.1);
 }
 
-.tab.active .material-symbols-outlined {
+.tab.active .icon {
   color: var(--v-primary-base);
-  font-variation-settings: "FILL" 1;
 }
 
 /* --- Bottom Header --- */
@@ -899,7 +936,7 @@ h1.brand {
   color: var(--v-primary-base);
 }
 
-.wakelock-indicator .material-symbols-outlined {
+.wakelock-indicator .icon {
   font-size: 14px;
   vertical-align: middle;
 }
@@ -931,7 +968,7 @@ h1.brand {
   background-color: var(--error-hover);
 }
 
-.btn-danger .material-symbols-outlined {
+.btn-danger .icon {
   font-size: 32px;
 }
 
@@ -1042,7 +1079,7 @@ h1.brand {
   cursor: pointer;
 }
 
-.icon-button .material-symbols-outlined {
+.icon-button .icon {
   font-size: 24px;
 }
 
@@ -1072,7 +1109,7 @@ h1.brand {
   background-color: var(--v-secondary-darken2);
 }
 
-.action-button .material-symbols-outlined {
+.action-button .icon {
   font-size: 22px;
 }
 
@@ -1224,7 +1261,7 @@ h1.brand {
   background-color: var(--v-secondary-darken1);
 }
 
-#clear-emoji-button-settings .material-symbols-outlined {
+#clear-emoji-button-settings .icon {
   font-size: 20px;
 }
 
@@ -1563,7 +1600,7 @@ emoji-picker section#favorites {
 }
 
 #app-settings-modal .long-press-button span,
-#app-settings-modal .long-press-button .material-symbols-outlined {
+#app-settings-modal .long-press-button .icon {
   /* Ensure text and icon are above progress */
   position: relative;
   z-index: 1;
@@ -1728,25 +1765,20 @@ emoji-picker section#favorites {
   font-style: italic;
 }
 
-.material-symbols-outlined {
-  vertical-align: middle;
-}
-
 /* Favorite Button Styling */
 .icon-button[data-type='favorite'] {
   background-color: var(--v-secondary-base);
 }
 
-.icon-button[data-type='favorite'] .material-symbols-outlined {
-  transition: color 0.2s, transform 0.2s, font-variation-settings 0.2s;
-  font-variation-settings: "FILL" 0;
+.icon-button[data-type='favorite'] .icon {
+  transition: color 0.2s, transform 0.2s;
   color: var(--text-secondary);
 }
 
-.icon-button[data-type='favorite'].active .material-symbols-outlined {
+.icon-button[data-type='favorite'].active .icon {
   color: var(--error-color);
   transform: scale(1.1);
-  font-variation-settings: "FILL" 1;
+  --icon: url("../assets/icons/favorite-fill.svg");
 }
 
 /* Volume Control Layout */
@@ -1780,7 +1812,7 @@ emoji-picker section#favorites {
   gap: 10px;
 }
 
-.slider-container .material-symbols-outlined {
+.slider-container .icon {
   color: var(--text-secondary);
 }
 
@@ -1928,7 +1960,7 @@ emoji-picker section#favorites {
   background-color: var(--v-secondary-darken1);
 }
 
-#clear-emoji-button-settings .material-symbols-outlined {
+#clear-emoji-button-settings .icon {
   font-size: 20px;
 }
 
@@ -2281,7 +2313,7 @@ emoji-picker section#favorites
     transform var(--transition-speed) ease;
 }
 
-.btn-round .material-symbols-outlined {
+.btn-round .icon {
   font-size: 28px;
   /* Adjust icon size */
 }
@@ -2537,6 +2569,10 @@ emoji-picker section#favorites
 }
 
 /* --- Wake Lock Indicator Styles --- */
+#wake-lock-indicator .icon {
+  font-size: 14px;
+}
+
 #wake-lock-indicator {
   order: 3;
   /* Position after status text */
