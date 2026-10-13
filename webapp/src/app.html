@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="theme-color" content="#2a2c33">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="manifest" href="/manifest.json">
+    <link rel="icon" href="/assets/favicon.ico" sizes="any">
+    <link rel="icon" type="image/png" sizes="192x192" href="/assets/resound-192.png">
+    <link rel="apple-touch-icon" href="/assets/resound-192.png">
+    <title>Resound</title>
+    <!-- The connection to the PC: loaded first, it carries the remote's fetch() calls -->
+    <script src="js/rtc.js"></script>
+    <!-- Driver.js CSS (Local) -->
+    <link rel="stylesheet" href="vendor/driverjs/css/driver.css"/>
+    <link rel="stylesheet" href="css/styles.css">
+    <!-- SortableJS 1.15.6 (Local, MIT; see vendor/sortablejs/LICENSE) -->
+    <script src="vendor/sortablejs/Sortable.min.js"></script>
+    <!-- emoji-picker-element 1.29.1 (Local, Apache-2.0; data from vendor/emoji-picker-element-data) -->
+    <script type="module" src="vendor/emoji-picker-element/index.js"></script>
+    <!-- Driver.js Core (Local - Load synchronously in head) -->
+    <script src="vendor/driverjs/js/driver.js.iife.js"></script>
+</head>
+<body>
+    <!-- Top status/action bar -->
+    <div class="top-bar" id="top-bar">
+        <!-- Placeholder for left alignment -->
+        <div class="top-bar-placeholder"></div>
+        <!-- Edit Mode Info (Hidden by default) -->
+        <div class="edit-mode-info hidden" id="edit-mode-info">
+            <span>EDIT MODE</span>
+        </div>
+        <!-- Action Buttons -->
+        <div class="action-buttons" id="top-bar-action-buttons">
+            <button id="play-pause-toggle-button" class="icon-button top-bar-button hidden" aria-label="Toggle Play/Pause">
+                <span class="icon" data-icon="play_arrow" aria-hidden="true"></span>
+            </button>
+            <button id="layout-mode-button" class="icon-button top-bar-button hidden" aria-label="Change Layout">
+                <span class="icon" data-icon="view_module" aria-hidden="true"></span>
+            </button>
+            <button id="edit-mode-button" class="icon-button top-bar-button" aria-label="Toggle Edit Mode">
+                <span class="icon" data-icon="edit" aria-hidden="true"></span>
+            </button>
+            <button id="app-settings-button" class="icon-button top-bar-button" aria-label="App Settings">
+                <span class="icon" data-icon="settings" aria-hidden="true"></span>
+            </button>
+            <button id="tutorial-help-button" class="icon-button top-bar-button hidden" aria-label="Tutorial">
+                <span class="icon" data-icon="help" aria-hidden="true"></span>
+            </button>
+        </div>
+    </div>
+
+    <div class="container">
+        <!-- Wrapper for tab content animation -->
+        <div id="tab-content-wrapper">
+            <!-- Main sound grid -->
+            <main class="sounds-grid layout-grid-3" id="sounds-container">
+                <!-- Sounds will be dynamically added here -->
+            </main>
+        </div>
+
+        <!-- Tab navigation -->
+        <nav class="tabs" id="tabs-container">
+            <!-- Tabs will be dynamically added here -->
+        </nav>
+
+        <!-- Bottom header (Logo, Title, Status, Stop Button) -->
+        <header>
+            <div class="ripple-container"></div> <!-- Container for ripple effects -->
+            <div class="app-title">
+                <img src="assets/resound-192.png" alt="" class="logo">
+                <div class="title-group">
+                    <h1 class="brand">RESOUND</h1>
+                    <!-- Server Status -->
+                    <div class="server-status" id="server-status-container">
+                         <span id="status-indicator" class="status-dot"></span>
+                         <span id="server-status-text">Connecting...</span>
+                    </div>
+                </div>
+            </div>
+            <div class="header-actions">
+                <button id="talk-through-button" class="btn btn-round btn-talk" aria-label="Microphone Talk-Through">
+                    <span class="icon" data-icon="mic" aria-hidden="true"></span>
+                </button>
+                <button id="stop-all" class="btn btn-danger">
+                    <span class="icon" data-icon="stop_circle" aria-hidden="true"></span>
+                    <span class="stop-text">STOP</span>
+                </button>
+            </div>
+        </header>
+    </div>
+
+    <!-- Sound Settings Slide-in Menu -->
+    <div id="sound-settings-overlay" class="hidden">
+        <div id="settings-backdrop"></div>
+        <div id="settings-card">
+            <div class="handle-bar"></div>
+            <div class="sound-info">
+                <h2 id="settings-sound-name">Sound Name</h2>
+                <p id="settings-tab-name">Tab Name</p>
+            </div>
+            <div class="action-buttons">
+                <button id="favorite-button" class="icon-button" data-type="favorite" aria-label="Toggle Favorite">
+                    <span class="icon" data-icon="favorite" aria-hidden="true"></span>
+                </button>
+                <button id="preview-button" class="action-button" data-state="preview">
+                    <span class="icon" data-icon="volume_up" aria-hidden="true"></span>
+                    <span class="button-text">Preview</span>
+                </button>
+            </div>
+            <div class="divider"></div>
+
+            <!-- Volume Control -->
+            <div class="volume-control settings-section">
+                <div class="volume-header"> <!-- Added wrapper -->
+                    <h3>Volume Adjustment</h3>
+                </div>
+                <p class="volume-subtext">Adjusts local & remote volume</p> <!-- Added class -->
+                <div class="slider-container">
+                    <span class="icon" data-icon="volume_down" aria-hidden="true"></span>
+                    <input type="range" id="volume-slider" min="-50" max="50" value="0">
+                    <span class="icon" data-icon="volume_up" aria-hidden="true"></span>
+                </div>
+                <!-- Removed old volume-info div -->
+            </div>
+
+            <div class="divider"></div>
+
+            <!-- Color Selector (Round Buttons) -->
+            <div class="settings-section">
+                 <h3>Button Color</h3>
+                 <div id="color-selector" class="color-selector">
+                      <button class="color-swatch default" data-color="default" aria-label="Default color"></button>
+                      <button class="color-swatch red" data-color="red" aria-label="Red color"></button>
+                      <button class="color-swatch orange" data-color="orange" aria-label="Orange color"></button>
+                      <button class="color-swatch yellow" data-color="yellow" aria-label="Yellow color"></button>
+                      <button class="color-swatch green" data-color="green" aria-label="Green color"></button>
+                      <button class="color-swatch blue" data-color="blue" aria-label="Blue color"></button>
+                      <button class="color-swatch purple" data-color="purple" aria-label="Purple color"></button>
+                      <button class="color-swatch pink" data-color="pink" aria-label="Pink color"></button>
+                 </div>
+            </div>
+
+            <!-- Emoji Selector -->
+            <div class="settings-section emoji-section">
+                <h3>Button Emoji</h3>
+                <!-- Area shown when an emoji IS selected -->
+                <div id="emoji-display-area" class="emoji-display-area hidden">
+                    <button id="selected-emoji-button" aria-label="Current Emoji">
+                        <span id="current-emoji-display" class="current-emoji">❓</span>
+                    </button>
+                    <button id="clear-emoji-button-settings" aria-label="Clear Emoji">
+                        <span class="icon" data-icon="delete" aria-hidden="true"></span>
+                        <span class="button-text">Delete</span> <!-- Added text span -->
+                    </button>
+                </div>
+                <!-- Button shown when NO emoji is selected -->
+                <button id="select-emoji-button" class="action-button hidden">
+                    <span class="icon" data-icon="add_reaction" aria-hidden="true"></span>
+                    Select Background Emoji
+                </button>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- Emoji Picker Modal -->
+    <div id="emoji-picker-modal-overlay" class="hidden">
+        <div id="emoji-picker-modal">
+            <div class="modal-header">
+                <h2>Select Emoji</h2>
+                <button id="close-emoji-picker-button" class="modal-close-button" aria-label="Close emoji picker">
+                    <span class="icon" data-icon="close" aria-hidden="true"></span>
+                </button>
+            </div>
+            <div id="emoji-picker-container">
+                <emoji-picker class="dark" data-source="vendor/emoji-picker-element-data/data.json"></emoji-picker>
+            </div>
+        </div>
+    </div>
+
+    <!-- App Settings Modal -->
+    <div id="app-settings-modal-overlay" class="hidden">
+        <div id="app-settings-modal">
+            <div class="modal-header">
+                <h2>App Settings</h2>
+                <button id="close-app-settings-button" class="modal-close-button" aria-label="Close app settings">
+                    <span class="icon" data-icon="close" aria-hidden="true"></span>
+                </button>
+            </div>
+
+            <div class="settings-section">
+                 <h3>Preferences</h3>
+                 <label class="toggle-switch" id="wake-lock-toggle-label-container">
+                    <input type="checkbox" id="wake-lock-toggle">
+                    <span class="slider"></span>
+                    <span id="wake-lock-toggle-label">Keep Screen On</span>
+                 </label>
+                 <!-- Hidden where the app is fullscreen already or the browser can't (fullscreen.js) -->
+                 <label class="toggle-switch" id="fullscreen-toggle-container">
+                    <input type="checkbox" id="auto-fullscreen-toggle">
+                    <span class="slider"></span>
+                     Fullscreen
+                 </label>
+                 <!-- Hidden where the device can't vibrate (device.js) -->
+                 <label class="toggle-switch" id="haptics-toggle-container" hidden>
+                    <input type="checkbox" id="haptics-toggle">
+                    <span class="slider"></span>
+                     Vibrate on Tap
+                 </label>
+                 <label class="toggle-switch">
+                    <input type="checkbox" id="swap-button-position-toggle">
+                    <span class="slider"></span>
+                     Swap Menu Buttons to Left
+                 </label>
+            </div>
+            <div class="divider"></div>
+
+            <div class="settings-section">
+                <h3>Reset</h3>
+                <p class="modal-info">Hold a button until it fills, then tap it again to confirm. Colours, emoji and layouts are stored on the PC and shared by all devices; the desktop app backs them up under Settings → Backup &amp; restore.</p>
+                <div class="modal-actions vertical reset-actions">
+                    <button id="reset-current-page-visuals" class="action-button long-press-button" data-long-press-duration="800">
+                        <span class="icon" data-icon="restart_alt" aria-hidden="true"></span>
+                        <span>Hold to reset this page's colours</span>
+                    </button>
+                    <button id="reset-current-page-layout" class="action-button long-press-button" data-long-press-duration="800">
+                        <span class="icon" data-icon="restart_alt" aria-hidden="true"></span>
+                        <span>Hold to reset this page's layout</span>
+                    </button>
+                    <button id="reset-all-settings" class="action-button long-press-button" data-long-press-duration="800">
+                        <span class="icon" data-icon="delete_sweep" aria-hidden="true"></span>
+                        <span>Hold to reset all colours and layouts</span>
+                    </button>
+                </div>
+            </div>
+
+            <div class="divider"></div>
+            <div class="settings-section">
+                <h3>PC</h3>
+                <p class="modal-info">Connected to <strong id="app-connection-name">your PC</strong> directly over your network.</p>
+                <div class="modal-actions vertical">
+                    <button id="app-connection-switch" class="action-button">
+                        <span>Switch or pair a PC</span>
+                    </button>
+                    <!-- Shown while the browser offers to install the app (device.js) -->
+                    <button id="install-app-button" class="action-button" hidden>
+                        <span>Install the app</span>
+                    </button>
+                </div>
+            </div>
+
+            <div class="divider"></div>
+            <div class="settings-section">
+                <div class="help-container">
+                    <div class="help-text">
+                        <h3>Help wanted?</h3>
+                        <p class="modal-info">Get a quick tour of the features.</p>
+                    </div>
+                    <button id="start-tutorial-button" class="action-button">
+                        <span class="icon" data-icon="school" aria-hidden="true"></span>
+                        <span>Start Tutorial</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Load core modules -->
+    <script src="js/persistence.js" defer></script>
+    <script src="js/screen-wake.js" defer></script>
+    <script src="js/fullscreen.js" defer></script>
+    <script src="js/device.js" defer></script>
+    <script src="js/editMode.js" defer></script>
+    <script src="js/layout.js" defer></script>
+    <script src="js/dragDrop.js" defer></script>
+    <script src="js/sound-settings.js" defer></script>
+    <script src="js/tabs.js" defer></script>
+    <script src="js/tutorial.js" defer></script>
+    <!-- Load main app logic LAST -->
+    <script src="js/app.js" defer></script>
+
+</body>
+</html>

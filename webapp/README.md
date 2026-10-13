@@ -14,7 +14,8 @@ Nothing here is embedded into `Resound.exe`.
 
 | File | Purpose |
 |---|---|
-| `index.html`, `js/app.js`, `js/*.js`, `css/styles.css` | The remote: tabs, sound cards, layouts, settings |
+| `index.html`, `js/landing.js`, `css/landing.css` | The landing page at `/`: what Resound is, the download, getting started, features, how it works, news. The installed app skips it |
+| `app.html`, `js/app.js`, `js/*.js`, `css/styles.css` | The remote (the soundboard): tabs, sound cards, layouts, settings. The installed app starts here |
 | `js/rtc.js` | The connection: pairing, reconnecting, and `fetch()` for `/api/` over the data channel. The first script on every page |
 | `connect.html`, `js/connect.js`, `css/connect.css` | Pairing (link, in-app QR scanner, pasted link) and the list of paired PCs |
 | `js/screen-wake.js` | Keeps the screen on (Screen Wake Lock API), on by default |

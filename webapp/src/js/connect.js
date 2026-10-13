@@ -35,7 +35,7 @@
             open.textContent = pc.name;
             open.addEventListener('click', () => {
                 rtc.savePC(pc); // makes it the current PC
-                location.href = '/';
+                location.href = '/app.html';
             });
             const forget = document.createElement('button');
             forget.type = 'button';
@@ -76,7 +76,7 @@
         try {
             await rtc.pair(info);
             setMessage('Paired.');
-            location.replace('/');
+            location.replace('/app.html');
         } catch (e) {
             console.error('Pairing failed:', e);
             if (e.denied) {

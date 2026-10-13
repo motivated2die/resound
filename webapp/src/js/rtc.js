@@ -1,9 +1,9 @@
 // The app's connection to the PC: a WebRTC data channel without a signaling
 // server (see internal/server/rtc.go for the PC's side and the protocol).
 //
-// Loaded first on every page of the hosted app. On the remote (index.html)
-// it replaces fetch() for /api/ paths, so the remote's code talks to the PC
-// exactly as it does over HTTP on the LAN.
+// Loaded first on every page of the hosted app. On the remote (app.html) it
+// replaces fetch() for /api/ paths, so the remote's code speaks the REST API
+// it was written for.
 (() => {
     'use strict';
 
@@ -363,17 +363,22 @@
         }).catch((e) => console.warn('Service worker:', e));
     }
 
-    // On the remote itself: a pairing link goes to the connect page, an
-    // unpaired app too; otherwise /api/ requests go over the data channel.
-    if (location.pathname === '/' || location.pathname === '/index.html') {
-        if (location.hash.startsWith('#pair')) {
-            location.replace('/connect.html' + location.hash);
-        } else if (!currentPC()) {
+    const path = location.pathname;
+    if (path === '/' || path === '/index.html' || path === '/app.html') {
+        // A pairing link (the PC's QR code opens <app>/#pair&…) goes to the
+        // connect page, from the landing page or the remote.
+        if (location.hash.startsWith('#pair')) location.replace('/connect.html' + location.hash);
+    }
+
+    // On the remote: an unpaired app goes to the connect page; otherwise
+    // /api/ requests go over the data channel.
+    if (path === '/app.html' && !location.hash.startsWith('#pair')) {
+        if (!currentPC()) {
             toConnectPage();
         } else {
             installFetch();
             ensureConnection().catch(() => { /* the remote shows the state and retries */ });
-            // The "PC" section of the remote's settings (index.html).
+            // The "PC" section of the remote's settings (app.html).
             document.addEventListener('DOMContentLoaded', () => {
                 const name = document.getElementById('app-connection-name');
                 const pc = currentPC();

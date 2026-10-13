@@ -3,7 +3,7 @@
     "name": "Resound",
     "short_name": "Resound",
     "description": "Remote control for the Resound soundboard on your PC",
-    "start_url": "/",
+    "start_url": "/app.html",
     "scope": "/",
     "display": "standalone",
     "display_override": ["fullscreen", "standalone"],

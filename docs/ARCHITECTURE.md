@@ -207,6 +207,11 @@ The phone remote is a web app on an HTTPS host (`webapp/`, built by `cmd/webapp`
 
 ### The app (`webapp/src`)
 
+- **Pages.**
+  - `/` (`index.html`): the landing page, a one-pager for visitors: download (GitHub's `releases/latest/download/Resound.exe`), getting started, features, how it works, news. On a phone the soundboard button comes first, on a PC the download; with a paired PC it reads "Open soundboard". External links (GitHub) only navigate; the page loads nothing from other hosts.
+  - `/app.html`: the soundboard (the remote). The manifest's `start_url`, so the installed app starts here; without a paired PC it goes on to the connect page.
+  - `/connect.html`: pairing and the list of paired PCs.
+  - **Forwarding.** `rtc.js` sends a pairing link (`/#pair&…`, as the PC's QR code opens it) to the connect page. `landing.js` sends the installed app (display mode standalone or fullscreen) on to the soundboard or the connect page, so installs from before the landing page existed, which start at `/`, never see it.
 - **Phone persistence (v3).** Device preferences (last tab, fullscreen, keep the screen on, vibration, button position) stay in `localStorage`; everything about sounds and tabs lives on the PC, keyed by ID, with an in-memory mirror for synchronous reads. On first connect after the update, a phone sends its old path-keyed settings to the PC once. Paired PCs and their keys are in `localStorage` (`resound.pcs`); the app asks for persistent storage so the browser doesn't clear them.
 - **Platform features:**
   - **Keep the screen on** (`screen-wake.js`): the Screen Wake Lock API, on by default, requested again whenever the app becomes visible (browsers drop it in the background), and retried on the next tap where a browser wants one first.
