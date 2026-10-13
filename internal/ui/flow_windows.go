@@ -317,8 +317,10 @@ const (
 )
 
 // paintJack draws a 3.5 mm jack whose tip is at (x, y), pointing dir: a
-// slim shaft with a rounded tip and two insulating rings, then a wider body
-// where the cable leaves, flowJackL from the tip.
+// slim shaft with a rounded tip and one insulating ring, then a slightly
+// wider body where the cable leaves, flowJackL from the tip. Widths differ
+// from the pipe's by whole pixels on each side, so the jack sits centred
+// on the cable at any scale.
 func paintJack(c *canvas, x, y int32, dir jackDir, col uint32) {
 	// part returns the rectangle from a0 to a1 along the jack (0 = tip) and
 	// w wide across it.
@@ -331,14 +333,17 @@ func paintJack(c *canvas, x, y int32, dir jackDir, col uint32) {
 		}
 		return rect{x - w/2, y + a0, x - w/2 + w, y + a1}
 	}
-	shaftW, bodyW := max(3, c.px(4)), c.px(8)
+	pipeW := c.px(flowPipeL)
+	shaftW := pipeW + 2*max(1, c.px(1))
+	bodyW := pipeW + 2*max(2, c.px(2))
 	shaftL, bodyL := c.px(9), c.px(flowJackL)
-	c.roundRect(part(0, shaftL+c.px(1), shaftW), shaftW, col)
-	ring := max(1, c.px(1))
-	for _, a := range []int32{c.px(3), c.px(6)} {
-		c.fill(part(a, a+ring, shaftW), colBackground)
-	}
-	c.roundRect(part(shaftL, bodyL, bodyW), c.px(3), col)
+	// roundRect covers one more pixel right and below; shrink to match.
+	round := func(r rect, radius int32) { c.roundRect(rect{r.Left, r.Top, r.Right - 1, r.Bottom - 1}, radius, col) }
+	round(part(0, shaftL+c.px(1), shaftW), shaftW)
+	c.fill(part(0, c.px(2), pipeW), col) // the tip touches what it plugs into, at any scale
+	ring := c.px(4)
+	c.fill(part(ring, ring+max(1, c.px(1)), shaftW), colBackground)
+	round(part(shaftL, bodyL, bodyW), c.px(2))
 }
 
 // dockedUnit is a control with its level bar docked under it: one rounded
@@ -457,7 +462,7 @@ type flowSoundsRow struct {
 	mic, cable, line, you Pipe
 }
 
-func (flowSoundsRow) height() int { return 78 }
+func (flowSoundsRow) height() int { return 72 }
 
 // geometry: the soundboard's caption and button (its level bar docks
 // below), the y where the cable's two ends join, and the mic and cable
@@ -548,14 +553,14 @@ type flowCableRow struct {
 	cable, you Pipe
 }
 
-func (flowCableRow) height() int { return 50 }
+func (flowCableRow) height() int { return 40 }
 
 // badges returns the boxes of the cable and you badges (empty where a pipe
 // has none), side by side.
 func (j flowCableRow) badges(c *canvas, r rect) [2]rect {
 	var out [2]rect
 	lane, toYou := flowLanes(c, r)
-	cy := r.Top + c.px(18)
+	cy := r.Top + c.px(11)
 	if b := j.cable.Badge; b != nil {
 		out[0] = badgeOnLane(c, b, lane, cy, toYou-c.px(16))
 	}
@@ -754,15 +759,7 @@ func (o flowOutputsRow) paint(c *canvas, r rect, st rowState) {
 	// The cable's far end: a card, not a choice.
 	col := cols[0]
 	paintCaption(c, col.caption, o.cable.Caption, o.cable.Value)
-	bg := colRowHover
-	if o.cable.OnClick != nil {
-		switch {
-		case st.press == segCableCard:
-			bg = colRowPress
-		case st.hover == segCableCard:
-			bg = shade(colRowHover, 10)
-		}
-	}
+	bg := fieldBg(false, o.cable.OnClick != nil && st.hover == segCableCard, o.cable.OnClick != nil && st.press == segCableCard)
 	paintDocked(c, col.field, bg, readLevel(o.cable.Level))
 	card := col.field
 	pad := c.px(cardPadL)

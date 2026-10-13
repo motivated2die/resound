@@ -319,7 +319,8 @@ func (a *App) audioFlow(setupLater bool) ui.AudioFlow {
 	f.YouPipe = ui.Pipe{State: ui.PipeOn, Level: a.flowLevel(&l.monitor)}
 
 	// Playback paused: by the phone's pause, talk-through or a pause key.
-	// Both of the soundboard's streams stop; the badge sits on the cable's.
+	// Both of the soundboard's streams stop and show the pause icon; the
+	// label goes on the headphones' pipe, which has the room for it.
 	pb := &a.playback
 	if pb.pausedActive || pb.talkLive || pb.holdLive {
 		label, tip := "Paused", "Playback is paused from the phone."
@@ -330,9 +331,9 @@ func (a *App) audioFlow(setupLater bool) ui.AudioFlow {
 			label, tip = "Pause key held", "The sounds pause while you hold a pause key, and your mic and push-to-talk are let go."
 		}
 		if f.CablePipe.State == ui.PipeOn {
-			f.CablePipe = ui.Pipe{State: ui.PipeHeld, Badge: &ui.Badge{Icon: ui.IconPause, Label: label, Tip: tip}}
+			f.CablePipe = ui.Pipe{State: ui.PipeHeld, Badge: &ui.Badge{Icon: ui.IconPause, Tip: tip}}
 		}
-		f.YouPipe = ui.Pipe{State: ui.PipeHeld}
+		f.YouPipe = ui.Pipe{State: ui.PipeHeld, Badge: &ui.Badge{Icon: ui.IconPause, Label: label, Tip: tip}}
 	}
 	if s, ok := a.outputStatus(audio.RoleMonitor); ok && !s.Running && s.Err != nil {
 		f.YouPipe = ui.Pipe{State: ui.PipeBroken, Badge: &ui.Badge{

@@ -275,12 +275,16 @@ func (p *Popup) syncDropdown() {
 	want := int32(min(len(d.options), dropdownMaxItems))*d.itemH + 2*c.px(4)
 	below := p.height - d.field.Bottom - margin - c.px(4)
 	above := d.field.Top - margin - c.px(4)
+	// The list is as wide as the panel's content, also for a half-width
+	// field (the audio flow's "You hear"): long device names fit, and the
+	// options are easier to hit.
+	content := inset(c, p.rowRect(d.row))
 	if want <= below || below >= above {
 		h := min(want, max(below, d.itemH))
-		d.list = rect{d.field.Left, d.field.Bottom + c.px(4), d.field.Right, d.field.Bottom + c.px(4) + h}
+		d.list = rect{content.Left, d.field.Bottom + c.px(4), content.Right, d.field.Bottom + c.px(4) + h}
 	} else {
 		h := min(want, max(above, d.itemH))
-		d.list = rect{d.field.Left, d.field.Top - c.px(4) - h, d.field.Right, d.field.Top - c.px(4)}
+		d.list = rect{content.Left, d.field.Top - c.px(4) - h, content.Right, d.field.Top - c.px(4)}
 	}
 	// Inner padding: the list rect used for items excludes a 4px border area.
 	d.list = rect{d.list.Left, d.list.Top + c.px(4), d.list.Right, d.list.Bottom - c.px(4)}

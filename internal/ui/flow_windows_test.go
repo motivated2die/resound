@@ -189,8 +189,8 @@ func TestFlowRender(t *testing.T) {
 
 	paused := testFlow()
 	paused.Sounds.Status = "Paused"
-	paused.CablePipe = Pipe{State: PipeHeld, Badge: &Badge{Icon: IconPause, Label: "Talking", Tip: "why"}}
-	paused.YouPipe = Pipe{State: PipeHeld}
+	paused.CablePipe = Pipe{State: PipeHeld, Badge: &Badge{Icon: IconPause, Tip: "why"}}
+	paused.YouPipe = Pipe{State: PipeHeld, Badge: &Badge{Icon: IconPause, Label: "Pause key held", Tip: "why"}}
 
 	missing := testFlow()
 	missing.Sounds = FlowSounds{Caption: "Soundboard"}
