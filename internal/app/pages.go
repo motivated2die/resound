@@ -234,10 +234,8 @@ func (a *App) audioPage() []ui.Row {
 		rows = append(rows, a.cableOutputHint()...)
 	}
 
-	rows = append(rows,
-		ui.Section("While sounds play"),
-		ui.Toggle("Mute my microphone", a.cfg.MuteMicWhilePlaying, a.toggleMuteWhilePlaying),
-	)
+	rows = append(rows, ui.Section("While sounds play"))
+	rows = append(rows, a.muteMicRows()...)
 	keys, keysTone := a.keysSummary()
 	rows = append(rows, ui.Nav("Push-to-talk key", keys, keysTone, func() { a.openPage(pageKeys) }))
 
@@ -314,6 +312,15 @@ func (a *App) keysPage() []ui.Row {
 func (a *App) pttIntro() ui.Row {
 	return ui.Paragraph("Games with push-to-talk only send your voice while its key is held. "+
 		"Resound holds the key while sounds play, so others hear them.", ui.ToneMuted)
+}
+
+// muteMicRows are the option to mute the microphone while sounds play, with
+// why one would.
+func (a *App) muteMicRows() []ui.Row {
+	return []ui.Row{
+		ui.Toggle("Mute my microphone while sounds play", a.cfg.MuteMicWhilePlaying, a.toggleMuteWhilePlaying),
+		ui.Paragraph("With longer clips, others won't hear you talking in the background.", ui.ToneMuted),
+	}
 }
 
 // connectRows offer to connect VB-Cable in one go (sounds into CABLE Input,

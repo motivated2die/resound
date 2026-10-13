@@ -145,7 +145,10 @@ func (a *App) wizardAudio() []ui.Row {
 		rows = append(rows, a.connectRows()...)
 		rows = append(rows, a.cableOutputHint()...)
 	}
-	rows = append(rows, a.cableCredit()...)
+	// VB-Audio's credit and donation links are on Settings → Audio & voice
+	// chat; the intro above names them as VB-Cable's maker.
+	rows = append(rows, ui.Spacer(4))
+	rows = append(rows, a.muteMicRows()...)
 	return append(rows, ui.Flex(), ui.Separator(), a.wizardNext(a.voiceReady()), ui.Spacer(4))
 }
 
