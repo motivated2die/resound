@@ -571,19 +571,20 @@ func (s flowSoundsRow) paint(c *canvas, r rect, st rowState) {
 
 	lane, _ := flowLanes(c, r)
 	jack := jackLen
-	// The cable's jack in the microphone, and its pipe down to the join.
-	micCol, _ := pipeColor(s.mic)
-	paintJack(c, lane, r.Top, jackUp, micCol)
 	bend := c.px(flowBendL)
-	// The mic's part runs down to where the soundboard's curve meets it;
-	// from there on the cable carries both and lights up with either.
-	vGapped(c, lane, r.Top+jack, joinY+bend, micBadge, s.mic)
-	// Its jack in the soundboard, and its pipe across to the join, where it
-	// curves down into the cable: the sounds flow down like the voice.
+	// The cable's jack in the soundboard, and its pipe across to the join,
+	// where it curves down into the cable: the sounds flow down like the
+	// voice.
 	cableCol, _ := pipeColor(s.cable)
 	paintJack(c, button.Left, joinY, jackRight, cableCol)
 	hGapped(c, lane+bend, button.Left-jack, joinY, cableBadge, s.cable)
 	paintBend(c, lane, joinY, bend, cableCol)
+	// Its jack in the microphone, and the mic's part down to where the curve
+	// meets it, drawn over the curve's blended edge so a lit mic line runs
+	// through unbroken. From there on the cable carries both.
+	micCol, _ := pipeColor(s.mic)
+	paintJack(c, lane, r.Top, jackUp, micCol)
+	vGapped(c, lane, r.Top+jack, joinY+bend, micBadge, s.mic)
 	// From the join on, the cable carries both, down into the next row.
 	pipeV(c, lane, joinY+bend, r.Bottom, s.line)
 	if s.mic.Badge != nil {
