@@ -8,8 +8,7 @@ import (
 
 // shadow is a click-through layered window right below the popup in the
 // z-order, showing a blurred translucent black copy of its shape. It never
-// takes focus, so the popup still closes when the user clicks elsewhere
-// (clicks on the shadow go to the window under it).
+// takes focus, and clicks on it go to the window under it.
 type shadow struct {
 	hwnd uintptr
 	// Last rendered size, to re-render only when the popup's size changes.

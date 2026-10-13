@@ -488,7 +488,7 @@ type dropZoneRow struct {
 }
 
 // DropZone is a dashed field that invites dragging files or folders onto
-// the panel (see Popup.SetPinned); clicking it runs onClick, e.g. a picker.
+// the panel (see Popup.SetAcceptDrops); clicking it runs onClick, e.g. a picker.
 func DropZone(title, hint string, onClick func()) Row { return dropZoneRow{title, hint, onClick} }
 
 func (dropZoneRow) height() int { return 100 }

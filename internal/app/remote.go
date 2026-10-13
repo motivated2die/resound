@@ -259,9 +259,8 @@ func (a *App) renderIndexProgress() {
 	a.render()
 }
 
-// addFolder opens the folder picker. On the pages that take drops the
-// panel is pinned and stays open; the picker is owned by the panel so it
-// opens above it. Anywhere else the panel opens again afterwards.
+// addFolder opens the folder picker, owned by the panel so it opens above
+// it. If the panel was closed, it opens again afterwards.
 func (a *App) addFolder() {
 	pop := a.tray.Popup()
 	owner := a.tray.Hwnd()
@@ -358,7 +357,7 @@ func (a *App) folderCovering(p string) bool {
 }
 
 // acceptsDrops reports whether the current page adds folders by drag and
-// drop: the panel is pinned open there (see render).
+// drop (see render).
 func (a *App) acceptsDrops() bool {
 	return a.page == pageLibrary || (a.page == pageWizard && a.wizardStep == 1)
 }

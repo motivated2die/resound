@@ -460,13 +460,12 @@ func (a *App) folderRows() []ui.Row {
 	return rows
 }
 
-// dropRows is the drop field for sound folders. The panel stays open on
-// these pages (pinned), so folders can be dragged in from Explorer.
+// dropRows is the drop field for sound folders, dragged in from Explorer
+// (the panel stays open while another window has the focus).
 func (a *App) dropRows() []ui.Row {
 	return []ui.Row{
 		ui.Spacer(4),
 		ui.DropZone("Drop sound folders here", "or click to choose one", a.addFolder),
-		ui.Text("This page stays open while you drag. Click the tray icon to close.", "", ui.ToneMuted),
 	}
 }
 

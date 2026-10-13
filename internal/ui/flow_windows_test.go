@@ -10,10 +10,9 @@ import (
 	"unsafe"
 )
 
-// renderRows paints rows into an offscreen bitmap the panel's width, the
-// way Popup.paint does, and returns it. states gives a row's state (nil: no
-// hover, press or open list).
-func renderRows(t *testing.T, rows []Row, scale float64, states map[int]rowState) *image.RGBA {
+// renderCanvas creates an offscreen canvas of w×h device pixels at scale,
+// runs draw on it and returns the picture.
+func renderCanvas(t *testing.T, w, h int32, scale float64, draw func(c *canvas)) *image.RGBA {
 	t.Helper()
 	f := newFonts(scale)
 	defer f.destroy()
@@ -22,18 +21,6 @@ func renderRows(t *testing.T, rows []Row, scale float64, states map[int]rowState
 		t.Skip("no device context")
 	}
 	defer procDeleteDC.Call(dc)
-	c := &canvas{dc: dc, scale: scale, fonts: f}
-	w := c.px(popupWidthL)
-	var h int32
-	heights := make([]int32, len(rows))
-	for i, r := range rows {
-		heights[i] = c.px(r.height())
-		if m, ok := r.(measurer); ok {
-			heights[i] = m.measure(c, w)
-		}
-		h += heights[i]
-	}
-	h += 2 * c.px(popupPadL)
 
 	type bitmapInfoHeader struct {
 		Size                   uint32
@@ -54,16 +41,7 @@ func renderRows(t *testing.T, rows []Row, scale float64, states map[int]rowState
 	old, _, _ := procSelectObject.Call(dc, bmp)
 	defer procSelectObject.Call(dc, old)
 
-	c.fill(rect{0, 0, w, h}, colBackground)
-	y := c.px(popupPadL)
-	for i, r := range rows {
-		st, ok := states[i]
-		if !ok {
-			st = rowState{hover: -1, press: -1, open: -1}
-		}
-		r.paint(c, rect{0, y, w, y + heights[i]}, st)
-		y += heights[i]
-	}
+	draw(&canvas{dc: dc, scale: scale, fonts: f})
 
 	img := image.NewRGBA(image.Rect(0, 0, int(w), int(h)))
 	src := unsafe.Slice((*uint8)(bits), int(w*h*4))
@@ -72,6 +50,85 @@ func renderRows(t *testing.T, rows []Row, scale float64, states map[int]rowState
 	}
 	return img
 }
+
+// rowsHeight lays rows out like Popup does and returns their heights.
+func rowsHeight(c *canvas, rows []Row) (heights []int32, total int32) {
+	heights = make([]int32, len(rows))
+	for i, r := range rows {
+		heights[i] = c.px(r.height())
+		total += heights[i]
+	}
+	return heights, total
+}
+
+// paintRows paints rows from top, the way Popup.paint does. states gives a
+// row's state (nil: no hover, press or open list).
+func paintRows(c *canvas, rows []Row, heights []int32, left, top int32, states map[int]rowState) {
+	w := c.px(popupWidthL)
+	y := top
+	for i, r := range rows {
+		st, ok := states[i]
+		if !ok {
+			st = rowState{hover: -1, press: -1, open: -1}
+		}
+		r.paint(c, rect{left, y, left + w, y + heights[i]}, st)
+		y += heights[i]
+	}
+}
+
+// renderRows paints rows into an offscreen bitmap the panel's width, the
+// way Popup.paint does, and returns it.
+func renderRows(t *testing.T, rows []Row, scale float64, states map[int]rowState) *image.RGBA {
+	t.Helper()
+	m := &canvas{scale: scale}
+	heights, total := rowsHeight(m, rows)
+	w, h := m.px(popupWidthL), total+2*m.px(popupPadL)
+	return renderCanvas(t, w, h, scale, func(c *canvas) {
+		c.fill(rect{0, 0, w, h}, colBackground)
+		paintRows(c, rows, heights, 0, c.px(popupPadL), states)
+	})
+}
+
+// TestCloseTabRender draws the top of the panel with its close tab peeking
+// out above, over a desktop-coloured background.
+func TestCloseTabRender(t *testing.T) {
+	rows := testFlow().Rows()[:2]
+	for _, scale := range []float64{1, 1.5} {
+		for _, hover := range []bool{false, true} {
+			m := &canvas{scale: scale}
+			heights, total := rowsHeight(m, rows)
+			tabW, tabH := m.px(closeTabWL), m.px(closeTabHL)
+			margin := m.px(16)
+			top := margin + tabH - m.px(closeTabUnderL) // the popup's top
+			w, h := m.px(popupWidthL)+2*margin, top+total+m.px(popupPadL)
+			img := renderCanvas(t, w, h, scale, func(c *canvas) {
+				c.fill(rect{0, 0, w, h}, rgb(0x5A, 0x6B, 0x7C))
+				// The tab, clipped to its rounded window region.
+				tab := &closeTab{w: tabW, h: tabH, hover: hover}
+				x := margin + c.px(popupWidthL) - c.px(closeTabInsetL) - tabW
+				restore := c.clipRound(rect{x, margin, x + tabW, margin + tabH}, c.px(20))
+				procSetViewportOrgEx.Call(c.dc, uintptr(x), uintptr(margin), 0)
+				tab.draw(c)
+				procSetViewportOrgEx.Call(c.dc, 0, 0, 0)
+				restore()
+				// The popup over its lower edge. (Rows are placed by their
+				// rectangle: clip regions ignore a viewport origin.)
+				c.roundRect(rect{margin, top, margin + c.px(popupWidthL), h + c.px(20)}, c.px(16), colBackground)
+				paintRows(c, rows, heights, margin, top+c.px(popupPadL), nil)
+			})
+			name := "panel-top"
+			if hover {
+				name += "-hover"
+			}
+			if scale != 1 {
+				name += "@1.5x"
+			}
+			savePNG(t, img, name)
+		}
+	}
+}
+
+var procSetViewportOrgEx = gdi32.NewProc("SetViewportOrgEx")
 
 // savePNG writes img to $RESOUND_RENDER_DIR/name.png when that is set, to
 // look at the panel without running the app.

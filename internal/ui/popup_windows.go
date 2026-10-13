@@ -17,6 +17,9 @@ const (
 	// make the panel jump; short pages leave room at the bottom (or at a
 	// Flex row). Taller pages grow it, up to the work area.
 	popupMinL = 560
+	// popupMaxL is the maximum logical height; longer pages scroll. Small
+	// work areas lower it further, leaving room for the close tab.
+	popupMaxL = 680
 )
 
 type slot struct {
@@ -44,7 +47,8 @@ type Popup struct {
 	tracking           bool
 	lastHidden         time.Time
 
-	shadow *shadow // drop shadow window beneath the popup
+	shadow *shadow   // drop shadow window beneath the popup
+	tab    *closeTab // the "Close" tab above its top right corner
 
 	dd   *dropdownState // open dropdown list, if any
 	drag *dragState     // slider being dragged, if any
@@ -57,10 +61,10 @@ type Popup struct {
 	// (used to record a push-to-talk key). Returning true consumes it.
 	OnKey func(KeyEvent) bool
 	// OnDrop receives the paths of files and folders dropped on the popup
-	// while it is pinned (see SetPinned).
+	// while it accepts drops (see SetAcceptDrops).
 	OnDrop func(paths []string)
 
-	pinned bool
+	drops bool
 }
 
 // KeyEvent is a key or mouse button press/release seen by the popup. VK is
@@ -132,6 +136,9 @@ func newPopup() (*Popup, error) {
 	if p.shadow, err = newShadow(); err != nil {
 		return nil, err
 	}
+	if p.tab, err = newCloseTab(p); err != nil {
+		return nil, err
+	}
 	return p, nil
 }
 
@@ -185,6 +192,7 @@ func (p *Popup) Hide() {
 	p.hideTip()
 	procShowWindow.Call(p.hwnd, swHide)
 	p.shadow.hide()
+	p.tab.hide()
 	p.lastHidden = time.Now()
 	p.endDrag() // after hiding, so its re-render doesn't show the popup again
 	p.hoverRow, p.pressRow = -1, -1
@@ -224,14 +232,16 @@ func (p *Popup) layoutAndPlace() {
 	}
 	c = p.canvas(0)
 	gap := c.px(popupGapL)
-	if minH := min(c.px(popupMinL), work.h()-2*gap) - 2*c.px(popupPadL); y < minH {
+	tabRoom := c.px(closeTabHL - closeTabUnderL)
+	maxH := min(c.px(popupMaxL), work.h()-2*gap-tabRoom)
+	if minH := min(c.px(popupMinL), maxH) - 2*c.px(popupPadL); y < minH {
 		p.grow(minH - y)
 		y = minH
 	}
 	p.contentH = y
 	defer p.syncDropdown() // keep an open list attached to its row
 
-	p.height = min(p.contentH+2*c.px(popupPadL), work.h()-2*gap)
+	p.height = min(p.contentH+2*c.px(popupPadL), maxH)
 	p.scroll = max(0, min(p.scroll, p.maxScroll()))
 
 	// Horizontally centred on the anchor, kept inside the work area.
@@ -242,10 +252,11 @@ func (p *Popup) layoutAndPlace() {
 	if p.anchor.Y > work.Top+work.h()/2 {
 		yPos = work.Bottom - gap - p.height
 	} else {
-		yPos = work.Top + gap
+		yPos = work.Top + gap + tabRoom
 	}
 	procSetWindowPos.Call(p.hwnd, hwndTopmost, uintptr(x), uintptr(yPos), uintptr(p.width), uintptr(p.height), swpShowWindow)
 	p.shadow.place(p.hwnd, rect{x, yPos, x + p.width, yPos + p.height}, p.scale)
+	p.tab.place(rect{x, yPos, x + p.width, yPos + p.height}) // between the popup and its shadow
 	procInvalidateRect.Call(p.hwnd, 0, 0)
 }
 
@@ -301,9 +312,8 @@ func (p *Popup) wndProc(hwnd uintptr, m uint32, w, l uintptr) uintptr {
 		}
 		return 0
 	case wmActivate:
-		if loword(w) == waInactive && !p.pinned {
-			p.Hide()
-		}
+		// The popup stays open when another window gets the focus: closing
+		// is a deliberate click on its close tab, Esc or the tray icon.
 		return 0
 	case wmDropFiles:
 		paths := droppedFiles(w)
@@ -566,32 +576,23 @@ func (p *Popup) grow(extra int32) {
 const wmDropFiles = 0x0233
 
 var (
-	procDragAcceptFiles     = shell32.NewProc("DragAcceptFiles")
-	procDragQueryFileW      = shell32.NewProc("DragQueryFileW")
-	procDragFinish          = shell32.NewProc("DragFinish")
-	procGetForegroundWindow = user32.NewProc("GetForegroundWindow")
+	procDragAcceptFiles = shell32.NewProc("DragAcceptFiles")
+	procDragQueryFileW  = shell32.NewProc("DragQueryFileW")
+	procDragFinish      = shell32.NewProc("DragFinish")
 )
 
-// SetPinned keeps the popup open when another window gets the focus, so the
-// user can click into Explorer and drag folders onto it, or use a dialog
-// without the panel closing. While pinned it accepts file drops (OnDrop).
-// Clicking the tray icon still closes it. Unpinning hides it if it no
-// longer has the focus.
-func (p *Popup) SetPinned(on bool) {
-	if p.pinned == on {
+// SetAcceptDrops makes the popup accept dropped files and folders
+// (OnDrop), e.g. on the sound library page.
+func (p *Popup) SetAcceptDrops(on bool) {
+	if p.drops == on {
 		return
 	}
-	p.pinned = on
+	p.drops = on
 	accept := uintptr(0)
 	if on {
 		accept = 1
 	}
 	procDragAcceptFiles.Call(p.hwnd, accept)
-	if !on && p.Visible() {
-		if fg, _, _ := procGetForegroundWindow.Call(); fg != p.hwnd {
-			p.Hide()
-		}
-	}
 }
 
 // Hwnd returns the popup window, e.g. as the owner of a dialog so the

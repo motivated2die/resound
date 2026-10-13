@@ -308,7 +308,7 @@ func (a *App) render() {
 	a.updateTooltip()
 	a.flowOnPage = false // set again by flowRows
 	a.tray.Popup().SetRows(a.rows())
-	a.tray.Popup().SetPinned(a.acceptsDrops()) // stays open for dragging folders in
+	a.tray.Popup().SetAcceptDrops(a.acceptsDrops()) // folders can be dragged in
 	if a.flowOnPage || (a.page == pageHome && len(a.engine.Voices()) > 0) {
 		a.animate() // the flow's level bars, the progress bar under the title
 	}
