@@ -135,14 +135,16 @@ func (f AudioFlow) Rows() []Row {
 const (
 	flowColGapL    = 12 // between the two columns
 	flowLaneInL    = 18 // the cable's distance from the left edge
-	flowPipeL      = 2  // pipe and cable width
 	flowFieldL     = 34 // dropdowns, the cable card and the test button
 	flowMeterL     = 6  // level bar docked under a control
 	flowRadiusL    = 10 // corner radius of a control with its level bar
 	flowBadgeL     = 20 // badge height
 	flowBadgeIconL = 14
-	flowJackL      = 16 // a jack's length, tip to the end of its body
 )
+
+// flowPipePx is the width of pipes and the cable in device pixels, the
+// same at every scale, like the jacks drawn onto them.
+const flowPipePx = 3
 
 // flowCols returns the left and right column of a row.
 func flowCols(c *canvas, r rect) (left, right rect) {
@@ -184,7 +186,7 @@ func pipeColor(p Pipe) (col uint32, dashed bool) {
 // pipeV draws a vertical pipe from y0 to y1 at x.
 func pipeV(c *canvas, x, y0, y1 int32, p Pipe) {
 	col, dashed := pipeColor(p)
-	w := c.px(flowPipeL)
+	w := int32(flowPipePx)
 	if !dashed {
 		c.fill(rect{x - w/2, y0, x - w/2 + w, y1}, col)
 		return
@@ -198,7 +200,7 @@ func pipeV(c *canvas, x, y0, y1 int32, p Pipe) {
 // pipeH draws a horizontal pipe from x0 to x1 at y.
 func pipeH(c *canvas, x0, x1, y int32, p Pipe) {
 	col, dashed := pipeColor(p)
-	w := c.px(flowPipeL)
+	w := int32(flowPipePx)
 	if !dashed {
 		c.fill(rect{x0, y - w/2, x1, y - w/2 + w}, col)
 		return
@@ -316,34 +318,45 @@ const (
 	jackDown
 )
 
-// paintJack draws a 3.5 mm jack whose tip is at (x, y), pointing dir: a
-// slim shaft with a rounded tip and one insulating ring, then a slightly
-// wider body where the cable leaves, flowJackL from the tip. Widths differ
-// from the pipe's by whole pixels on each side, so the jack sits centred
-// on the cable at any scale.
+// jackRows is the 3.5 mm jack as pixel art, one entry per device pixel
+// from the tip: the width of that row, centred on the cable (0 = a gap; a
+// negative width is a bevel: its middle solid, its outer pixels half
+// blended into the background, a diagonal). A 1-pixel tip and the contact
+// part (6 pixels with the tip) with a divider at its fourth, then a bevel
+// out to a 5×5 body and one back into the 3-pixel cable. It is drawn the
+// same at every scale, like the cable.
+var jackRows = []int32{1, 3, 3, 0, 3, 3, -5, 5, 5, 5, 5, 5, -5}
+
+// jackLen is a jack's length in device pixels, tip to the end of its body.
+var jackLen = int32(len(jackRows))
+
+// paintJack draws a jack whose tip is at (x, y), pointing dir.
 func paintJack(c *canvas, x, y int32, dir jackDir, col uint32) {
-	// part returns the rectangle from a0 to a1 along the jack (0 = tip) and
-	// w wide across it.
-	part := func(a0, a1, w int32) rect {
+	// span fills row a (0 = tip) from u0 to u1 across the jack, measured
+	// from the cable's centre line.
+	span := func(a, u0, u1 int32, col uint32) {
 		switch dir {
 		case jackRight:
-			return rect{x - a1, y - w/2, x - a0, y - w/2 + w}
+			c.fill(rect{x - a - 1, y + u0, x - a, y + u1}, col)
 		case jackDown:
-			return rect{x - w/2, y - a1, x - w/2 + w, y - a0}
+			c.fill(rect{x + u0, y - a - 1, x + u1, y - a}, col)
+		default:
+			c.fill(rect{x + u0, y + a, x + u1, y + a + 1}, col)
 		}
-		return rect{x - w/2, y + a0, x - w/2 + w, y + a1}
 	}
-	pipeW := c.px(flowPipeL)
-	shaftW := pipeW + 2*max(1, c.px(1))
-	bodyW := pipeW + 2*max(2, c.px(2))
-	shaftL, bodyL := c.px(9), c.px(flowJackL)
-	// roundRect covers one more pixel right and below; shrink to match.
-	round := func(r rect, radius int32) { c.roundRect(rect{r.Left, r.Top, r.Right - 1, r.Bottom - 1}, radius, col) }
-	round(part(0, shaftL+c.px(1), shaftW), shaftW)
-	c.fill(part(0, c.px(2), pipeW), col) // the tip touches what it plugs into, at any scale
-	ring := c.px(4)
-	c.fill(part(ring, ring+max(1, c.px(1)), shaftW), colBackground)
-	round(part(shaftL, bodyL, bodyW), c.px(2))
+	soft := mix(colBackground, col, 0.5)
+	for i, w := range jackRows {
+		a := int32(i)
+		switch {
+		case w > 0:
+			span(a, -w/2, -w/2+w, col)
+		case w < 0: // bevel: solid middle, half-blended ends
+			w = -w
+			span(a, -w/2+1, w/2, col)
+			span(a, -w/2, -w/2+1, soft)
+			span(a, w/2, w/2+1, soft)
+		}
+	}
 }
 
 // dockedUnit is a control with its level bar docked under it: one rounded
@@ -474,10 +487,10 @@ func (s flowSoundsRow) geometry(c *canvas, r rect) (caption, button rect, joinY 
 	joinY = button.Top + button.h()/2
 	lane, _ := flowLanes(c, r)
 	if b := s.mic.Badge; b != nil {
-		micBadge = badgeOnLane(c, b, lane, (r.Top+c.px(flowJackL)+joinY)/2, rc.Left-c.px(10))
+		micBadge = badgeOnLane(c, b, lane, (r.Top+jackLen+joinY)/2, rc.Left-c.px(10))
 	}
 	if b := s.cable.Badge; b != nil {
-		x0, x1 := lane+c.px(4), rc.Left-c.px(flowJackL)
+		x0, x1 := lane+c.px(4), rc.Left-jackLen
 		cableBadge = badgeCentred(c, b, (x0+x1)/2, joinY, x1-x0-c.px(8))
 	}
 	return
@@ -525,7 +538,7 @@ func (s flowSoundsRow) paint(c *canvas, r rect, st rowState) {
 	paintButtonFace(c, button, label, icon, fg)
 
 	lane, toYou := flowLanes(c, r)
-	jack := c.px(flowJackL)
+	jack := jackLen
 	// The cable's jack in the microphone, and its pipe down to the join.
 	micCol, _ := pipeColor(s.mic)
 	paintJack(c, lane, r.Top, jackUp, micCol)
@@ -535,7 +548,7 @@ func (s flowSoundsRow) paint(c *canvas, r rect, st rowState) {
 	paintJack(c, button.Left, joinY, jackRight, cableCol)
 	hGapped(c, lane, button.Left-jack, joinY, cableBadge, s.cable)
 	// From the join on, the cable carries both, down into the next row.
-	pipeV(c, lane, joinY-c.px(flowPipeL)/2, r.Bottom, s.line)
+	pipeV(c, lane, joinY-flowPipePx/2, r.Bottom, s.line)
 	if s.mic.Badge != nil {
 		paintBadge(c, micBadge, s.mic.Badge, st.hover == 1, st.press == 1, false)
 	}
@@ -605,7 +618,7 @@ func (j flowCableRow) paint(c *canvas, r rect, st rowState) {
 	tip := r.Bottom - c.px(3) // just above the outputs' captions
 
 	// The cable down to its jack at the far end, CABLE Output.
-	vGapped(c, lane, r.Top, tip-c.px(flowJackL), boxes[0], j.cable)
+	vGapped(c, lane, r.Top, tip-jackLen, boxes[0], j.cable)
 	col, _ := pipeColor(j.cable)
 	paintJack(c, lane, tip, jackDown, col)
 	// The headphones' stream, straight down.
