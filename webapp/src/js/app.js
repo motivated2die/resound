@@ -653,7 +653,7 @@ function stopHold(button, st, early) {
     clearTimeout(st.holdTimer);
     button.classList.remove('holding');
     if (!early) return;
-    setLongPressLabel(button, 'Keep holding until it fills');
+    setLongPressLabel(button, 'Keep holding');
     clearTimeout(st.hintTimer);
     st.hintTimer = setTimeout(() => { if (!st.armed) setLongPressLabel(button, st.label); }, 1500);
 }
@@ -663,7 +663,7 @@ function armHold(button, st) {
     st.armed = true;
     button.classList.remove('holding');
     button.classList.add('confirming');
-    setLongPressLabel(button, 'Tap again to confirm. This can\'t be undone.');
+    setLongPressLabel(button, 'Tap to confirm');
     if (navigator.vibrate) navigator.vibrate(50);
     st.armTimer = setTimeout(() => disarmHold(button, st), HOLD_ARMED_MS);
 }

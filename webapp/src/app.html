@@ -192,78 +192,71 @@
                 </button>
             </div>
 
-            <div class="settings-section">
-                 <h3>Preferences</h3>
-                 <label class="toggle-switch" id="wake-lock-toggle-label-container">
-                    <input type="checkbox" id="wake-lock-toggle">
-                    <span class="slider"></span>
-                    <span id="wake-lock-toggle-label">Keep Screen On</span>
-                 </label>
-                 <!-- Hidden where the app is fullscreen already or the browser can't (fullscreen.js) -->
-                 <label class="toggle-switch" id="fullscreen-toggle-container">
-                    <input type="checkbox" id="auto-fullscreen-toggle">
-                    <span class="slider"></span>
-                     Fullscreen
-                 </label>
-                 <!-- Hidden where the device can't vibrate (device.js) -->
-                 <label class="toggle-switch" id="haptics-toggle-container" hidden>
-                    <input type="checkbox" id="haptics-toggle">
-                    <span class="slider"></span>
-                     Vibrate on Tap
-                 </label>
-                 <label class="toggle-switch">
-                    <input type="checkbox" id="swap-button-position-toggle">
-                    <span class="slider"></span>
-                     Swap Menu Buttons to Left
-                 </label>
-            </div>
-            <div class="divider"></div>
-
-            <div class="settings-section">
-                <h3>Reset</h3>
-                <p class="modal-info">Hold a button until it fills, then tap it again to confirm. Colours, emoji and layouts are stored on the PC and shared by all devices; the desktop app backs them up under Settings → Backup &amp; restore.</p>
-                <div class="modal-actions vertical reset-actions">
-                    <button id="reset-current-page-visuals" class="action-button long-press-button" data-long-press-duration="800">
-                        <span class="icon" data-icon="restart_alt" aria-hidden="true"></span>
-                        <span>Hold to reset this page's colours</span>
-                    </button>
-                    <button id="reset-current-page-layout" class="action-button long-press-button" data-long-press-duration="800">
-                        <span class="icon" data-icon="restart_alt" aria-hidden="true"></span>
-                        <span>Hold to reset this page's layout</span>
-                    </button>
-                    <button id="reset-all-settings" class="action-button long-press-button" data-long-press-duration="800">
-                        <span class="icon" data-icon="delete_sweep" aria-hidden="true"></span>
-                        <span>Hold to reset all colours and layouts</span>
-                    </button>
+            <!-- Scrolls when the screen is short; the header stays -->
+            <div class="modal-body">
+                <div class="settings-section">
+                    <h3>Preferences</h3>
+                    <label class="toggle-switch" id="wake-lock-toggle-label-container">
+                        <input type="checkbox" id="wake-lock-toggle">
+                        <span class="slider"></span>
+                        <span id="wake-lock-toggle-label">Keep Screen On</span>
+                    </label>
+                    <!-- Hidden where the app is fullscreen already or the browser can't (fullscreen.js) -->
+                    <label class="toggle-switch" id="fullscreen-toggle-container">
+                        <input type="checkbox" id="auto-fullscreen-toggle">
+                        <span class="slider"></span>
+                        Fullscreen
+                    </label>
+                    <!-- Hidden where the device can't vibrate (device.js) -->
+                    <label class="toggle-switch" id="haptics-toggle-container" hidden>
+                        <input type="checkbox" id="haptics-toggle">
+                        <span class="slider"></span>
+                        Vibrate on Tap
+                    </label>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="swap-button-position-toggle">
+                        <span class="slider"></span>
+                        Menu Buttons on the Left
+                    </label>
                 </div>
-            </div>
+                <div class="divider"></div>
 
-            <div class="divider"></div>
-            <div class="settings-section">
-                <h3>PC</h3>
-                <p class="modal-info">Connected to <strong id="app-connection-name">your PC</strong> directly over your network.</p>
-                <div class="modal-actions vertical">
-                    <button id="app-connection-switch" class="action-button">
-                        <span>Switch or pair a PC</span>
-                    </button>
-                    <!-- Shown while the browser offers to install the app (device.js) -->
-                    <button id="install-app-button" class="action-button" hidden>
-                        <span>Install the app</span>
-                    </button>
-                </div>
-            </div>
-
-            <div class="divider"></div>
-            <div class="settings-section">
-                <div class="help-container">
-                    <div class="help-text">
-                        <h3>Help wanted?</h3>
-                        <p class="modal-info">Get a quick tour of the features.</p>
+                <div class="settings-section">
+                    <h3>Reset</h3>
+                    <p class="modal-info">Hold until it fills, then tap to confirm. Can't be undone; applies to all devices.</p>
+                    <div class="modal-actions grid reset-actions">
+                        <button id="reset-current-page-visuals" class="action-button long-press-button" data-long-press-duration="800">
+                            <span class="icon" data-icon="restart_alt" aria-hidden="true"></span>
+                            <span>Page colours</span>
+                        </button>
+                        <button id="reset-current-page-layout" class="action-button long-press-button" data-long-press-duration="800">
+                            <span class="icon" data-icon="restart_alt" aria-hidden="true"></span>
+                            <span>Page layout</span>
+                        </button>
+                        <button id="reset-all-settings" class="action-button long-press-button wide" data-long-press-duration="800">
+                            <span class="icon" data-icon="delete_sweep" aria-hidden="true"></span>
+                            <span>All colours and layouts</span>
+                        </button>
                     </div>
-                    <button id="start-tutorial-button" class="action-button">
-                        <span class="icon" data-icon="school" aria-hidden="true"></span>
-                        <span>Start Tutorial</span>
-                    </button>
+                </div>
+                <div class="divider"></div>
+
+                <div class="settings-section">
+                    <h3>PC</h3>
+                    <p class="modal-info">Connected to <strong id="app-connection-name">your PC</strong> directly over your network.</p>
+                    <div class="modal-actions grid">
+                        <button id="app-connection-switch" class="action-button">
+                            <span>Switch PC</span>
+                        </button>
+                        <button id="start-tutorial-button" class="action-button">
+                            <span class="icon" data-icon="school" aria-hidden="true"></span>
+                            <span>Tour</span>
+                        </button>
+                        <!-- Shown while the browser offers to install the app (device.js) -->
+                        <button id="install-app-button" class="action-button wide" hidden>
+                            <span>Install the app</span>
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>

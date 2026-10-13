@@ -1387,11 +1387,26 @@ emoji-picker section#favorites {
   /* Remove default padding */
   width: 90%;
   max-width: 400px;
+  /* Never taller than the screen (notch and home bar included): the body
+     scrolls, the header stays. */
+  max-height: calc(100vh - 32px);
+  max-height: calc(100dvh - 32px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
+  display: flex;
+  flex-direction: column;
   box-shadow: 0 5px 25px rgba(0, 0, 0, 0.5);
   transform: scale(0.95);
   transition: transform 0.3s ease;
   overflow: hidden;
   /* Hide overflow for border-radius */
+}
+
+#app-settings-modal .modal-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  padding-bottom: 6px;
 }
 
 #app-settings-modal-overlay:not(.hidden) #app-settings-modal {
@@ -1403,7 +1418,8 @@ emoji-picker section#favorites {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 15px 20px;
+  flex-shrink: 0;
+  padding: 12px 16px 12px 20px;
   /* Padding for header */
   border-bottom: 1px solid rgba(255, 255, 255, 0.1);
   /* Separator */
@@ -1444,7 +1460,7 @@ emoji-picker section#favorites {
 #app-settings-modal .settings-section {
   margin-bottom: 0;
   /* Remove bottom margin */
-  padding: 15px 20px;
+  padding: 12px 20px;
   /* Padding for each section */
 }
 
@@ -1471,7 +1487,7 @@ emoji-picker section#favorites {
   color: var(--text-secondary);
   margin-top: 0;
   /* Remove top margin */
-  margin-bottom: 15px;
+  margin-bottom: 10px;
   /* Space below description */
   text-align: left;
   /* Align left */
@@ -1484,7 +1500,7 @@ emoji-picker section#favorites {
   gap: 10px;
   /* Consistent gap */
   justify-content: center;
-  margin-top: 15px;
+  margin-top: 10px;
   /* Space above button groups */
   flex-wrap: wrap;
 }
@@ -2571,4 +2587,23 @@ emoji-picker section#favorites
    browser or device does not support are hidden). */
 [hidden] {
   display: none !important;
+}
+
+/* Settings buttons two by two; .wide spans the row. */
+#app-settings-modal .modal-actions.grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+#app-settings-modal .modal-actions.grid .action-button {
+  width: 100%;
+  min-width: 0;
+  gap: 6px;
+  padding: 0 12px;
+}
+#app-settings-modal .modal-actions.grid .wide {
+  grid-column: 1 / -1;
+}
+#app-settings-modal .toggle-switch {
+  padding: 6px 0;
 }

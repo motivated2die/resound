@@ -66,15 +66,20 @@ code { font-family: Consolas, "Cascadia Mono", monospace; background: var(--rais
 .icon[data-icon="code"] { --icon: url("../assets/icons/code.svg"); }
 .icon[data-icon="computer"] { --icon: url("../assets/icons/computer.svg"); }
 .icon[data-icon="download"] { --icon: url("../assets/icons/download.svg"); }
+.icon[data-icon="edit"] { --icon: url("../assets/icons/edit.svg"); }
+.icon[data-icon="favorite-fill"] { --icon: url("../assets/icons/favorite-fill.svg"); }
 .icon[data-icon="folder_open"] { --icon: url("../assets/icons/folder_open.svg"); }
 .icon[data-icon="graphic_eq"] { --icon: url("../assets/icons/graphic_eq.svg"); }
 .icon[data-icon="headset_mic"] { --icon: url("../assets/icons/headset_mic.svg"); }
 .icon[data-icon="install_mobile"] { --icon: url("../assets/icons/install_mobile.svg"); }
 .icon[data-icon="keyboard"] { --icon: url("../assets/icons/keyboard.svg"); }
 .icon[data-icon="lock"] { --icon: url("../assets/icons/lock.svg"); }
+.icon[data-icon="mic"] { --icon: url("../assets/icons/mic.svg"); }
 .icon[data-icon="newspaper"] { --icon: url("../assets/icons/newspaper.svg"); }
 .icon[data-icon="qr_code_scanner"] { --icon: url("../assets/icons/qr_code_scanner.svg"); }
+.icon[data-icon="settings"] { --icon: url("../assets/icons/settings.svg"); }
 .icon[data-icon="smartphone"] { --icon: url("../assets/icons/smartphone.svg"); }
+.icon[data-icon="stop_circle"] { --icon: url("../assets/icons/stop_circle.svg"); }
 .icon[data-icon="update"] { --icon: url("../assets/icons/update.svg"); }
 .icon[data-icon="wifi"] { --icon: url("../assets/icons/wifi.svg"); }
 
@@ -166,6 +171,8 @@ h1 { font-size: clamp(32px, 5vw, 52px); line-height: 1.1; font-weight: 700; lett
     box-shadow: 0 30px 80px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(255, 255, 255, 0.06), 0 0 90px rgba(var(--accent-rgb), 0.12);
     transform: rotate(-3deg);
 }
+/* The screen follows the remote's layout (app.html): a slim top bar, the
+   sound grid, the tabs, and the bottom bar with logo, mic and STOP. */
 .phone-screen {
     height: 100%;
     border-radius: 30px;
@@ -173,36 +180,65 @@ h1 { font-size: clamp(32px, 5vw, 52px); line-height: 1.1; font-weight: 700; lett
     overflow: hidden;
     display: flex;
     flex-direction: column;
-    padding: 18px 10px 10px;
 }
-.mock-top { display: flex; align-items: center; gap: 8px; padding: 0 4px 10px; }
-.mock-title { display: flex; flex-direction: column; line-height: 1.2; }
-.mock-brand { font-size: 11px; font-weight: 600; letter-spacing: 0.14em; }
-.mock-status { font-size: 9px; color: var(--muted); display: flex; align-items: center; gap: 4px; }
-.mock-status i { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 6px var(--accent); }
-.mock-stop { margin-left: auto; font-size: 9px; font-weight: 700; color: #fff; background: var(--berry); padding: 4px 9px; border-radius: 7px; }
-.mock-tabs { display: flex; gap: 6px; padding: 0 2px 10px; font-size: 10px; color: var(--muted); }
-.mock-tabs span { padding: 4px 9px; border-radius: 999px; background: var(--raised); }
-.mock-tabs .on { background: rgba(var(--accent-rgb), 0.18); color: var(--accent); }
-.mock-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; flex: 1; align-content: start; }
+.mock-top {
+    display: flex;
+    justify-content: flex-end;
+    gap: 14px;
+    padding: 16px 16px 8px;
+    background: var(--raised);
+    border-bottom: 1px solid var(--divider);
+    color: var(--muted);
+}
+.mock-top .icon { font-size: 15px; }
+.mock-grid {
+    flex: 1;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    grid-auto-rows: 1fr;
+    gap: 6px;
+    padding: 8px;
+    min-height: 0;
+}
 .tile {
     position: relative;
     overflow: hidden;
-    min-height: 70px;
-    border-radius: 9px;
+    border-radius: 8px;
     background: var(--surface);
-    font-size: 9.5px;
+    font-size: 10px;
     line-height: 1.2;
     display: flex;
-    flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 3px;
     text-align: center;
     padding: 4px;
     border: 1.5px solid transparent;
+    z-index: 0;
 }
-.tile b { font-size: 17px; font-weight: normal; }
+/* The emoji sits large behind the name, as on the remote's cards */
+.tile b {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 26px;
+    font-weight: normal;
+    opacity: 0.85;
+    z-index: -1;
+}
+.tile span { text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9), 0 0 6px rgba(0, 0, 0, 0.6); }
+.tile.fav::after {
+    content: "";
+    position: absolute;
+    right: 5px;
+    bottom: 5px;
+    width: 8px;
+    height: 8px;
+    background: rgba(236, 236, 240, 0.75);
+    -webkit-mask: url("../assets/icons/favorite-fill.svg") center / contain no-repeat;
+    mask: url("../assets/icons/favorite-fill.svg") center / contain no-repeat;
+}
 /* The remote's card colours (css/styles.css --sound-color-*) */
 .tile.red { background: #4a2a2a; }
 .tile.orange { background: #5a3c1f; }
@@ -218,13 +254,69 @@ h1 { font-size: clamp(32px, 5vw, 52px); line-height: 1.1; font-weight: 700; lett
     inset: 0 auto 0 0;
     width: 62%;
     background: #6b3a3a;
-    z-index: -1;
+    z-index: -2;
 }
-.tile.playing { z-index: 0; }
 @media (prefers-reduced-motion: no-preference) {
     .tile.playing::before { animation: progress 3.2s linear infinite; }
     @keyframes progress { from { width: 0; } to { width: 100%; } }
 }
+.mock-tabs {
+    display: flex;
+    background: var(--raised);
+    border-top: 1px solid var(--divider);
+    font-size: 9.5px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+    color: var(--muted);
+    white-space: nowrap;
+    overflow: hidden;
+}
+.mock-tab {
+    display: flex;
+    align-items: center;
+    padding: 0 11px;
+    height: 30px;
+    border-top: 2px solid transparent;
+    margin-top: -1px;
+}
+.mock-tab .icon { font-size: 14px; }
+.mock-tab.on { color: var(--accent); border-top-color: var(--accent); background: rgba(var(--accent-rgb), 0.1); }
+.mock-bar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 9px 12px 14px;
+    background: #16171b;
+}
+.mock-title { display: flex; flex-direction: column; line-height: 1.25; }
+.mock-brand { font-size: 10px; font-weight: 600; letter-spacing: 0.16em; }
+.mock-status { font-size: 8px; color: var(--muted); display: flex; align-items: center; gap: 4px; }
+.mock-status i { width: 5px; height: 5px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 6px var(--accent); }
+.mock-mic {
+    margin-left: auto;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: var(--control);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.mock-mic .icon { font-size: 15px; }
+.mock-stop {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 10px;
+    font-weight: 700;
+    color: #fff;
+    background: var(--berry);
+    padding: 6px 12px 6px 8px;
+    border-radius: 999px;
+}
+.mock-stop .icon { font-size: 14px; }
 
 /* --- Sections --- */
 .section { padding: 56px 0; }
