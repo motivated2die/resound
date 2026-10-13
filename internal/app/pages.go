@@ -25,10 +25,8 @@ func (a *App) rows() []ui.Row {
 		return a.wizardPage()
 	case pageSettings:
 		return a.settingsPage()
-	case pageOutputs:
-		return a.outputsPage()
-	case pageVoice:
-		return a.voicePage()
+	case pageAudio:
+		return a.audioPage()
 	case pageKeys:
 		return a.keysPage()
 	case pageLibrary:
@@ -47,13 +45,20 @@ func (a *App) rows() []ui.Row {
 
 // openPage opens a detail page; its back button returns to the current one.
 func (a *App) openPage(p page) {
-	a.parent = a.page
+	if p == a.page {
+		return
+	}
+	a.parents = append(a.parents, a.page)
 	a.showPage(p)
 }
 
 func (a *App) back() {
 	a.removing = ""
-	a.showPage(a.parent)
+	to := pageHome
+	if n := len(a.parents); n > 0 {
+		to, a.parents = a.parents[n-1], a.parents[:n-1]
+	}
+	a.showPage(to)
 }
 
 func roleLabel(role string) string {
@@ -83,10 +88,10 @@ type issue struct {
 func (a *App) issues() []issue {
 	var out []issue
 	if detail, tone := a.outputsSummary(); tone == ui.ToneBad {
-		out = append(out, issue{"Audio outputs", detail, tone, pageOutputs})
+		out = append(out, issue{"Audio outputs", detail, tone, pageAudio})
 	}
 	if detail, tone := a.voiceSummary(); tone != ui.ToneGood {
-		out = append(out, issue{"Voice chat", detail, tone, pageVoice})
+		out = append(out, issue{"Voice chat", detail, tone, pageAudio})
 	}
 	return out
 }
@@ -128,9 +133,8 @@ func (a *App) homePage() []ui.Row {
 		rows = append(rows, ui.Paragraph(a.libNote, ui.ToneGood))
 	}
 
-	rows = append(rows, ui.Spacer(4), a.monitorDropdown("Audio output"))
-	rows = append(rows, a.volumeSliders()...)
-	rows = append(rows, a.testButtons()...)
+	rows = append(rows, ui.Spacer(6))
+	rows = append(rows, a.flowRows(false)...)
 
 	remoteDetail, remoteTone := a.remoteSummary()
 	rows = append(rows,
@@ -148,24 +152,7 @@ func (a *App) homePage() []ui.Row {
 	return rows
 }
 
-func (a *App) volumeSliders() []ui.Row {
-	return []ui.Row{
-		ui.Slider("vol-monitor", "You hear", fmt.Sprintf("%d%%", a.cfg.MonitorVolume), a.cfg.MonitorVolume, 100, 5,
-			func(v int, done bool) { a.setVolume(audio.RoleMonitor, v, done) }),
-		ui.Slider("vol-cable", "Others hear", fmt.Sprintf("%d%%", a.cfg.CableVolume), a.cfg.CableVolume, 100, 5,
-			func(v int, done bool) { a.setVolume(audio.RoleCable, v, done) }),
-	}
-}
-
-// testButtons play the test tone on both outputs and stop everything.
-func (a *App) testButtons() []ui.Row {
-	rows := []ui.Row{a.testActions()}
-	if a.playback.lastError != "" {
-		rows = append(rows, ui.Paragraph(a.playback.lastError, ui.ToneBad))
-	}
-	return rows
-}
-
+// testActions play the test tone on both outputs and stop everything.
 func (a *App) testActions() ui.Row {
 	return ui.Buttons(
 		ui.Action{Label: "Play test tone", Icon: ui.IconPlay, OnClick: func() { a.playTest(true) }},
@@ -176,18 +163,16 @@ func (a *App) testActions() ui.Row {
 // --- settings --------------------------------------------------------------
 
 func (a *App) settingsPage() []ui.Row {
-	voice, voiceTone := a.voiceSummary()
+	audioDetail, audioTone := a.audioSummary()
 	keys, keysTone := a.keysSummary()
-	out, outTone := a.outputsSummary()
 	lib, libTone := a.librarySummary()
 	remote, remoteTone := a.remoteSummary()
 	appDetail, appTone := a.appSummary()
 	backupDetail, backupTone := a.backupSummary()
 	return []ui.Row{
 		ui.Header("Settings", func() { a.showPage(pageHome) }),
-		ui.Nav("Voice chat", voice, voiceTone, func() { a.openPage(pageVoice) }),
+		ui.Nav("Audio & voice chat", audioDetail, audioTone, func() { a.openPage(pageAudio) }),
 		ui.Nav("Push-to-talk", keys, keysTone, func() { a.openPage(pageKeys) }),
-		ui.Nav("Audio outputs", out, outTone, func() { a.openPage(pageOutputs) }),
 		ui.Nav("Sound library", lib, libTone, func() { a.openPage(pageLibrary) }),
 		ui.Nav("Phone remote", remote, remoteTone, func() { a.openPage(pageRemote) }),
 		ui.Nav("App & startup", appDetail, appTone, func() { a.openPage(pageApp) }),
@@ -222,86 +207,53 @@ func (a *App) outputsSummary() (string, ui.Tone) {
 	return "None running", ui.ToneBad
 }
 
-// outputError returns a row explaining a failed output, or nil.
-func (a *App) outputError(role string) ui.Row {
-	for _, s := range a.engine.Status() {
-		if s.Role == role && !s.Running && s.Err != nil {
-			return ui.Paragraph(roleLabel(role)+": "+s.Err.Error(), ui.ToneBad)
-		}
+// audioSummary is the Settings entry's status: a failed output first, then
+// voice chat.
+func (a *App) audioSummary() (string, ui.Tone) {
+	if detail, tone := a.outputsSummary(); tone == ui.ToneBad {
+		return "Output " + detail, tone
 	}
-	return nil
+	return a.voiceSummary()
 }
 
-func (a *App) outputsPage() []ui.Row {
+// audioPage is the audio flow with everything that sets it up: installing
+// VB-Cable, connecting it, and the options of what happens while sounds play.
+func (a *App) audioPage() []ui.Row {
 	rows := []ui.Row{
-		ui.Header("Audio outputs", a.back),
-		ui.Paragraph("You hear sounds on the first output. Others hear them through the second, normally VB-Cable's “CABLE Input”.", ui.ToneMuted),
-		a.monitorDropdown("You hear"),
+		ui.Header("Audio & voice chat", a.back),
+		ui.Paragraph("Speak and play the test sound: the bars show what arrives where. "+
+			"Others hear your microphone and sounds through VB-Cable; you hear the sounds yourself.", ui.ToneMuted),
 	}
-	if r := a.outputError(audio.RoleMonitor); r != nil {
-		rows = append(rows, r)
+	rows = append(rows, a.flowRows(false)...)
+	if !a.route.CableInstalled() {
+		rows = append(rows, ui.Section("Install VB-Cable"))
+		rows = append(rows, a.cableInstallRows()...)
+	} else {
+		rows = append(rows, a.cableNoteRows()...)
+		rows = append(rows, a.connectRows()...)
+		rows = append(rows, a.cableOutputHint()...)
 	}
-	rows = append(rows, a.cableDropdown("Others hear"))
-	if r := a.outputError(audio.RoleCable); r != nil {
-		rows = append(rows, r)
-	}
-	if a.devErr != nil {
-		rows = append(rows, ui.Paragraph("Device list failed: "+a.devErr.Error(), ui.ToneBad))
-	}
-	rows = append(rows, ui.Section("Volume"))
-	rows = append(rows, a.volumeSliders()...)
-	return append(rows,
-		ui.Separator(),
-		ui.Button("Restart outputs", ui.ButtonNormal, false, a.restartOutputs),
-		ui.Text("Use it after plugging in or removing a device.", "", ui.ToneMuted),
-		ui.Spacer(4),
+
+	rows = append(rows,
+		ui.Section("While sounds play"),
+		ui.Toggle("Mute my microphone", a.cfg.MuteMicWhilePlaying, a.toggleMuteWhilePlaying),
 	)
-}
+	keys, keysTone := a.keysSummary()
+	rows = append(rows, ui.Nav("Push-to-talk key", keys, keysTone, func() { a.openPage(pageKeys) }))
 
-// monitorDropdown chooses the "you hear" output: system default + every output.
-func (a *App) monitorDropdown(label string) ui.Row {
-	opts := []ui.Option{{Label: "System default"}}
-	sel := 0
-	for i, d := range a.devices {
-		o := ui.Option{Label: d.Name}
-		if d.Default {
-			o.Detail = "default"
-		}
-		opts = append(opts, o)
-		if d.ID == a.cfg.MonitorDeviceID {
-			sel = i + 1
-		}
+	rows = append(rows, ui.Section("Devices"))
+	if a.route.MicRouted && a.busy == "" {
+		rows = append(rows, ui.Button("Stop routing microphone into the cable", ui.ButtonNormal, false, func() { a.setMicRouting(false) }))
 	}
-	return ui.Dropdown("monitor", label, "", opts, sel, func(i int) {
-		if i == 0 {
-			a.selectMonitor("")
-		} else {
-			a.selectMonitor(a.devices[i-1].ID)
-		}
-	})
-}
-
-// cableDropdown chooses the "others hear" output: off + every output.
-func (a *App) cableDropdown(label string) ui.Row {
-	opts := []ui.Option{{Label: "Off"}}
-	sel := 0
-	for i, d := range a.devices {
-		o := ui.Option{Label: d.Name}
-		if d.IsVirtualCable() {
-			o.Detail = "cable"
-		}
-		opts = append(opts, o)
-		if d.ID == a.cfg.CableDeviceID {
-			sel = i + 1
-		}
-	}
-	return ui.Dropdown("cable", label, "", opts, sel, func(i int) {
-		if i == 0 {
-			a.selectCable("")
-		} else {
-			a.selectCable(a.devices[i-1].ID)
-		}
-	})
+	rows = append(rows,
+		ui.Buttons(
+			ui.Action{Label: "Restart outputs", Icon: ui.IconRefresh, OnClick: a.restartOutputs},
+			ui.Action{Label: "Windows sound", Icon: ui.IconExternalLink, Closes: true, OnClick: func() { _ = ui.ShellRun("control.exe", "mmsys.cpl,,1") }},
+		),
+		ui.Text("Restart outputs after plugging in a device.", "", ui.ToneMuted),
+	)
+	rows = append(rows, a.cableCredit()...)
+	return append(rows, ui.Spacer(4))
 }
 
 // --- voice chat (VB-Cable, microphone, push-to-talk) -------------------------
@@ -338,22 +290,6 @@ func (a *App) setupStepsDone() int {
 	return n
 }
 
-func (a *App) voicePage() []ui.Row {
-	rows := []ui.Row{
-		ui.Header("Voice chat", a.back),
-		ui.Paragraph("Others hear Resound through VB-Cable, together with your microphone.", ui.ToneMuted),
-	}
-	rows = append(rows, a.cableRows()...)
-	rows = append(rows, a.cableCredit()...)
-	return append(rows,
-		ui.Section("Options"),
-		ui.Toggle("Mute microphone while sounds play", a.cfg.MuteMicWhilePlaying, a.toggleMuteWhilePlaying),
-		ui.Separator(),
-		ui.ClosingButton("Open Windows recording devices", ui.ButtonNormal, func() { _ = ui.ShellRun("control.exe", "mmsys.cpl,,1") }),
-		ui.Spacer(4),
-	)
-}
-
 // --- push-to-talk -----------------------------------------------------------
 
 func (a *App) keysSummary() (string, ui.Tone) {
@@ -376,61 +312,29 @@ func (a *App) pttIntro() ui.Row {
 		"Resound holds the key while sounds play, so others hear them.", ui.ToneMuted)
 }
 
-// cableRows is the VB-Cable checklist with an action under each open step.
-func (a *App) cableRows() []ui.Row {
+// connectRows offer to connect VB-Cable in one go (sounds into CABLE Input,
+// the microphone into the cable) while either is missing.
+func (a *App) connectRows() []ui.Row {
 	st := a.route
 	var rows []ui.Row
-
-	// 1. VB-Cable present.
-	info := "Found"
-	if !st.CableInstalled() {
-		info = a.cableStepInfo()
-	}
-	rows = append(rows, ui.Step(1, "VB-Cable installed", info, st.CableInstalled()))
-	if st.CableInstalled() {
-		rows = append(rows, a.cableNoteRows()...)
-	} else {
-		rows = append(rows, a.cableInstallRows()...)
-	}
-
-	// 2. Sounds go into the cable.
-	info = "Not set"
-	if a.cableSelected() {
-		info = "CABLE Input"
-	}
-	rows = append(rows, ui.Step(2, "Sounds go to the cable", info, a.cableSelected()))
-	if !a.cableSelected() && st.CableInput != nil {
-		rows = append(rows, ui.Button("Use CABLE Input", ui.ButtonPrimary, false, a.useCableAsOutput))
-	}
-
-	// 3. Voice goes into the cable ("Listen to this device").
-	info = "Off"
-	if st.MicRouted {
-		info = "On"
-	}
-	rows = append(rows, ui.Step(3, "Your voice goes to the cable", info, st.MicRouted))
-	rows = append(rows, a.micRows()...)
 	switch {
 	case a.busy != "":
 		rows = append(rows, ui.Text(a.busy, "", ui.ToneWarning))
-	case st.Mic != nil && st.MicRouted:
-		rows = append(rows, ui.Button("Stop routing microphone", ui.ButtonNormal, false, func() { a.setMicRouting(false) }))
-	case st.Mic != nil:
+	case !a.cableSelected() || (!st.MicRouted && st.Mic != nil):
 		rows = append(rows,
-			ui.Button("Route microphone into cable", ui.ButtonPrimary, st.CableInput == nil, func() { a.setMicRouting(true) }),
-			ui.Text("Needs administrator approval once.", "", ui.ToneMuted))
+			ui.Button("Connect to VB-Cable", ui.ButtonPrimary, false, a.connectCable),
+			ui.Text("Windows asks for administrator approval once.", "", ui.ToneMuted))
 	}
 	if a.routeErr != nil {
 		rows = append(rows, ui.Paragraph(a.routeErr.Error(), ui.ToneBad))
 	}
-
-	// 4. The user's own step in their apps.
-	return append(rows, a.cableOutputHint()...)
+	return rows
 }
 
+// cableOutputHint is the user's own step: their apps listen to the cable.
 func (a *App) cableOutputHint() []ui.Row {
 	return []ui.Row{
-		ui.Step(4, "Pick “CABLE Output” as mic", "in your apps", false),
+		ui.Section("In your apps"),
 		ui.Paragraph("In Discord, games or OBS, choose “CABLE Output” as your microphone.", ui.ToneMuted),
 	}
 }
@@ -439,39 +343,6 @@ func (a *App) recheckCable() {
 	a.refreshDevices(true)
 	a.refreshRouting(true)
 	a.render()
-}
-
-func (a *App) micRows() []ui.Row {
-	st := a.route
-	auto := ui.Option{Label: "Automatic"}
-	if st.Mic != nil && a.cfg.MicDeviceID == "" {
-		auto.Label = "Automatic: " + st.Mic.Name
-	}
-	opts := []ui.Option{auto}
-	ids := []string{""}
-	sel := 0
-	for _, in := range st.Inputs {
-		if in.IsCableOutput() {
-			continue
-		}
-		o := ui.Option{Label: in.Name}
-		switch {
-		case in.Muted:
-			o.Detail = "muted"
-		case in.Default:
-			o.Detail = "default"
-		}
-		if in.ID == a.cfg.MicDeviceID {
-			sel = len(opts)
-		}
-		opts = append(opts, o)
-		ids = append(ids, in.ID)
-	}
-	rows := []ui.Row{ui.Dropdown("mic", "Your microphone", "", opts, sel, func(i int) { a.selectMic(ids[i]) })}
-	if a.cfg.MicDeviceID != "" && st.Mic == nil {
-		rows = append(rows, ui.Text("The chosen microphone is not connected.", "", ui.ToneBad))
-	}
-	return rows
 }
 
 func (a *App) pttRows() []ui.Row {

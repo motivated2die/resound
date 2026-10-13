@@ -87,7 +87,7 @@ func (a *App) start(p *audio.Prepared, opts audio.PlayOptions, meta voiceMeta, f
 	}
 	pb.remaining[info.VoiceID] = info.Outputs
 	pb.setVoice(info.VoiceID, meta)
-	a.watchPlayback()
+	a.animate()
 	logx.Printf("play #%d %q (%v) on %d output(s) with %d decoder(s), ready in %v",
 		info.VoiceID, info.Name, info.Length.Round(time.Millisecond), info.Outputs, info.Decoders, info.Decode.Round(100*time.Microsecond))
 	return info, nil
@@ -376,52 +376,6 @@ func (a *App) playbackProgress() float64 {
 		}
 	}
 	return best
-}
-
-// watchPlayback keeps the home page's progress bar moving while the panel
-// is open and sounds play: it repaints about 20 times a second and renders
-// the page again when playback starts or stops (the status text changes).
-// It ends by itself when the panel closes or playback ends. UI thread.
-func (a *App) watchPlayback() {
-	if a.watching {
-		return
-	}
-	a.watching = true
-	go func() {
-		t := time.NewTicker(50 * time.Millisecond)
-		defer t.Stop()
-		for range t.C {
-			keep := make(chan bool, 1)
-			a.tray.Post(func() { keep <- a.tickPlayback() })
-			select {
-			case k := <-keep:
-				if !k {
-					return
-				}
-			case <-time.After(time.Second): // UI thread gone (quitting)
-				return
-			}
-		}
-	}()
-}
-
-func (a *App) tickPlayback() bool {
-	visible := a.tray.Popup().Visible() && a.page == pageHome
-	playing := len(a.engine.Voices()) > 0
-	switch {
-	case playing != a.wasPlaying:
-		a.wasPlaying = playing
-		if visible {
-			a.render()
-		}
-	case visible && playing:
-		a.tray.Popup().Repaint()
-	}
-	keep := visible && playing
-	if !keep {
-		a.watching = false
-	}
-	return keep
 }
 
 // migrateVolumeScale converts volumes saved on the linear scale of versions

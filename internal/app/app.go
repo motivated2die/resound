@@ -50,8 +50,7 @@ const (
 	pageHome   page = iota
 	pageWizard      // guided first-run setup, step in App.wizardStep
 	pageSettings
-	pageOutputs
-	pageVoice // VB-Cable and microphone
+	pageAudio // the audio flow, VB-Cable and the microphone
 	pageKeys  // push-to-talk
 	pageLibrary
 	pageRemote
@@ -69,8 +68,8 @@ type App struct {
 	logo   *ui.Image // header logo, nil if it can't be decoded
 	page   page
 
-	parent     page // where a detail page's back button returns to
-	wizardStep int  // current step of the guided setup (pageWizard)
+	parents    []page // where detail pages' back buttons return to, innermost last
+	wizardStep int    // current step of the guided setup (pageWizard)
 
 	devices []audio.Device
 	devErr  error
@@ -80,8 +79,10 @@ type App struct {
 	busy     string // non-empty while waiting for the elevated helper
 	cable    cableInstall
 
-	playback playbackState
-	ptt      pttState
+	playback   playbackState
+	ptt        pttState
+	levels     levelState // the audio flow's meters (flow.go)
+	flowOnPage bool       // the current page shows the audio flow
 
 	lib      *library.Library
 	indexer  *library.Indexer
@@ -93,7 +94,7 @@ type App struct {
 	backupFailed     bool
 	restoreCandidate string    // backup awaiting the restore confirmation
 	lastIndex        time.Time // last panel refresh for indexer progress
-	watching         bool      // watchPlayback is running
+	watching         bool      // animate is running
 	wasPlaying       bool      // playback state at the last tick
 	srv              *server.Server
 	serverErr        error
@@ -244,6 +245,7 @@ func Run() int {
 	}
 	a.tray.Run()
 
+	a.closeLevels()
 	a.closeHotkeys()
 	a.releasePlayback() // never leave the mic muted or a key held behind
 	a.releaseAllPTT()
@@ -291,6 +293,9 @@ func (a *App) quit() {
 }
 
 func (a *App) showPage(p page) {
+	if p == pageHome {
+		a.parents = nil
+	}
 	a.page = p
 	a.tray.Popup().ScrollToTop()
 	a.render()
@@ -299,10 +304,11 @@ func (a *App) showPage(p page) {
 // render rebuilds the panel rows from the current state.
 func (a *App) render() {
 	a.updateTooltip()
+	a.flowOnPage = false // set again by flowRows
 	a.tray.Popup().SetRows(a.rows())
 	a.tray.Popup().SetPinned(a.acceptsDrops()) // stays open for dragging folders in
-	if a.page == pageHome && len(a.engine.Voices()) > 0 {
-		a.watchPlayback() // animate the progress bar under the title
+	if a.flowOnPage || (a.page == pageHome && len(a.engine.Voices()) > 0) {
+		a.animate() // the flow's level bars, the progress bar under the title
 	}
 }
 

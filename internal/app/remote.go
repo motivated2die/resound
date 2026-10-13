@@ -144,11 +144,13 @@ func (r remotePlayer) Progress() []server.Progress {
 
 func (r remotePlayer) TogglePause() bool {
 	var paused bool
-	r.a.onUI(func() { paused = r.a.togglePause() })
+	r.a.onUI(func() { paused = r.a.togglePause(); r.a.render() }) // the audio flow shows the pause
 	return paused
 }
 
-func (r remotePlayer) SetTalkThrough(on bool) { r.a.onUI(func() { r.a.setTalkThrough(on) }) }
+func (r remotePlayer) SetTalkThrough(on bool) {
+	r.a.onUI(func() { r.a.setTalkThrough(on); r.a.render() })
+}
 
 func (r remotePlayer) DefaultVolumes() (local, remote int) {
 	r.a.onUI(func() { local, remote = r.a.cfg.MonitorVolume, r.a.cfg.CableVolume })

@@ -14,6 +14,9 @@ import (
 
 const wizardSteps = 5
 
+// wizardVoiceStep is the step that connects voice chat (VB-Cable).
+const wizardVoiceStep = 3
+
 func (a *App) startWizard() {
 	a.wizardStep = 0
 	a.showPage(pageWizard)
@@ -35,7 +38,6 @@ func (a *App) finishWizard() {
 		a.save()
 	}
 	logx.Printf("guided setup: finished at step %d", a.wizardStep)
-	a.parent = pageHome
 	a.showPage(pageHome)
 }
 
@@ -45,7 +47,7 @@ func (a *App) wizardPage() []ui.Row {
 		return a.wizardSounds()
 	case 2:
 		return a.wizardSpeakers()
-	case 3:
+	case wizardVoiceStep:
 		return a.wizardVoice()
 	case 4:
 		return a.wizardKeys()
@@ -76,7 +78,7 @@ func (a *App) wizardWelcome() []ui.Row {
 		ui.Brand(a.logo, "RESOUND", "", "Guided setup · about 2 minutes", nil, nil),
 		ui.Paragraph("Welcome! Play sounds into games and voice chat, controlled from your phone. "+
 			"You hear them on your speakers; the others hear them through your microphone.", ui.ToneNormal),
-		ui.Paragraph("Five short steps: add your sounds, check your speakers, connect voice chat, set your push-to-talk key and pair your phone.", ui.ToneMuted),
+		ui.Paragraph("Five short steps: add your sounds, check your audio, connect voice chat, set your push-to-talk key and pair your phone.", ui.ToneMuted),
 		ui.Flex(),
 		ui.Button("Start setup", ui.ButtonPrimary, false, func() { a.wizardGo(1) }),
 		ui.Button("Skip, I'll set it up myself", ui.ButtonNormal, false, a.finishWizard),
@@ -102,67 +104,36 @@ func (a *App) wizardSounds() []ui.Row {
 
 func (a *App) wizardSpeakers() []ui.Row {
 	rows := []ui.Row{
-		a.wizardHeader("Check your speakers"),
-		ui.Paragraph("Choose where you hear sounds yourself, then play the test tone. "+
-			"Set the volume for you and for the others in the call.", ui.ToneMuted),
-		a.monitorDropdown("You hear sounds on"),
+		a.wizardHeader("Check your audio"),
+		ui.Paragraph("Choose your microphone and where you hear sounds, then speak and play the test sound: "+
+			"the bars show what arrives where.", ui.ToneMuted),
 	}
-	if r := a.outputError(audio.RoleMonitor); r != nil {
-		rows = append(rows, r)
-	}
-	rows = append(rows, a.volumeSliders()...)
-	rows = append(rows, a.testButtons()...)
+	rows = append(rows, a.flowRows(true)...)
 	running := false
-	for _, s := range a.engine.Status() {
-		if s.Role == audio.RoleMonitor && s.Running {
-			running = true
-		}
+	if s, ok := a.outputStatus(audio.RoleMonitor); ok && s.Running {
+		running = true
 	}
 	return append(rows, ui.Flex(), ui.Separator(), a.wizardNext(running), ui.Spacer(4))
 }
 
 func (a *App) wizardVoice() []ui.Row {
-	st := a.route
 	rows := []ui.Row{
 		a.wizardHeader("Connect voice chat"),
 		ui.Paragraph("Others hear your sounds through VB-Cable, a free virtual audio driver by VB-Audio. "+
 			"Your microphone is passed through it as well, so they still hear you.", ui.ToneMuted),
 	}
-	if !st.CableInstalled() {
-		rows = append(rows, ui.Step(1, "Install VB-Cable", a.cableStepInfo(), false))
+	if !a.route.CableInstalled() {
+		rows = append(rows, ui.Section("Install VB-Cable"))
 		rows = append(rows, a.cableInstallRows()...)
 		rows = append(rows, a.cableCredit()...)
 		return append(rows, ui.Flex(), ui.Separator(), a.wizardNext(false), ui.Spacer(4))
 	}
-
 	rows = append(rows, a.cableNoteRows()...)
-	rows = append(rows,
-		ui.Step(1, "VB-Cable installed", "Found", true),
-		ui.Step(2, "Sounds go to the cable", onOff(a.cableSelected()), a.cableSelected()),
-		ui.Step(3, "Your voice goes to the cable", onOff(st.MicRouted), st.MicRouted),
-	)
-	rows = append(rows, a.micRows()...)
-	switch {
-	case a.busy != "":
-		rows = append(rows, ui.Text(a.busy, "", ui.ToneWarning))
-	case !a.cableSelected() || (!st.MicRouted && st.Mic != nil):
-		rows = append(rows,
-			ui.Button("Connect to VB-Cable", ui.ButtonPrimary, false, a.connectCable),
-			ui.Text("Windows asks for administrator approval once.", "", ui.ToneMuted))
-	}
-	if a.routeErr != nil {
-		rows = append(rows, ui.Paragraph(a.routeErr.Error(), ui.ToneBad))
-	}
+	rows = append(rows, a.flowRows(false)...)
+	rows = append(rows, a.connectRows()...)
 	rows = append(rows, a.cableOutputHint()...)
 	rows = append(rows, a.cableCredit()...)
 	return append(rows, ui.Flex(), ui.Separator(), a.wizardNext(a.setupStepsDone() == 3), ui.Spacer(4))
-}
-
-func onOff(on bool) string {
-	if on {
-		return "On"
-	}
-	return "Off"
 }
 
 // connectCable does steps 2 and 3 in one go: sounds into CABLE Input, then

@@ -31,13 +31,90 @@ const (
 	tipTimerID       = 7
 )
 
-type dropdownRow struct {
-	id          string
-	label       string
+// dropdownField is one select field. Rows with fields implement fieldHost;
+// a Dropdown row is a field with a caption, other rows may hold several.
+type dropdownField struct {
+	id          string // unique on the page, stable across re-renders
 	options     []Option
-	selected    int
+	selected    int // index into options, -1 shows the placeholder
 	placeholder string
 	onSelect    func(int)
+}
+
+func (f dropdownField) current() (Option, bool) {
+	if f.selected >= 0 && f.selected < len(f.options) {
+		return f.options[f.selected], true
+	}
+	return Option{}, false
+}
+
+// fieldHost is implemented by rows with dropdown fields: field returns the
+// field at segment seg, if that segment is one. Clicking it opens its list.
+type fieldHost interface {
+	field(seg int) (dropdownField, bool)
+}
+
+// fieldDetailMinL is the narrowest field (logical) that shows the
+// selection's detail tag; narrower ones (the audio flow's half-width
+// outputs) leave all the room to the name. The list still shows the tags.
+const fieldDetailMinL = 200
+
+// showDetail reports whether box shows the selection's detail tag.
+func showDetail(c *canvas, box rect, o Option) bool {
+	return o.Detail != "" && box.w() >= c.px(fieldDetailMinL)
+}
+
+// paintField draws a select field in box: the selection (or placeholder),
+// its detail tag and the chevron. open is true while its list is open.
+func paintField(c *canvas, box rect, f dropdownField, open, hover, press bool) {
+	bg, border := colControl, colControl
+	switch {
+	case open:
+		border = colAccent
+	case press:
+		bg = shade(bg, -12)
+	case hover:
+		bg = shade(bg, 12)
+	}
+	c.frame(box, c.px(10), bg, border)
+
+	pad := c.px(12)
+	chevX := box.Right - pad - c.px(5)
+	c.chevron(chevX, box.Top+box.h()/2, c.px(5), open, colMuted)
+	textRight := chevX - c.px(14)
+
+	opt, ok := f.current()
+	if !ok {
+		c.text(f.placeholder, rect{box.Left + pad, box.Top, textRight, box.Bottom}, fontBody, colMuted, dtLeft)
+		return
+	}
+	if showDetail(c, box, opt) {
+		w := c.textWidth(opt.Detail, fontCaption) + c.px(4)
+		c.text(opt.Detail, rect{textRight - w, box.Top, textRight, box.Bottom}, fontCaption, colAccent, dtRight)
+		textRight -= w + c.px(8)
+	}
+	c.text(opt.Label, rect{box.Left + pad, box.Top, textRight, box.Bottom}, fontBody, colText, dtLeft)
+}
+
+// fieldTip returns the field's full selection when it doesn't fit box.
+func fieldTip(c *canvas, box rect, f dropdownField) string {
+	opt, ok := f.current()
+	if !ok {
+		return ""
+	}
+	avail := box.w() - 2*c.px(12) - c.px(24)
+	if showDetail(c, box, opt) {
+		avail -= c.textWidth(opt.Detail, fontCaption) + c.px(12)
+	}
+	if c.textWidth(opt.Label, fontBody) <= avail {
+		return ""
+	}
+	return opt.full()
+}
+
+type dropdownRow struct {
+	dropdownField
+	label string
 }
 
 // Dropdown is a labelled select field. id must be unique on the page and
@@ -48,7 +125,7 @@ func Dropdown(id, label, placeholder string, options []Option, selected int, onS
 	if placeholder == "" {
 		placeholder = "Choose…"
 	}
-	return dropdownRow{id: id, label: label, options: options, selected: selected, placeholder: placeholder, onSelect: onSelect}
+	return dropdownRow{dropdownField{id: id, options: options, selected: selected, placeholder: placeholder, onSelect: onSelect}, label}
 }
 
 func (d dropdownRow) height() int {
@@ -67,82 +144,36 @@ func (d dropdownRow) segments(c *canvas, r rect) []rect {
 	return []rect{{in.Left, top, in.Right, top + c.px(34)}}
 }
 
-func (dropdownRow) click(int)       {} // handled by the popup (see open)
+func (dropdownRow) click(int)       {} // handled by the popup (fieldHost)
 func (dropdownRow) keepsOpen() bool { return true }
 
-func (d dropdownRow) current() (Option, bool) {
-	if d.selected >= 0 && d.selected < len(d.options) {
-		return d.options[d.selected], true
-	}
-	return Option{}, false
-}
+func (d dropdownRow) field(seg int) (dropdownField, bool) { return d.dropdownField, seg == 0 }
 
 func (d dropdownRow) paint(c *canvas, r rect, st rowState) {
 	in := inset(c, r)
 	if d.label != "" {
 		c.text(upper(d.label), rect{in.Left, r.Top + c.px(4), in.Right, r.Top + c.px(20)}, fontCaption, colCaption, dtLeft)
 	}
-	field := d.segments(c, r)[0]
-	bg, border := colControl, colControl
-	switch {
-	case st.open:
-		border = colAccent
-	case st.press == 0:
-		bg = shade(bg, -12)
-	case st.hover == 0:
-		bg = shade(bg, 12)
-	}
-	c.frame(field, c.px(10), bg, border)
-
-	pad := c.px(12)
-	chevX := field.Right - pad - c.px(5)
-	c.chevron(chevX, field.Top+field.h()/2, c.px(5), st.open, colMuted)
-	textRight := chevX - c.px(14)
-
-	opt, ok := d.current()
-	if !ok {
-		c.text(d.placeholder, rect{field.Left + pad, field.Top, textRight, field.Bottom}, fontBody, colMuted, dtLeft)
-		return
-	}
-	if opt.Detail != "" {
-		w := c.textWidth(opt.Detail, fontCaption) + c.px(4)
-		c.text(opt.Detail, rect{textRight - w, field.Top, textRight, field.Bottom}, fontCaption, colAccent, dtRight)
-		textRight -= w + c.px(8)
-	}
-	c.text(opt.Label, rect{field.Left + pad, field.Top, textRight, field.Bottom}, fontBody, colText, dtLeft)
+	paintField(c, d.segments(c, r)[0], d.dropdownField, st.open == 0, st.hover == 0, st.press == 0)
 }
 
 // tip returns the full selection when it does not fit the field.
 func (d dropdownRow) tip(c *canvas, r rect, _ int) string {
-	opt, ok := d.current()
-	if !ok {
-		return ""
-	}
-	field := d.segments(c, r)[0]
-	avail := field.w() - 2*c.px(12) - c.px(24)
-	if opt.Detail != "" {
-		avail -= c.textWidth(opt.Detail, fontCaption) + c.px(12)
-	}
-	if c.textWidth(opt.Label, fontBody) <= avail {
-		return ""
-	}
-	return opt.full()
+	return fieldTip(c, d.segments(c, r)[0], d.dropdownField)
 }
 
-func (d dropdownRow) open(p *Popup, row int) {
-	p.dd = &dropdownState{id: d.id, row: row, hover: d.selected, press: -1}
+// openDropdown opens the list of the field at segment seg of row.
+func (p *Popup) openDropdown(row, seg int, f dropdownField) {
+	p.dd = &dropdownState{id: f.id, row: row, seg: seg, hover: f.selected, press: -1}
 	p.syncDropdown()
 	if p.dd != nil {
-		p.dd.scrollTo(d.selected)
+		p.dd.scrollTo(f.selected)
 	}
 	p.hideTip()
 	procInvalidateRect.Call(p.hwnd, 0, 0)
 }
 
 // --- popup side ------------------------------------------------------------
-
-// opener is implemented by rows that open something inside the popup.
-type opener interface{ open(p *Popup, row int) }
 
 // tipper is implemented by rows that can show a full-text tooltip.
 type tipper interface {
@@ -151,7 +182,7 @@ type tipper interface {
 
 type dropdownState struct {
 	id       string
-	row      int
+	row, seg int // the row and segment of its field
 	options  []Option
 	selected int
 	onSelect func(int)
@@ -212,21 +243,20 @@ func (p *Popup) syncDropdown() {
 	if d == nil {
 		return
 	}
-	row := -1
-	for i, s := range p.slots {
-		if dr, ok := s.row.(dropdownRow); ok && dr.id == d.id {
-			row = i
-			d.options, d.selected, d.onSelect = dr.options, dr.selected, dr.onSelect
-			break
-		}
-	}
-	if row < 0 || len(d.options) == 0 {
+	c := p.canvas(0)
+	row, seg := p.findField(d.id)
+	if row < 0 {
 		p.dd = nil
 		return
 	}
-	c := p.canvas(0)
-	d.row = row
-	d.field = p.slots[row].row.segments(c, p.rowRect(row))[0]
+	f, _ := p.slots[row].row.(fieldHost).field(seg)
+	d.options, d.selected, d.onSelect = f.options, f.selected, f.onSelect
+	if len(d.options) == 0 {
+		p.dd = nil
+		return
+	}
+	d.row, d.seg = row, seg
+	d.field = p.slots[row].row.segments(c, p.rowRect(row))[seg]
 	d.itemH = c.px(dropdownItemL)
 	margin := c.px(6)
 	want := int32(min(len(d.options), dropdownMaxItems))*d.itemH + 2*c.px(4)
@@ -245,6 +275,23 @@ func (p *Popup) syncDropdown() {
 	if d.hover >= len(d.options) {
 		d.hover = -1
 	}
+}
+
+// findField returns the row and segment of the dropdown field id, or -1.
+func (p *Popup) findField(id string) (row, seg int) {
+	c := p.canvas(0)
+	for i, s := range p.slots {
+		fh, ok := s.row.(fieldHost)
+		if !ok {
+			continue
+		}
+		for seg := range s.row.segments(c, p.rowRect(i)) {
+			if f, ok := fh.field(seg); ok && f.id == id {
+				return i, seg
+			}
+		}
+	}
+	return -1, -1
 }
 
 func (p *Popup) closeDropdown() {

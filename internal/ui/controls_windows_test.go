@@ -12,13 +12,13 @@ func TestSliderDrag(t *testing.T) {
 	r := rect{0, 0, popupWidthL, 56}
 	_, _, _, x0, x1 := s.geometry(testCanvas, r)
 
-	s.dragTo(testCanvas, r, x0-50, false) // left of the track clamps to 0
-	s.dragTo(testCanvas, r, x1+50, false) // right of it to max
-	s.dragTo(testCanvas, r, (x0+x1)/2, false)
+	s.dragTo(testCanvas, r, s.dragIDAt(1), x0-50, false) // left of the track clamps to 0
+	s.dragTo(testCanvas, r, s.dragIDAt(1), x1+50, false) // right of it to max
+	s.dragTo(testCanvas, r, s.dragIDAt(1), (x0+x1)/2, false)
 	if want := []int{0, 100}; len(got) != 2 || got[0] != want[0] || got[1] != want[1] {
 		t.Fatalf("drag values = %v, want %v (the middle is the current value, so no change)", got, want)
 	}
-	s.dragTo(testCanvas, r, (x0+x1)/2, true) // release reports even without a change
+	s.dragTo(testCanvas, r, s.dragIDAt(1), (x0+x1)/2, true) // release reports even without a change
 	if len(got) != 3 || got[2] != 50 || !done[2] {
 		t.Fatalf("release = %v %v, want 50 done", got, done)
 	}

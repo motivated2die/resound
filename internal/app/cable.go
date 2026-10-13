@@ -294,7 +294,7 @@ func (a *App) returnTo(p vbcable.Pending) {
 		a.page, a.wizardStep = pageWizard, max(0, min(p.WizardStep, wizardSteps))
 		return
 	}
-	a.page, a.parent = pageVoice, pageSettings
+	a.page, a.parents = pageAudio, []page{pageSettings}
 }
 
 // --- rows --------------------------------------------------------------------

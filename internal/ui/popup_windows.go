@@ -374,9 +374,11 @@ func (p *Popup) wndProc(hwnd uintptr, m uint32, w, l uintptr) uintptr {
 		if row >= 0 && row == pressedRow && seg == pressedSeg {
 			r := p.slots[row].row
 			p.hideTip()
-			if o, ok := r.(opener); ok {
-				o.open(p, row)
-				return 0
+			if fh, ok := r.(fieldHost); ok {
+				if f, ok := fh.field(seg); ok {
+					p.openDropdown(row, seg, f)
+					return 0
+				}
 			}
 			keep := r.keepsOpen()
 			if k, ok := r.(segmentKeeper); ok {
@@ -426,14 +428,16 @@ func (p *Popup) paint() {
 		if r.Bottom < 0 || r.Top > p.height {
 			continue
 		}
-		st := rowState{hover: -1, press: -1}
+		st := rowState{hover: -1, press: -1, open: -1}
 		if i == p.hoverRow {
 			st.hover = p.hoverSeg
 		}
 		if i == p.pressRow {
 			st.press = p.pressSeg
 		}
-		st.open = p.dd != nil && p.dd.row == i
+		if p.dd != nil && p.dd.row == i {
+			st.open = p.dd.seg
+		}
 		s.row.paint(c, r, st)
 	}
 	// Scroll indicator.
@@ -472,14 +476,14 @@ type segmentKeeper interface {
 	keepsOpenAt(seg int) bool
 }
 
-// dragger is implemented by rows with a segment that follows the mouse
-// while the left button is held, such as a slider's track. Rows are rebuilt
-// on every change, so an ongoing drag finds its row again by dragID.
+// dragger is implemented by rows with segments that follow the mouse while
+// the left button is held, such as a slider's track. Rows are rebuilt on
+// every change, so an ongoing drag finds its row again by its id.
 type dragger interface {
-	dragID() string
-	dragSegment() int
-	// dragTo moves to window x; done is true once, when the drag ends.
-	dragTo(c *canvas, r rect, x int32, done bool)
+	// dragIDAt returns the drag id of segment seg, "" if it doesn't drag.
+	dragIDAt(seg int) string
+	// dragTo moves drag id to window x; done is true once, when it ends.
+	dragTo(c *canvas, r rect, id string, x int32, done bool)
 }
 
 type dragState struct {
@@ -498,10 +502,10 @@ func (p *Popup) startDrag(x int32) {
 		return
 	}
 	d, ok := p.slots[p.pressRow].row.(dragger)
-	if !ok || d.dragSegment() != p.pressSeg {
+	if !ok || d.dragIDAt(p.pressSeg) == "" {
 		return
 	}
-	p.drag = &dragState{id: d.dragID(), x: x}
+	p.drag = &dragState{id: d.dragIDAt(p.pressSeg), x: x}
 	p.hideTip()
 	procSetCapture.Call(p.hwnd)
 	p.dragTo(x, false)
@@ -514,11 +518,18 @@ func (p *Popup) dragTo(x int32, done bool) {
 		return
 	}
 	p.drag.x = x
+	c := p.canvas(0)
 	for i, s := range p.slots {
-		if d, ok := s.row.(dragger); ok && d.dragID() == p.drag.id {
-			p.pressRow, p.pressSeg = i, d.dragSegment()
-			d.dragTo(p.canvas(0), p.rowRect(i), x, done) // may call SetRows
-			return
+		d, ok := s.row.(dragger)
+		if !ok {
+			continue
+		}
+		for seg := range s.row.segments(c, p.rowRect(i)) {
+			if d.dragIDAt(seg) == p.drag.id {
+				p.pressRow, p.pressSeg = i, seg
+				d.dragTo(c, p.rowRect(i), p.drag.id, x, done) // may call SetRows
+				return
+			}
 		}
 	}
 }
