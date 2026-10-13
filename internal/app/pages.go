@@ -249,7 +249,7 @@ func (a *App) audioPage() []ui.Row {
 			ui.Action{Label: "Windows sound", Icon: ui.IconExternalLink, Closes: true, OnClick: func() { _ = ui.ShellRun("control.exe", "mmsys.cpl,,1") }},
 		),
 		ui.Text("Restart outputs after plugging in a device.", "", ui.ToneMuted),
-		ui.Section("Advanced"),
+		ui.Section("Advanced _____"),
 		a.cableOutputDropdown(),
 		ui.Paragraph("Only for your own routing, e.g. a virtual mixer such as Voicemeeter. "+
 			"Otherwise your sounds and your voice no longer meet in VB-Cable.", ui.ToneMuted),
@@ -319,7 +319,7 @@ func (a *App) pttIntro() ui.Row {
 func (a *App) muteMicRows() []ui.Row {
 	return []ui.Row{
 		ui.Toggle("Mute my microphone while sounds play", a.cfg.MuteMicWhilePlaying, a.toggleMuteWhilePlaying),
-		ui.Paragraph("With longer clips, others won't hear you talking in the background.", ui.ToneMuted),
+		ui.Paragraph("By default Resound mutes your mic during playback so others won't hear you talking in the background during music. You can disable this here.", ui.ToneMuted),
 	}
 }
 
@@ -346,7 +346,7 @@ func (a *App) connectRows() []ui.Row {
 func (a *App) cableOutputHint() []ui.Row {
 	return []ui.Row{
 		ui.Section("In your apps"),
-		ui.Paragraph("In Discord, games or OBS, choose “CABLE Output” as your microphone.", ui.ToneMuted),
+		ui.Paragraph("In Games, Discord or OBS choose “CABLE Output” as your microphone so others hear you and your sounds.", ui.ToneMuted),
 	}
 }
 
@@ -371,7 +371,7 @@ func (a *App) pttRows() []ui.Row {
 	for i, p := range input.Presets {
 		presetOpts[i] = ui.Option{Label: p.Keys.String(), Detail: p.Note}
 	}
-	rows = append(rows, ui.Dropdown("ptt-preset", "Quick pick: keys no one types", "Choose a rarely used key…",
+	rows = append(rows, ui.Dropdown("ptt-preset", "Pick a push to talk key", "Choose from these buttons or set your own…",
 		presetOpts, a.presetIndex(), a.choosePreset))
 	action := "Record"
 	if len(a.cfg.PushToTalkKeys) > 0 {
@@ -389,7 +389,7 @@ func (a *App) pttRows() []ui.Row {
 	return append(rows,
 		ui.Text("Press, then click the game's keybind field.", "", ui.ToneMuted),
 		ui.Toggle("Hold it while sounds play", a.cfg.PushToTalkWhilePlaying, a.togglePTTWhilePlaying),
-		ui.Text("Talk-through on the phone always holds it.", "", ui.ToneMuted),
+		ui.Text("Talk-through on the phone always holds the PTT key.", "", ui.ToneMuted),
 		ui.Button("Remove push-to-talk key", ui.ButtonNormal, false, func() { a.setPTTKeys(nil) }),
 	)
 }

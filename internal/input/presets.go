@@ -13,11 +13,11 @@ type Preset struct {
 var Presets = func() []Preset {
 	var p []Preset
 	for vk := uint16(0x7C); vk <= 0x87; vk++ { // F13 … F24
-		p = append(p, Preset{Keys: Combo{vk}, Note: "no key"})
+		p = append(p, Preset{Keys: Combo{vk}, Note: "unused F-keys"})
 	}
 	p = append(p,
-		Preset{Keys: Combo{0x13}, Note: "rare"}, // Pause/Break
-		Preset{Keys: Combo{0x91}, Note: "rare"}, // Scroll Lock
+		Preset{Keys: Combo{0x13}, Note: "rarely used"}, // Pause/Break
+		Preset{Keys: Combo{0x91}, Note: "rarely used"}, // Scroll Lock
 		Preset{Keys: Combo{VKXButton1}, Note: "mouse"},
 		Preset{Keys: Combo{VKXButton2}, Note: "mouse"},
 		Preset{Keys: Combo{VKMiddle}, Note: "mouse"},

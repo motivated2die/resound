@@ -440,14 +440,14 @@ func (a *App) cableEnd() ui.FlowCable {
 	switch out := a.route.CableOutput; {
 	case out != nil && a.cableSelected():
 		c.Name = "CABLE Output"
-		c.Info = "Others hear you and your sounds through VB-Cable. In Discord, games or OBS, choose “" + out.Name + "” as your microphone."
+		c.Info = "Others hear you and your sounds through CABLE Output. In Games, Discord or OBS, choose “" + out.Name + "” as your microphone."
 	case out != nil:
 		c.Name = a.cableTargetName()
 		c.Info = "Your sounds for others go to “" + c.Name + "” (chosen in Settings → Audio & voice chat), not to VB-Cable, where your voice goes."
 		c.OnClick = a.flowFix(func() {})
 	default:
 		c.Placeholder = "Not installed"
-		c.Tip = "Others hear you and your sounds through VB-Cable, a free virtual audio driver by VB-Audio. Click to install it."
+		c.Tip = "To combine mic and sound effects you need VB-Cable, a free virtual audio driver by VB-Audio. Click to install it."
 		c.OnClick = a.flowFix(a.installCable)
 		if a.cable.state != cableIdle {
 			c.Placeholder = a.cableStepInfo()
@@ -585,7 +585,7 @@ func (a *App) cableLine() ui.Pipe {
 			Tip: "VB-Cable is installed. Restart your PC to finish; Resound reopens afterwards.", OnClick: a.flowFix(func() {})}}
 	case !a.route.CableInstalled():
 		return ui.Pipe{State: ui.PipeBroken, Badge: &ui.Badge{Icon: ui.IconAlert, Label: "VB-Cable missing", Tone: ui.ToneWarning,
-			Tip:     "Others hear you and your sounds through VB-Cable, a free virtual audio driver by VB-Audio. Click to install it.",
+			Tip:     "To combine mic and sound effects you need VB-Cable, a free virtual audio driver by VB-Audio. Click to install it.",
 			OnClick: a.flowFix(a.installCable)}}
 	case a.ptt.pressed != nil:
 		return ui.Pipe{State: ui.PipeOn, Level: a.flowLevel(&a.levels.others), Badge: &ui.Badge{

@@ -133,8 +133,8 @@ func (a *App) wizardSounds() []ui.Row {
 func (a *App) wizardAudio() []ui.Row {
 	rows := []ui.Row{
 		a.wizardHeader("Audio and voice chat"),
-		ui.Paragraph("Choose your microphone and where you hear sounds, then speak and play the test sound. "+
-			"Others hear you and your sounds through VB-Cable, a free virtual audio driver by VB-Audio.", ui.ToneMuted),
+		ui.Paragraph("Choose your microphone and where you want to hear sounds yourself. Below is a live visualization. "+
+			"CABLE Output is the combined mic and effects.", ui.ToneMuted),
 	}
 	rows = append(rows, a.cableNoteRows()...)
 	rows = append(rows, a.flowRows()...)
@@ -167,8 +167,8 @@ func (a *App) connectCable() {
 func (a *App) wizardKeys() []ui.Row {
 	rows := []ui.Row{a.wizardHeader("Push-to-talk key"), a.pttIntro()}
 	if !a.ptt.capturing {
-		rows = append(rows, ui.Paragraph("Pick a key no one types, such as F13, and bind the same key in your game: "+
-			"use “Send it to the game”, then click the game's keybind field. No push-to-talk? Skip this step.", ui.ToneMuted))
+		rows = append(rows, ui.Paragraph("TIP: pick a rarely used key, such as F13 (yes, that's a thing), and bind it as a secondary voice activation key. Or just bind your primary PTT key here. "+
+			"Use “Send it to the game”, then trigger the game's keybind field. No push-to-talk? Skip this step.", ui.ToneMuted))
 	}
 	rows = append(rows, a.pttRows()...)
 	return append(rows, ui.Flex(), ui.Separator(), a.wizardNext(len(a.cfg.PushToTalkKeys) > 0), ui.Spacer(4))
