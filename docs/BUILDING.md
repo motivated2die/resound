@@ -82,18 +82,24 @@ Icons are SVG files in `internal\ui\icons\`, embedded at build time. To add one 
 
 Commit the SVG, use it as `ui.Icon("<file name>")` (or add a constant in `internal\ui\icon.go`) and rebuild. `go test ./internal/ui` renders every embedded icon. Details and licenses: `internal\ui\icons\README.md`. The panel logo is `assets\resound.png`, embedded by `assets\assets.go`.
 
-## Phone UI (embedded web app)
+## Phone app
 
-Everything under `internal\server\web\` is compiled into the exe (`go:embed all:web`). After changing front-end files, **rebuild**: a running exe never reads them from disk. Without `index.html`, the server serves a placeholder page and the API still works. The minified `*.min.*` files are not referenced by `index.html` and only add size.
+The phone remote is a separate web app in `webapp/`, hosted as a static site; nothing of it is in the exe, so changing it needs no rebuild of Resound. See `webapp/README.md`.
 
-To work on it without the desktop app: `go run ./cmd/devremote -folder <sounds>` (prints the PIN and a pairing link). Its colours follow the desktop panel; see `internal/server/web/README.md`.
+```powershell
+go run ./cmd/webapp                          # builds webapp/dist: upload that folder to Cloudflare Pages
+go run ./cmd/webapp -serve :8095             # builds and serves it on http://localhost:8095
+go run ./cmd/devremote -folder <sounds>      # the PC side without audio; prints a pairing link for localhost:8095
+```
+
+To test a local app with the real Resound, start it with `RESOUND_APP_URL=http://localhost:8095` set: its QR code and "Open the app on this PC" then use the local app (phones need the HTTPS deployment).
 
 ## Tests
 
 ```powershell
 gofmt -l .               # lists unformatted files; CI fails on any
 go vet ./...
-go test ./...            # audio mixer/clips/cache, library, server+auth, routing helpers
+go test ./...            # audio mixer/clips/cache, library, server (API, pairing, WebRTC), app files, routing helpers
 go test -race ./...      # same with the race detector (needs a C compiler on Windows; optional)
 ```
 
@@ -157,10 +163,10 @@ Check, within about 10 s: the home page's header shows `v0.7.0` and a dot with "
 | Exits right after start | End of `debug.log` (crash trace), or start the debug build from a terminal |
 | No sound / output "Error" | `… output open` lines, Settings → Diagnostics; "Restart outputs" after unplugging |
 | Others don't hear the voice | Settings → Voice chat step 3; `input: … listen=… target=…` lines |
-| Phone can't connect | `server: reachable at …` lines; Phone remote → "Allow phones through the firewall" |
+| Phone can't connect | `app: reachable at …` and `app: device … connected` lines; Phone remote → "Allow phones through the firewall"; same Wi-Fi, not a guest network |
 | Game ignores push-to-talk | `push-to-talk down/up` lines; games running as admin don't see input from normal apps |
 | Pause/stop key does nothing | `hotkeys: watching …` at start, `hotkey: …` lines when pressed; inside a game running as admin, Resound sees no keys |
-| Port 8080 busy | Phone remote page shows the error; change `serverPort` in `config.json` |
+| UDP port 8080 busy | Phone remote page shows the error; change `serverPort` in `config.json` |
 
 ## Release checklist
 

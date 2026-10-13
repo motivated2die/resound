@@ -1,8 +1,9 @@
-// Command devremote serves the phone remote (web app, API, library and
-// indexer) without the Windows tray, outputs or routing, so
-// the front end and the library can be worked on and tested on any system.
-// Playing a sound only logs it.
+// Command devremote is the PC side of the app (API, pairing, library and
+// indexer) without the Windows tray, outputs or routing, so the app and the
+// library can be worked on and tested on any system. Playing a sound only
+// logs it. It prints a pairing link for the app, by default the local one:
 //
+//	go run ./cmd/webapp -serve :8095
 //	go run ./cmd/devremote -folder D:\Sounds -port 8090
 package main
 
@@ -55,7 +56,8 @@ func deref(v *int) any {
 func main() {
 	var dirs folders
 	data := flag.String("data", filepath.Join(os.TempDir(), "resound-dev"), "data folder (library.json, remote.json)")
-	port := flag.Int("port", 8090, "HTTP port")
+	port := flag.Int("port", 8090, "UDP port the app connects to")
+	appURL := flag.String("app", "http://localhost:8095", "the app's address (go run ./cmd/webapp -serve :8095 serves it locally)")
 	flag.Var(&dirs, "folder", "sound folder (repeatable)")
 	flag.Parse()
 
@@ -72,10 +74,21 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	srv := server.New(lib, logPlayer{lib}, auth, server.WebFS(), log.Printf)
+	srv := server.New(lib, logPlayer{lib}, auth, log.Printf)
+	srv.Name, _ = os.Hostname()
 	if err := srv.Start(*port); err != nil {
 		log.Fatal(err)
 	}
-	fmt.Printf("PIN %s\nhttp://localhost:%d/pair?code=%s\n", auth.PIN(), *port, auth.PairCode())
+	var addrs []string
+	for _, a := range server.LocalAddresses() {
+		if !a.Other {
+			addrs = append(addrs, a.IP)
+		}
+	}
+	if link, ok := srv.PairURL(*appURL, addrs); ok {
+		fmt.Printf("pairing link (works once, for 10 minutes):\n%s\n", link)
+	} else {
+		fmt.Println("pairing: not available (see the log)")
+	}
 	select {}
 }

@@ -22,7 +22,7 @@ Open an issue with your Resound version (Settings → App & startup), your Windo
 
 **Commit messages** start with a type: `feat:` (new feature), `fix:` (bug fix), `ui:` (look and feel), `docs:`, `chore:` (build, dependencies, cleanup). They become the release notes, so write them for users: `fix: phone remote reconnects after the PC wakes up`.
 
-**Dependencies.** The project is pure Go without cgo; please keep it that way. New Go modules and front-end libraries must have a license compatible with GPL-3.0 (MIT, BSD, Apache-2.0, …) and are listed in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md). Front-end libraries are vendored under `internal/server/web/vendor/` with their license file, not loaded from a CDN.
+**Dependencies.** The project is pure Go without cgo; please keep it that way. New Go modules and front-end libraries must have a license compatible with GPL-3.0 (MIT, BSD, Apache-2.0, …) and are listed in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md). Front-end libraries are vendored under `webapp/src/vendor/` with their license file, not loaded from a CDN.
 
 Releases are made by the maintainers; see [docs/RELEASING.md](docs/RELEASING.md).
 

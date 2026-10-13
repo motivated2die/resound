@@ -20,10 +20,6 @@ $Out = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($
 $repo = Split-Path -Parent $PSScriptRoot
 Push-Location $repo
 try {
-    if (-not (Test-Path "internal\server\web\index.html")) {
-        throw "internal\server\web\index.html is missing: the phone remote would not be embedded."
-    }
-
     $commit = git rev-parse --short HEAD 2>$null
     if ($LASTEXITCODE) { $commit = "unknown" }
     if (git status --porcelain 2>$null) {

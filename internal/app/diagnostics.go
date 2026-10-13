@@ -58,13 +58,14 @@ func (a *App) diagnosticsPage() []ui.Row {
 		rows = append(rows, ui.Text("Without length", plural(st.Failed, "sound"), ui.ToneMuted))
 	}
 
-	rows = append(rows, ui.Section("Phone server"))
+	rows = append(rows, ui.Section("Phone connection"))
 	if a.srv == nil || a.serverErr != nil {
-		rows = append(rows, ui.Text("Port", fmt.Sprintf("%d · not running", a.cfg.ServerPort), ui.ToneBad))
+		rows = append(rows, ui.Text("UDP port", fmt.Sprintf("%d · not running", a.cfg.ServerPort), ui.ToneBad))
 	} else {
 		rows = append(rows,
-			ui.Text("Port", fmt.Sprint(a.cfg.ServerPort), ui.ToneNormal),
-			ui.Text("Paired devices", fmt.Sprint(a.srv.Auth().SessionCount()), ui.ToneNormal))
+			ui.Text("UDP port", fmt.Sprint(a.cfg.ServerPort), ui.ToneNormal),
+			ui.Text("App", a.appURL(), ui.ToneMuted),
+			ui.Text("Paired devices", fmt.Sprint(a.srv.Auth().DeviceCount()), ui.ToneNormal))
 	}
 
 	mode := "installed"

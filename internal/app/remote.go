@@ -165,7 +165,8 @@ func (a *App) startServer() {
 		return
 	}
 	auth.OnChange = func() { a.tray.Post(a.render) }
-	a.srv = server.New(a.lib, remotePlayer{a}, auth, server.WebFS(), logx.Printf)
+	a.srv = server.New(a.lib, remotePlayer{a}, auth, logx.Printf)
+	a.srv.Name, _ = os.Hostname() // the app shows it in its list of PCs
 	a.restartServer()
 }
 
@@ -173,13 +174,10 @@ func (a *App) restartServer() {
 	if a.srv == nil {
 		return
 	}
-	a.serverErr = a.srv.Start(a.cfg.ServerPort)
-	if a.serverErr != nil {
-		logx.Printf("server: cannot listen on port %d: %v", a.cfg.ServerPort, a.serverErr)
-	}
+	a.serverErr = a.srv.Start(a.cfg.ServerPort) // logs a failure itself
 	a.addresses = server.LocalAddresses()
 	for _, ad := range a.addresses {
-		logx.Printf("server: reachable at http://%s:%d (%s)", ad.IP, a.cfg.ServerPort, ad.Interface)
+		logx.Printf("app: reachable at %s, UDP port %d (%s)", ad.IP, a.cfg.ServerPort, ad.Interface)
 	}
 }
 
@@ -188,9 +186,9 @@ func (a *App) resetRemote() {
 		return
 	}
 	if err := a.srv.Auth().ResetAll(); err != nil {
-		logx.Printf("resetting remote: %v", err)
+		logx.Printf("signing out all devices: %v", err)
 	}
-	logx.Printf("remote: new PIN, all phones signed out")
+	logx.Printf("remote: all devices signed out")
 	a.render()
 }
 

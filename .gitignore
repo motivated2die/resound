@@ -9,3 +9,6 @@
 
 # Release builds (scripts/build-release.ps1 -Out dist)
 /dist/
+
+# The installable app (go run ./cmd/webapp)
+/webapp/dist/

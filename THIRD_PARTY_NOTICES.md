@@ -7,6 +7,7 @@ Resound is licensed under the [GNU General Public License v3.0](LICENSE). It inc
 | Module | License |
 |---|---|
 | [github.com/go-ole/go-ole](https://github.com/go-ole/go-ole) | MIT |
+| [github.com/google/uuid](https://github.com/google/uuid) | BSD-3-Clause |
 | [github.com/gopxl/beep](https://github.com/gopxl/beep) | MIT |
 | [github.com/hajimehoshi/go-mp3](https://github.com/hajimehoshi/go-mp3) | Apache-2.0 |
 | [github.com/icza/bitio](https://github.com/icza/bitio) | Apache-2.0 |
@@ -15,27 +16,29 @@ Resound is licensed under the [GNU General Public License v3.0](LICENSE). It inc
 | [github.com/mewkiz/flac](https://github.com/mewkiz/flac) | Unlicense (public domain) |
 | [github.com/mewkiz/pkg](https://github.com/mewkiz/pkg) | Unlicense (public domain) |
 | [github.com/moutend/go-wca](https://github.com/moutend/go-wca) | MIT |
+| [github.com/pion/webrtc](https://github.com/pion/webrtc) and its modules (datachannel, dtls, ice, interceptor, logging, mdns, randutil, rtcp, rtp, sctp, sdp, srtp, stun, transport, turn) | MIT |
 | [github.com/pkg/errors](https://github.com/pkg/errors) | BSD-2-Clause |
 | [github.com/skip2/go-qrcode](https://github.com/skip2/go-qrcode) | MIT |
 | [github.com/srwiley/oksvg](https://github.com/srwiley/oksvg) | BSD-3-Clause |
 | [github.com/srwiley/rasterx](https://github.com/srwiley/rasterx) | BSD-3-Clause |
-| [golang.org/x/image](https://pkg.go.dev/golang.org/x/image), [x/net](https://pkg.go.dev/golang.org/x/net), [x/sys](https://pkg.go.dev/golang.org/x/sys), [x/text](https://pkg.go.dev/golang.org/x/text) | BSD-3-Clause |
+| [github.com/wlynxg/anet](https://github.com/wlynxg/anet) | BSD-3-Clause |
+| [golang.org/x/crypto](https://pkg.go.dev/golang.org/x/crypto), [x/image](https://pkg.go.dev/golang.org/x/image), [x/net](https://pkg.go.dev/golang.org/x/net), [x/sys](https://pkg.go.dev/golang.org/x/sys), [x/text](https://pkg.go.dev/golang.org/x/text), [x/time](https://pkg.go.dev/golang.org/x/time) | BSD-3-Clause |
 | The Go standard library and runtime | BSD-3-Clause |
 
 The full license texts are in each module's source (`go mod download`, then the module's folder in the Go module cache).
 
-## Phone remote (embedded in Resound.exe)
+## Phone app (webapp/, hosted as a web page, not in Resound.exe)
 
 | Component | License | Location |
 |---|---|---|
-| [driver.js](https://github.com/kamranahmedse/driver.js) | MIT | `internal/server/web/vendor/driverjs/` |
-| [SortableJS](https://github.com/SortableJS/Sortable) 1.15.6 | MIT | `internal/server/web/vendor/sortablejs/` |
-| [NoSleep.js](https://github.com/richtr/NoSleep.js) 0.12.0 | MIT | `internal/server/web/vendor/nosleep/` |
-| [emoji-picker-element](https://github.com/nolanlawson/emoji-picker-element) 1.29.1 | Apache-2.0 | `internal/server/web/vendor/emoji-picker-element/` |
-| [emoji-picker-element-data](https://github.com/nolanlawson/emoji-picker-element-data) 1.8.0 (English, Emojibase shortcodes) | Apache-2.0; built from [Emojibase](https://emojibase.dev) data (MIT) with names and keywords from [Unicode CLDR](https://cldr.unicode.org) (Unicode License v3) | `internal/server/web/vendor/emoji-picker-element-data/` |
-| [Material Symbols](https://github.com/google/material-design-icons) (Outlined) SVG icons by Google | Apache-2.0 | `internal/server/web/assets/icons/` |
+| [driver.js](https://github.com/kamranahmedse/driver.js) | MIT | `webapp/src/vendor/driverjs/` |
+| [SortableJS](https://github.com/SortableJS/Sortable) 1.15.6 | MIT | `webapp/src/vendor/sortablejs/` |
+| [emoji-picker-element](https://github.com/nolanlawson/emoji-picker-element) 1.29.1 | Apache-2.0 | `webapp/src/vendor/emoji-picker-element/` |
+| [emoji-picker-element-data](https://github.com/nolanlawson/emoji-picker-element-data) 1.8.0 (English, Emojibase shortcodes) | Apache-2.0; built from [Emojibase](https://emojibase.dev) data (MIT) with names and keywords from [Unicode CLDR](https://cldr.unicode.org) (Unicode License v3) | `webapp/src/vendor/emoji-picker-element-data/` |
+| [jsQR](https://github.com/cozmo/jsQR) 1.4.0 | Apache-2.0 | `webapp/src/vendor/jsqr/` |
+| [Material Symbols](https://github.com/google/material-design-icons) (Outlined) SVG icons by Google | Apache-2.0 | `webapp/src/assets/icons/` |
 
-Each folder contains the component's license file(s) and a README naming the exact source. The phone remote loads nothing from outside Resound.
+Each folder contains the component's license file(s) and a README naming the exact source. The app loads nothing from other hosts.
 
 ## Icons
 

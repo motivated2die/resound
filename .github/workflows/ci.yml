@@ -39,3 +39,6 @@ jobs:
 
       - name: go build
         run: go build -o resound-ci.exe ./cmd/resound
+
+      - name: build the installable app
+        run: go run ./cmd/webapp

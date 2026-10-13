@@ -7,7 +7,7 @@ Resound lives in the system tray and is a single small program: no runtime to in
 ## Features
 
 - **Play into voice chat.** Sounds go to your speakers ("You hear") and to [VB-Cable](https://vb-audio.com/Cable/) ("Others hear"), with separate volumes. Your microphone keeps working through the cable.
-- **Phone remote.** Pair any phone on your network by scanning a QR code; no app needed, it runs in the phone's browser. Tabs, favorites, colors and emoji per sound, custom layouts, play progress, stop and pause.
+- **Phone app.** Scan a QR code and the Resound app opens on your phone; install it from the browser, no app store needed. It connects straight to your PC over your network, keeps the screen on and runs fullscreen. Tabs, favorites, colors and emoji per sound, custom layouts, play progress, stop and pause.
 - **Your folders are your library.** Add folders by drag and drop; each folder and subfolder becomes a tab. MP3, WAV, FLAC and OGG. Renaming or moving files keeps their settings.
 - **Mic mute and push-to-talk.** While a sound plays, Resound can mute your real microphone and hold your game's push-to-talk key. "Talk through" lets you speak over a sound. Optional pause and stop keys work from inside your game: hold a pause key to pause the sounds and release push-to-talk (for example to talk on another channel), or press a stop key to end them at once.
 - **Guided setup.** A short first-run setup covers sounds, speakers, voice chat, push-to-talk and the phone. It can install VB-Cable for you (downloaded from VB-Audio, signature checked).

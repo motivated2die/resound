@@ -37,8 +37,12 @@ type Config struct {
 	PushToTalkWhilePlaying bool `json:"pushToTalkWhilePlaying"`
 	// Folders are the sound folders; each becomes tabs on the phone.
 	Folders []string `json:"folders"`
-	// ServerPort is the phone remote's HTTP port.
+	// ServerPort is the UDP port the app connects to (the name is from the
+	// HTTP server of earlier versions; same default).
 	ServerPort int `json:"serverPort"`
+	// AppURL replaces the app's address (app.AppURL), e.g. for
+	// a test deployment. Usually empty.
+	AppURL string `json:"appURL,omitempty"`
 	// TestSoundPath is the file played by "Play test sound" (diagnostics).
 	TestSoundPath string `json:"testSoundPath"`
 	// SetupComplete is set once the guided first-run setup was finished or

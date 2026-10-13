@@ -8,8 +8,9 @@
 //     size Windows asks for at 100–200 % display scaling (16 to 96 px as
 //     bitmaps, 256 px as PNG). Without these, Windows shrinks one large image
 //     on the fly and the icon looks soft.
-//   - internal/server/web/assets: resound-512.png and -192.png (copies)
-//     and favicon.ico for the phone remote.
+//   - webapp/src/assets: resound-512.png and -192.png (copies), favicon.ico,
+//     and resound-maskable-512.png: the logo on the app's background with
+//     room around it, which Android crops to its icon shape.
 //
 // Sizes are scaled from assets/resound.png (512 px) with a Catmull-Rom
 // filter and a light sharpening at small sizes. A hand-made version wins:
@@ -22,6 +23,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"image"
+	"image/color"
 	"image/png"
 	"log"
 	"os"
@@ -44,7 +46,7 @@ func main() {
 	check(os.WriteFile(filepath.Join("assets", "icon.ico"), ico, 0o644))
 	fmt.Printf("wrote assets/icon.ico (%d sizes, %d KB)\n", len(appIconSizes), len(ico)/1024)
 
-	web := filepath.Join("internal", "server", "web", "assets")
+	web := filepath.Join("webapp", "src", "assets")
 	for from, to := range map[string]string{"resound.png": "resound-512.png", "resound-192.png": "resound-192.png"} {
 		data, err := os.ReadFile(filepath.Join("assets", from))
 		check(err)
@@ -53,7 +55,21 @@ func main() {
 	fav, err := buildICO(sized(logo, webIconSizes, false), true)
 	check(err)
 	check(os.WriteFile(filepath.Join(web, "favicon.ico"), fav, 0o644))
-	fmt.Println("wrote", web, "resound-512.png, resound-192.png, favicon.ico")
+	var buf bytes.Buffer
+	check(png.Encode(&buf, maskable(logo, 512)))
+	check(os.WriteFile(filepath.Join(web, "resound-maskable-512.png"), buf.Bytes(), 0o644))
+	fmt.Println("wrote", web, "resound-512.png, resound-192.png, favicon.ico, resound-maskable-512.png")
+}
+
+// maskable puts the logo at 60 % on the app's background (#1c1d22), inside
+// the safe zone (a centred circle of 80 %) that every icon mask keeps.
+func maskable(logo image.Image, size int) *image.RGBA {
+	img := image.NewRGBA(image.Rect(0, 0, size, size))
+	draw.Draw(img, img.Bounds(), &image.Uniform{color.RGBA{0x1c, 0x1d, 0x22, 0xff}}, image.Point{}, draw.Src)
+	s := size * 60 / 100
+	o := (size - s) / 2
+	draw.Draw(img, image.Rect(o, o, o+s, o+s), scale(logo, s), image.Point{}, draw.Over)
+	return img
 }
 
 type sizedImage struct {

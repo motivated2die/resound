@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -11,7 +12,6 @@ import (
 	"strconv"
 	"strings"
 	"testing"
-	"testing/fstest"
 	"time"
 
 	"github.com/motivated2die/resound/internal/library"
@@ -58,134 +58,34 @@ func newTestServer(t *testing.T) (*Server, *fakePlayer, uint64) {
 		t.Fatal(err)
 	}
 	player := &fakePlayer{lib: lib}
-	web := fstest.MapFS{"index.html": {Data: []byte("app")}, "login.html": {Data: []byte("login")}}
-	return New(lib, player, auth, web, t.Logf), player, library.ID(path)
+	return New(lib, player, auth, t.Logf), player, library.ID(path)
 }
 
-func do(t *testing.T, h http.Handler, method, path, body string, cookie *http.Cookie) *httptest.ResponseRecorder {
-	t.Helper()
-	req := httptest.NewRequest(method, path, strings.NewReader(body))
-	req.RemoteAddr = "192.168.1.50:5000"
-	if cookie != nil {
-		req.AddCookie(cookie)
+// withDevice marks a request as coming from a paired device's connection,
+// as rtc.go does.
+func withDevice(r *http.Request, device string) *http.Request {
+	if device == "" {
+		return r
 	}
+	return r.WithContext(context.WithValue(r.Context(), rtcDeviceKey{}, device))
+}
+
+func do(t *testing.T, h http.Handler, method, path, body, device string) *httptest.ResponseRecorder {
+	t.Helper()
+	req := withDevice(httptest.NewRequest(method, path, strings.NewReader(body)), device)
 	rec := httptest.NewRecorder()
 	h.ServeHTTP(rec, req)
 	return rec
 }
 
-func sessionCookie(t *testing.T, rec *httptest.ResponseRecorder) *http.Cookie {
+// login pairs a device and returns its ID.
+func login(t *testing.T, s *Server) string {
 	t.Helper()
-	for _, c := range rec.Result().Cookies() {
-		if c.Name == cookieName && c.Value != "" {
-			return c
-		}
-	}
-	t.Fatalf("no session cookie (status %d, body %s)", rec.Code, rec.Body)
-	return nil
-}
-
-func TestUnauthenticatedAccess(t *testing.T) {
-	s, _, _ := newTestServer(t)
-	h := s.Handler()
-	if rec := do(t, h, "GET", "/api/tabs", "", nil); rec.Code != http.StatusUnauthorized {
-		t.Fatalf("api without session: %d", rec.Code)
-	}
-	if rec := do(t, h, "GET", "/", "", nil); rec.Code != http.StatusFound || rec.Header().Get("Location") != "/login.html" {
-		t.Fatalf("page without session: %d %q", rec.Code, rec.Header().Get("Location"))
-	}
-	if rec := do(t, h, "GET", "/login.html", "", nil); rec.Code != http.StatusOK {
-		t.Fatalf("login page: %d", rec.Code)
-	}
-}
-
-func TestLoginLockoutAndAPI(t *testing.T) {
-	s, player, soundID := newTestServer(t)
-	h := s.Handler()
-
-	for i := 0; i < maxFailures; i++ {
-		if rec := do(t, h, "POST", "/api/auth/login", `{"pin":"wrong"}`, nil); rec.Code != http.StatusUnauthorized {
-			t.Fatalf("wrong pin %d: %d", i, rec.Code)
-		}
-	}
-	pin := s.Auth().PIN()
-	if rec := do(t, h, "POST", "/api/auth/login", `{"pin":"`+pin+`"}`, nil); rec.Code != http.StatusTooManyRequests {
-		t.Fatalf("expected lockout, got %d", rec.Code)
-	}
-	s.Auth().now = func() time.Time { return time.Now().Add(2 * lockoutDuration) }
-	rec := do(t, h, "POST", "/api/auth/login", `{"pin":"`+pin+`"}`, nil)
-	cookie := sessionCookie(t, rec)
-
-	rec = do(t, h, "GET", "/api/tabs", "", cookie)
-	var tabs []map[string]any
-	if err := json.Unmarshal(rec.Body.Bytes(), &tabs); err != nil || len(tabs) != 1 {
-		t.Fatalf("tabs: %d %s", rec.Code, rec.Body)
-	}
-
-	rec = do(t, h, "POST", "/api/sounds/"+jsonID(soundID)+"/play", "", cookie)
-	var play map[string]any
-	_ = json.Unmarshal(rec.Body.Bytes(), &play)
-	if rec.Code != http.StatusOK || play["playingId"] != float64(7) || len(player.played) != 1 {
-		t.Fatalf("play: %d %s", rec.Code, rec.Body)
-	}
-	if rec := do(t, h, "POST", "/api/sounds/123/play", "", cookie); rec.Code != http.StatusNotFound {
-		t.Fatalf("unknown sound: %d", rec.Code)
-	}
-
-	rec = do(t, h, "POST", "/api/sounds/"+jsonID(soundID)+"/volume", `{"sliderPosition":25}`, cookie)
-	var vol map[string]any
-	_ = json.Unmarshal(rec.Body.Bytes(), &vol)
-	if vol["localVolume"] != float64(75) || vol["remoteVolume"] != float64(150) || vol["sliderPosition"] != float64(25) {
-		t.Fatalf("volume: %s", rec.Body)
-	}
-
-	rec = do(t, h, "POST", "/api/sounds/"+jsonID(soundID)+"/favorite", "", cookie)
-	if !strings.Contains(rec.Body.String(), `"isFavorite":true`) {
-		t.Fatalf("favorite: %s", rec.Body)
-	}
-	rec = do(t, h, "GET", "/api/favorites", "", cookie)
-	if !strings.Contains(rec.Body.String(), "boom") {
-		t.Fatalf("favorites: %s", rec.Body)
-	}
-
-	do(t, h, "POST", "/api/auth/logout", "", cookie)
-	if rec := do(t, h, "GET", "/api/tabs", "", cookie); rec.Code != http.StatusUnauthorized {
-		t.Fatalf("after logout: %d", rec.Code)
-	}
-}
-
-func TestPairCodeIsSingleUse(t *testing.T) {
-	s, _, _ := newTestServer(t)
-	h := s.Handler()
-	code := s.Auth().PairCode()
-	rec := do(t, h, "GET", "/pair?code="+code, "", nil)
-	if rec.Header().Get("Location") != "/" {
-		t.Fatalf("pair redirect: %q", rec.Header().Get("Location"))
-	}
-	sessionCookie(t, rec)
-	rec = do(t, h, "GET", "/pair?code="+code, "", nil)
-	if rec.Header().Get("Location") != "/login.html" {
-		t.Fatal("pairing code worked twice")
-	}
-	if s.Auth().PairCode() == code {
-		t.Fatal("pairing code was not rotated")
-	}
-}
-
-func TestResetSignsOutEveryone(t *testing.T) {
-	s, _, _ := newTestServer(t)
-	h := s.Handler()
-	old := s.Auth().PIN()
-	cookie := sessionCookie(t, do(t, h, "POST", "/api/auth/login", `{"pin":"`+old+`"}`, nil))
-	if err := s.Auth().ResetAll(); err != nil {
+	id, _, err := s.Auth().PairDevice(s.Auth().PairCode(), "test")
+	if err != nil {
 		t.Fatal(err)
 	}
-	if rec := do(t, h, "GET", "/api/tabs", "", cookie); rec.Code != http.StatusUnauthorized {
-		t.Fatalf("session survived reset: %d", rec.Code)
-	}
-	if s.Auth().SessionCount() != 0 {
-		t.Fatal("sessions not cleared")
-	}
+	return id
 }
 
 func jsonID(id uint64) string {
@@ -193,25 +93,108 @@ func jsonID(id uint64) string {
 	return string(b)
 }
 
-func TestRepairingReplacesSession(t *testing.T) {
-	s, _, _ := newTestServer(t)
+// Only requests from a device's connection reach the API.
+func TestUnauthenticatedAccess(t *testing.T) {
+	s, player, soundID := newTestServer(t)
 	h := s.Handler()
-	first := sessionCookie(t, do(t, h, "GET", "/pair?code="+s.Auth().PairCode(), "", nil))
-	second := sessionCookie(t, do(t, h, "GET", "/pair?code="+s.Auth().PairCode(), "", first))
-	if n := s.Auth().SessionCount(); n != 1 {
-		t.Fatalf("sessions after re-pairing = %d, want 1", n)
+	if rec := do(t, h, "GET", "/api/tabs", "", ""); rec.Code != http.StatusUnauthorized {
+		t.Fatalf("api without device: %d", rec.Code)
 	}
-	if rec := do(t, h, "GET", "/api/tabs", "", first); rec.Code != http.StatusUnauthorized {
-		t.Fatal("old session still valid")
-	}
-	if rec := do(t, h, "GET", "/api/tabs", "", second); rec.Code != http.StatusOK {
-		t.Fatal("new session rejected")
+	if rec := do(t, h, "POST", "/api/sounds/"+jsonID(soundID)+"/play", "", ""); rec.Code != http.StatusUnauthorized || len(player.played) != 0 {
+		t.Fatalf("play without device: %d", rec.Code)
 	}
 }
 
-func login(t *testing.T, s *Server) *http.Cookie {
-	t.Helper()
-	return sessionCookie(t, do(t, s.Handler(), "POST", "/api/auth/login", `{"pin":"`+s.Auth().PIN()+`"}`, nil))
+func TestAPI(t *testing.T) {
+	s, player, soundID := newTestServer(t)
+	h, c := s.Handler(), login(t, s)
+
+	rec := do(t, h, "GET", "/api/tabs", "", c)
+	var tabs []map[string]any
+	if err := json.Unmarshal(rec.Body.Bytes(), &tabs); err != nil || len(tabs) != 1 {
+		t.Fatalf("tabs: %d %s", rec.Code, rec.Body)
+	}
+
+	rec = do(t, h, "POST", "/api/sounds/"+jsonID(soundID)+"/play", "", c)
+	var play map[string]any
+	_ = json.Unmarshal(rec.Body.Bytes(), &play)
+	if rec.Code != http.StatusOK || play["playingId"] != float64(7) || len(player.played) != 1 {
+		t.Fatalf("play: %d %s", rec.Code, rec.Body)
+	}
+	if rec := do(t, h, "POST", "/api/sounds/123/play", "", c); rec.Code != http.StatusNotFound {
+		t.Fatalf("unknown sound: %d", rec.Code)
+	}
+
+	rec = do(t, h, "POST", "/api/sounds/"+jsonID(soundID)+"/volume", `{"sliderPosition":25}`, c)
+	var vol map[string]any
+	_ = json.Unmarshal(rec.Body.Bytes(), &vol)
+	if vol["localVolume"] != float64(75) || vol["remoteVolume"] != float64(150) || vol["sliderPosition"] != float64(25) {
+		t.Fatalf("volume: %s", rec.Body)
+	}
+
+	rec = do(t, h, "POST", "/api/sounds/"+jsonID(soundID)+"/favorite", "", c)
+	if !strings.Contains(rec.Body.String(), `"isFavorite":true`) {
+		t.Fatalf("favorite: %s", rec.Body)
+	}
+	rec = do(t, h, "GET", "/api/favorites", "", c)
+	if !strings.Contains(rec.Body.String(), "boom") {
+		t.Fatalf("favorites: %s", rec.Body)
+	}
+
+	do(t, h, "POST", "/api/auth/logout", "", c)
+	if s.Auth().DeviceCount() != 0 {
+		t.Fatal("device still paired after logout")
+	}
+}
+
+func TestPairCodeIsSingleUse(t *testing.T) {
+	s, _, _ := newTestServer(t)
+	code := s.Auth().PairCode()
+	if _, _, err := s.Auth().PairDevice(code, "a"); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := s.Auth().PairDevice(code, "b"); !errors.Is(err, ErrBadCode) {
+		t.Fatalf("pairing code worked twice: %v", err)
+	}
+	if s.Auth().PairCode() == code {
+		t.Fatal("pairing code was not rotated")
+	}
+	s.Auth().now = func() time.Time { return time.Now().Add(2 * pairCodeLifetime) }
+	if _, _, err := s.Auth().PairDevice(s.Auth().pairCode, "c"); !errors.Is(err, ErrBadCode) {
+		t.Fatalf("expired pairing code worked: %v", err)
+	}
+}
+
+func TestResetSignsOutEveryone(t *testing.T) {
+	s, _, _ := newTestServer(t)
+	id := login(t, s)
+	if err := s.Auth().ResetAll(); err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := s.Auth().DeviceKey(id); ok || s.Auth().DeviceCount() != 0 {
+		t.Fatal("device survived reset")
+	}
+}
+
+// remote.json of versions with the browser remote has a PIN and sessions:
+// devices pair anew, nothing breaks.
+func TestOldRemoteJSON(t *testing.T) {
+	dir := t.TempDir()
+	old := `{"pin":"123456","sessions":[{"hash":"ab","created":"2026-01-01T00:00:00Z","lastSeen":"2026-01-01T00:00:00Z"}]}`
+	if err := os.WriteFile(filepath.Join(dir, "remote.json"), []byte(old), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	a, err := NewAuth(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if a.DeviceCount() != 0 || a.state.DeviceSecret == "" {
+		t.Fatalf("state = %+v", a.state)
+	}
+	data, _ := os.ReadFile(filepath.Join(dir, "remote.json"))
+	if strings.Contains(string(data), "pin") {
+		t.Fatalf("old fields kept: %s", data)
+	}
 }
 
 func TestLibraryEndpointAndETag(t *testing.T) {
@@ -230,7 +213,7 @@ func TestLibraryEndpointAndETag(t *testing.T) {
 	}
 	etag := rec.Header().Get("ETag")
 	req := httptest.NewRequest("GET", "/api/library", nil)
-	req.AddCookie(c)
+	req = withDevice(req, c)
 	req.Header.Set("If-None-Match", etag)
 	r2 := httptest.NewRecorder()
 	h.ServeHTTP(r2, req)
