@@ -167,7 +167,14 @@ const buttonIconL = 16 // logical icon size inside buttons
 // paintButton draws a push button with an optional icon before the label
 // (or alone when the label is empty); shared by Button, Buttons, NavTool.
 func paintButton(c *canvas, box rect, label string, icon Icon, style ButtonStyle, disabled, hover, press bool) {
-	bg, fg := colControl, colText
+	bg, fg := buttonColors(style, disabled, hover, press)
+	c.roundRect(box, c.px(10), bg)
+	paintButtonFace(c, box, label, icon, fg)
+}
+
+// buttonColors are a button's background and text colour.
+func buttonColors(style ButtonStyle, disabled, hover, press bool) (bg, fg uint32) {
+	bg, fg = colControl, colText
 	switch {
 	case disabled:
 		bg, fg = colRowHover, colMuted
@@ -183,7 +190,11 @@ func paintButton(c *canvas, box rect, label string, icon Icon, style ButtonStyle
 			bg = shade(bg, 14)
 		}
 	}
-	c.roundRect(box, c.px(10), bg)
+	return bg, fg
+}
+
+// paintButtonFace draws a button's icon and label centred in box.
+func paintButtonFace(c *canvas, box rect, label string, icon Icon, fg uint32) {
 	switch {
 	case icon == "":
 		c.text(label, box, fontBold, fg, dtCenter)

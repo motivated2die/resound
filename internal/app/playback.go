@@ -28,6 +28,9 @@ type playbackState struct {
 	// mutedMic is the capture device Resound muted, "" when none. A mic
 	// the user muted themselves is never unmuted by Resound.
 	mutedMic string
+	// muteGen counts Resound's mute changes, so a routing check that read
+	// the mic's mute state before one is discarded (flow.go).
+	muteGen int
 
 	// paused holds the voices paused by the play/pause toggle; talk the
 	// voices paused by talk-through. wasHolding remembers that mic/PTT were
@@ -280,6 +283,7 @@ func (a *App) holdMic() {
 		return
 	}
 	pb.mutedMic = id
+	a.setRouteMuted(id, true)
 	logx.Printf("mic muted for playback in %v", time.Since(start).Round(100*time.Microsecond))
 }
 
@@ -293,8 +297,24 @@ func (a *App) releaseMic() {
 		logx.Printf("unmuting mic: %v", err)
 	} else {
 		logx.Printf("mic unmuted")
+		a.setRouteMuted(pb.mutedMic, false)
 	}
 	pb.mutedMic = ""
+}
+
+// setRouteMuted records a mute change Resound made in the routing state, so
+// the panel doesn't show the mute Windows reported before it (until the
+// next check) as the user's own.
+func (a *App) setRouteMuted(id string, muted bool) {
+	a.playback.muteGen++
+	for i := range a.route.Inputs {
+		if a.route.Inputs[i].ID == id {
+			a.route.Inputs[i].Muted = muted
+		}
+	}
+	if a.route.Mic != nil && a.route.Mic.ID == id {
+		a.route.Mic.Muted = muted
+	}
 }
 
 func (a *App) chooseTestSound() {

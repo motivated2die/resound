@@ -163,13 +163,19 @@ func (a *App) recheckRouting() {
 		return
 	}
 	l.checking = true
-	micID := a.cfg.MicDeviceID
+	micID, gen := a.cfg.MicDeviceID, a.playback.muteGen
 	go func() {
 		st, err := routing.Check(micID)
 		a.tray.Post(func() {
 			l.checking, l.lastCheck = false, time.Now()
 			if a.cfg.MicDeviceID != micID || a.busy != "" {
 				return // changed meanwhile; that refreshed the routing itself
+			}
+			if a.playback.muteGen != gen {
+				// Resound muted or unmuted the mic while this ran: its mute
+				// state is outdated. Check again on the next tick.
+				l.lastCheck = time.Time{}
+				return
 			}
 			if err != nil {
 				logx.Printf("routing check: %v", err)
@@ -413,7 +419,6 @@ func (a *App) onlyPreviews() bool {
 func (a *App) cableEnd() ui.FlowCable {
 	c := ui.FlowCable{
 		Caption: "Others hear", Value: fmt.Sprintf("%d%%", a.cfg.CableVolume),
-		Hint:  "Choose it as your mic in games and chat apps",
 		Level: a.flowLevel(&a.levels.others),
 		Volume: &ui.FlowVolume{Value: a.cfg.CableVolume,
 			Tip:      "Volume of your sounds for others. Your voice isn't changed.",
@@ -422,11 +427,10 @@ func (a *App) cableEnd() ui.FlowCable {
 	switch out := a.route.CableOutput; {
 	case out != nil && a.cableSelected():
 		c.Name = "CABLE Output"
-		c.Tip = "Others hear you and your sounds through VB-Cable. In Discord, games or OBS, choose “" + out.Name + "” as your microphone."
+		c.Info = "Others hear you and your sounds through VB-Cable. In Discord, games or OBS, choose “" + out.Name + "” as your microphone."
 	case out != nil:
 		c.Name = a.cableTargetName()
-		c.Tip = "Your sounds for others go to “" + c.Name + "” (chosen in Settings → Audio & voice chat), not to VB-Cable, where your voice goes."
-		c.Hint = "Chosen in Settings"
+		c.Info = "Your sounds for others go to “" + c.Name + "” (chosen in Settings → Audio & voice chat), not to VB-Cable, where your voice goes."
 		c.OnClick = a.flowFix(func() {})
 	default:
 		c.Placeholder = "Not installed"

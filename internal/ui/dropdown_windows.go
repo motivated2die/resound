@@ -67,17 +67,30 @@ func showDetail(c *canvas, box rect, o Option) bool {
 // paintField draws a select field in box: the selection (or placeholder),
 // its detail tag and the chevron. open is true while its list is open.
 func paintField(c *canvas, box rect, f dropdownField, open, hover, press bool) {
-	bg, border := colControl, colControl
+	border := fieldBg(open, hover, press)
+	if open {
+		border = colAccent
+	}
+	c.frame(box, c.px(10), fieldBg(open, hover, press), border)
+	paintFieldContent(c, box, f, open)
+}
+
+// fieldBg is a select field's background.
+func fieldBg(open, hover, press bool) uint32 {
 	switch {
 	case open:
-		border = colAccent
+		return colControl
 	case press:
-		bg = shade(bg, -12)
+		return shade(colControl, -12)
 	case hover:
-		bg = shade(bg, 12)
+		return shade(colControl, 12)
 	}
-	c.frame(box, c.px(10), bg, border)
+	return colControl
+}
 
+// paintFieldContent draws a field's selection (or placeholder), its detail
+// tag and the chevron, without the background.
+func paintFieldContent(c *canvas, box rect, f dropdownField, open bool) {
 	pad := c.px(12)
 	chevX := box.Right - pad - c.px(5)
 	c.chevron(chevX, box.Top+box.h()/2, c.px(5), open, colMuted)

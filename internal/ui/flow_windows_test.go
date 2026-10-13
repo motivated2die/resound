@@ -96,8 +96,7 @@ func testFlow() AudioFlow {
 	return AudioFlow{
 		Mic:    FlowDevice{ID: "mic", Caption: "Your microphone", Options: []Option{{Label: "Automatic: Headset Microphone (Realtek)"}}, Selected: 0, Level: level(0.62)},
 		Sounds: FlowSounds{Caption: "Soundboard", Status: "Playing", Playing: true, Level: level(0.8)},
-		Cable: FlowCable{Caption: "Others hear", Value: "100%", Name: "CABLE Output", Hint: "Choose it as your mic in games and chat apps",
-			Tip: "why", Level: level(0.85), Volume: &FlowVolume{Value: 100}},
+		Cable:  FlowCable{Caption: "Others hear", Value: "100%", Name: "CABLE Output", Info: "why", Level: level(0.85), Volume: &FlowVolume{Value: 100}},
 		You: FlowDevice{ID: "monitor", Caption: "You hear", Value: "80%", Options: []Option{{Label: "System default"}},
 			Level: level(0.55), Volume: &FlowVolume{Value: 80}},
 		MicPipe:   Pipe{State: PipeOn, Level: level(0.62)},
@@ -157,7 +156,7 @@ func TestFlowRender(t *testing.T) {
 			if f.MicPipe.State == PipeOn {
 				c := &canvas{scale: scale}
 				micH := c.px(flowMicRow{}.height())
-				lane, _, _ := flowLanes(c, rect{0, 0, c.px(popupWidthL), 1})
+				lane, _ := flowLanes(c, rect{0, 0, c.px(popupWidthL), 1})
 				y := c.px(popupPadL) + micH
 				bg := color.RGBA{0x1C, 0x1D, 0x22, 255}
 				if img.RGBAAt(int(lane), int(y-1)) == bg || img.RGBAAt(int(lane), int(y)) == bg {
@@ -175,35 +174,39 @@ func TestFlowSegments(t *testing.T) {
 	rows := f.Rows()
 
 	// Segment indexes stay put whether or not a badge is shown.
-	if n := len(rows[1].segments(c, r)); n != 2 {
-		t.Errorf("sounds row: %d segments, want 2", n)
+	if n := len(rows[1].segments(c, r)); n != 3 {
+		t.Errorf("sounds row: %d segments, want 3", n)
 	}
-	if n := len(rows[2].segments(c, r)); n != 3 {
-		t.Errorf("junction row: %d segments, want 3", n)
+	if n := len(rows[2].segments(c, r)); n != 2 {
+		t.Errorf("cable row: %d segments, want 2", n)
 	}
-	for i, s := range rows[2].segments(c, r) {
+	for i, s := range append(rows[1].segments(c, r)[1:], rows[2].segments(c, r)...) {
 		if s.w() != 0 {
-			t.Errorf("junction segment %d without a badge is %v, want empty", i, s)
+			t.Errorf("badge segment %d without a badge is %v, want empty", i, s)
 		}
 	}
 
-	// Outputs: the cable card, the you field, then two volume tracks.
+	// Outputs: the cable card and its info icon, the you field, then two
+	// volume tracks.
 	out := rows[3].(flowOutputsRow)
-	if _, ok := out.field(0); ok {
+	if _, ok := out.field(segCableCard); ok {
 		t.Error("the cable card is a dropdown")
 	}
-	if f, ok := out.field(1); !ok || f.id != "monitor" {
-		t.Errorf("field 1 = %q, %v; want monitor", f.id, ok)
+	if f, ok := out.field(segYouField); !ok || f.id != "monitor" {
+		t.Errorf("you field = %q, %v; want monitor", f.id, ok)
 	}
-	if out.dragIDAt(1) != "" || out.dragIDAt(3) != "flow-volume:you" {
-		t.Errorf("drag ids: %q, %q", out.dragIDAt(1), out.dragIDAt(3))
+	if out.tip(c, r, segCableInfo) != "why" {
+		t.Errorf("info tip = %q", out.tip(c, r, segCableInfo))
+	}
+	if out.dragIDAt(segYouField) != "" || out.dragIDAt(segYouVolume) != "flow-volume:you" {
+		t.Errorf("drag ids: %q, %q", out.dragIDAt(segYouField), out.dragIDAt(segYouVolume))
 	}
 
 	var got []int
 	f.You.Volume.OnChange = func(v int, done bool) { got = append(got, v) }
 	out = f.Rows()[3].(flowOutputsRow)
 	segs := out.segments(c, r)
-	_, x0, x1 := trackRange(c, segs[3])
+	_, x0, x1 := trackRange(c, segs[segYouVolume])
 	out.dragTo(c, r, "flow-volume:you", x0-40, false) // clamps to 0
 	out.dragTo(c, r, "flow-volume:you", x1+40, false) // clamps to 100
 	out.dragTo(c, r, "flow-volume:cable", x0, false)  // the other track: not this callback

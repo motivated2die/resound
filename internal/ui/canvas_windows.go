@@ -145,6 +145,33 @@ func (c *canvas) hGradientStops(r rect, stops []uint32, clip rect, radius int32)
 	procGradientFill.Call(c.dc, uintptr(unsafe.Pointer(&v[0])), uintptr(len(v)), uintptr(unsafe.Pointer(&mesh[0])), uintptr(n), 0 /* GRADIENT_FILL_RECT_H */)
 }
 
+// clipRound restricts drawing to the rounded rectangle r (the shape
+// roundRect draws with that radius) until the returned function runs.
+// hGradientStops sets its own clip, so don't call it in between.
+func (c *canvas) clipRound(r rect, radius int32) (restore func()) {
+	rgn, _, _ := procCreateRoundRectRgn.Call(uintptr(r.Left), uintptr(r.Top), uintptr(r.Right+1), uintptr(r.Bottom+1), uintptr(radius), uintptr(radius))
+	if rgn == 0 {
+		return func() {}
+	}
+	procSelectClipRgn.Call(c.dc, rgn)
+	return func() {
+		procSelectClipRgn.Call(c.dc, 0)
+		procDeleteObject.Call(rgn)
+	}
+}
+
+// outline draws only the 1-pixel border of a rounded rectangle.
+func (c *canvas) outline(r rect, radius int32, color uint32) {
+	pen, _, _ := procCreatePen.Call(0 /* PS_SOLID */, uintptr(max(1, c.px(1))), uintptr(color))
+	brush, _, _ := procGetStockObject.Call(5 /* NULL_BRUSH */)
+	oldB, _, _ := procSelectObject.Call(c.dc, brush)
+	oldP, _, _ := procSelectObject.Call(c.dc, pen)
+	procRoundRect.Call(c.dc, uintptr(r.Left), uintptr(r.Top), uintptr(r.Right), uintptr(r.Bottom), uintptr(radius), uintptr(radius))
+	procSelectObject.Call(c.dc, oldB)
+	procSelectObject.Call(c.dc, oldP)
+	procDeleteObject.Call(pen)
+}
+
 // ring draws a circle outline of the given width, optionally with a filled dot.
 func (c *canvas) circle(cx, cy, radius int32, color uint32) {
 	b, _, _ := procCreateSolidBrush.Call(uintptr(color))
