@@ -16,25 +16,24 @@ import (
 	"github.com/motivated2die/resound/internal/wincom"
 )
 
-// Live level meters for devices outside Resound's own mixers, shown while
-// the panel's audio flow is visible:
+// Live level meters for capture devices (the microphone, VB-Cable's "CABLE
+// Output"), shown while the panel's audio flow is visible. InputLevel
+// records from the device only to measure it; nothing is kept. Windows
+// meters a capture device only while some app records from it, so Resound
+// has to, and while it runs Windows 11 shows its microphone-in-use icon.
 //
-//   - InputLevel records from a microphone only to measure it. Windows
-//     meters a capture device only while some app records from it, so
-//     Resound has to; nothing is kept. While it runs, Windows 11 shows its
-//     microphone-in-use icon.
-//   - DeviceLevel reads Windows' own peak meter of an output device: the
-//     mix of everything played on it (for VB-Cable's "CABLE Input": the
-//     sounds and the routed microphone). Output meters need no stream.
+// Recording also measures the actual samples: Windows' own peak meter of
+// VB-Cable's devices (IAudioMeterInformation, what the Sound dialog shows)
+// decays over seconds after the audio stopped.
 //
-// Each runs on its own locked COM thread that owns its COM objects, like an
-// output's render thread.
+// Each meter runs on its own locked COM thread that owns its COM objects,
+// like an output's render thread.
 
 // ErrMicBlocked means Windows' privacy settings keep desktop apps from the
 // microphone.
 var ErrMicBlocked = errors.New("Windows' privacy settings block microphone access for desktop apps")
 
-// meterThread is the thread and peak shared by both meters.
+// meterThread is a meter's thread and peak.
 type meterThread struct {
 	peak    peakHold
 	failed  atomic.Bool
@@ -248,62 +247,4 @@ func samplesPeak(b []byte, f sampleFormat) float32 {
 		}
 	}
 	return min(peak, 1)
-}
-
-// --- output device ------------------------------------------------------------
-
-// DeviceLevel reads Windows' peak meter of an output device.
-type DeviceLevel struct{ *meterThread }
-
-// meterPoll is how often DeviceLevel reads the meter. Windows' meter holds
-// the peak of the last device period, so this only needs to be a little
-// faster than the panel's repaints.
-const meterPoll = 15 * time.Millisecond
-
-// OpenDeviceLevel starts reading the peak meter of the output deviceID
-// ("" = the default output).
-func OpenDeviceLevel(deviceID string) (*DeviceLevel, error) {
-	l := &DeviceLevel{newMeterThread()}
-	if err := l.start(func(ready chan<- error) { l.run(deviceID, ready) }); err != nil {
-		return nil, err
-	}
-	return l, nil
-}
-
-func (l *DeviceLevel) run(deviceID string, ready chan<- error) {
-	enum, err := wincom.NewEnumerator()
-	if err != nil {
-		ready <- err
-		return
-	}
-	defer enum.Release()
-	dev, err := wincom.Find(enum, wincom.Render, deviceID)
-	if err != nil {
-		ready <- fmt.Errorf("finding device: %w", err)
-		return
-	}
-	defer dev.Release()
-	var meter *wca.IAudioMeterInformation
-	if err := wincom.Activate(dev, wca.IID_IAudioMeterInformation, unsafe.Pointer(&meter)); err != nil {
-		ready <- fmt.Errorf("activate meter: %w", describeHRESULT(err))
-		return
-	}
-	defer meter.Release()
-	ready <- nil
-
-	t := time.NewTicker(meterPoll)
-	defer t.Stop()
-	for {
-		select {
-		case <-l.stop:
-			return
-		case <-t.C:
-		}
-		var peak float32
-		if err := meter.GetPeakValue(&peak); err != nil {
-			l.fail(fmt.Errorf("meter: %w", describeHRESULT(err)))
-			return
-		}
-		l.peak.raise(peak)
-	}
 }

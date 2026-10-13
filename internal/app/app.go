@@ -71,8 +71,10 @@ type App struct {
 	parents    []page // where detail pages' back buttons return to, innermost last
 	wizardStep int    // current step of the guided setup (pageWizard)
 
-	devices []audio.Device
-	devErr  error
+	devices     []audio.Device
+	devErr      error
+	outputsOpen bool   // openOutputs ran: the automatic cable output follows VB-Cable
+	cableOpenID string // the device the cable output was last opened on
 
 	route    routing.Status
 	routeErr error

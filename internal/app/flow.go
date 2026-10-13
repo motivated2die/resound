@@ -12,8 +12,10 @@ import (
 )
 
 // The audio flow (ui.AudioFlow) shows where audio goes: the microphone and
-// the soundboard at the top, piped into what others hear (VB-Cable) and
-// what the user hears. It is on the home page, the setup's audio steps and
+// the soundboard at the top; the mic and the soundboard's cable stream plug
+// into VB-Cable, whose far end ("CABLE Output") is what others hear; the
+// soundboard's second stream goes to what the user hears (a preview only
+// there). It is on the home page, the setup's audio steps and
 // Settings → Audio & voice chat. Pipes break where the routing isn't set
 // up, with a badge that explains why and leads to the fix; they show what
 // Resound does while sounds play (mic muted, push-to-talk held, paused).
@@ -22,23 +24,25 @@ import (
 //   - the microphone: recorded by Resound only to measure it (Windows meters
 //     a capture device only while something records from it);
 //   - the sounds and "You hear": Resound's own mixers;
-//   - "Others hear": Windows' meter of the cable output device, so the
-//     routed microphone shows there too.
+//   - "Others hear": recorded from "CABLE Output", the cable's far end, the
+//     same way: exactly what others' apps receive, the mic included.
+//     (Windows' own meter of the cable's devices, which its Sound dialog
+//     shows, decays over seconds after audio stopped; recording measures
+//     the samples.)
 
 // Meter ballistics: a bar jumps up at once and falls by flowFall per tick.
 const (
-	flowTick       = 33 * time.Millisecond
-	flowFall       = 0.05
-	flowRecheck    = 3 * time.Second // routing re-read while the flow is visible
-	flowLevelOnset = 0.02            // below this a pipe counts as silent
+	flowTick    = 33 * time.Millisecond
+	flowFall    = 0.05
+	flowRecheck = 3 * time.Second // routing re-read while the flow is visible
 )
 
 // levelState holds the meters while the flow is visible. UI thread only.
 type levelState struct {
 	mic      *audio.InputLevel
-	micID    string // what mic records from ("" = not open)
-	micErr   error  // why the mic meter couldn't open; not retried for micID
-	cable    *audio.DeviceLevel
+	micID    string            // what mic records from ("" = not open)
+	micErr   error             // why the mic meter couldn't open; not retried for micID
+	cable    *audio.InputLevel // records CABLE Output to measure it
 	cableID  string
 	cableErr error
 
@@ -76,8 +80,8 @@ func (a *App) syncLevels() {
 		}
 	}
 	cableID := ""
-	if s, ok := a.outputStatus(audio.RoleCable); ok && s.Running {
-		cableID = s.Info.DeviceID
+	if a.route.CableOutput != nil && a.cableSelected() {
+		cableID = a.route.CableOutput.ID
 	}
 	if cableID != l.cableID {
 		if l.cable != nil {
@@ -86,7 +90,7 @@ func (a *App) syncLevels() {
 		}
 		l.cableID, l.cableErr = cableID, nil
 		if cableID != "" {
-			if l.cable, l.cableErr = audio.OpenDeviceLevel(cableID); l.cableErr != nil {
+			if l.cable, l.cableErr = audio.OpenInputLevel(cableID); l.cableErr != nil {
 				logx.Printf("cable level: %v", l.cableErr)
 			}
 		}
@@ -145,7 +149,7 @@ func (a *App) takeLevels() {
 		}
 		fall(&l.others, peak)
 	} else {
-		fall(&l.others, lv.Cable) // without Windows' meter, at least Resound's part
+		fall(&l.others, lv.Cable) // another output than VB-Cable: Resound's part
 	}
 }
 
@@ -174,6 +178,7 @@ func (a *App) recheckRouting() {
 			a.route, a.routeErr = st, err
 			if a.routeKey() != before {
 				a.refreshDevices(false)
+				a.syncCableOutput() // VB-Cable appeared or went
 				a.render()
 			}
 		})
@@ -299,17 +304,16 @@ func (a *App) audioFlow(setupLater bool) ui.AudioFlow {
 	f := ui.AudioFlow{
 		Mic:    a.micDevice(),
 		Sounds: a.soundsSource(),
-		Others: a.outputDevice(audio.RoleCable),
-		You:    a.outputDevice(audio.RoleMonitor),
+		Cable:  a.cableEnd(),
+		You:    a.youDevice(),
 	}
-	on := func(level *float64) ui.Pipe { return ui.Pipe{State: ui.PipeOn, Level: a.flowLevel(level)} }
 	f.MicPipe = a.micPipe(setupLater)
-	f.SoundsPipe = on(&l.sounds)
 	f.CablePipe = a.cablePipe(setupLater)
-	f.OthersPipe = a.othersPipe(setupLater)
-	f.YouPipe = on(&l.monitor)
+	f.CableLine = a.cableLine(setupLater)
+	f.YouPipe = ui.Pipe{State: ui.PipeOn, Level: a.flowLevel(&l.monitor)}
 
 	// Playback paused: by the phone's pause, talk-through or a pause key.
+	// Both of the soundboard's streams stop; the badge sits on the cable's.
 	pb := &a.playback
 	if pb.pausedActive || pb.talkLive || pb.holdLive {
 		label, tip := "Paused", "Playback is paused from the phone."
@@ -319,7 +323,10 @@ func (a *App) audioFlow(setupLater bool) ui.AudioFlow {
 		case pb.holdLive:
 			label, tip = "Pause key held", "The sounds pause while you hold a pause key, and your mic and push-to-talk are let go."
 		}
-		f.SoundsPipe = ui.Pipe{State: ui.PipeHeld, Badge: &ui.Badge{Icon: ui.IconPause, Label: label, Tip: tip}}
+		if f.CablePipe.State == ui.PipeOn {
+			f.CablePipe = ui.Pipe{State: ui.PipeHeld, Badge: &ui.Badge{Icon: ui.IconPause, Label: label, Tip: tip}}
+		}
+		f.YouPipe = ui.Pipe{State: ui.PipeHeld}
 	}
 	if s, ok := a.outputStatus(audio.RoleMonitor); ok && !s.Running && s.Err != nil {
 		f.YouPipe = ui.Pipe{State: ui.PipeBroken, Badge: &ui.Badge{
@@ -376,45 +383,76 @@ func (a *App) micDevice() ui.FlowDevice {
 func (a *App) soundsSource() ui.FlowSounds {
 	s := ui.FlowSounds{Caption: "Soundboard", OnTest: func() { a.playTest(true) }, OnStop: a.stopAll,
 		Level: a.flowLevel(&a.levels.sounds)}
-	if text, ok := a.playingStatus(); ok {
-		s.Playing = true
-		s.Status = "Playing"
-		if text == "Paused" {
-			s.Status = "Paused"
-		}
+	text, ok := a.playingStatus()
+	if !ok {
+		return s
+	}
+	s.Playing, s.Status = true, "Playing"
+	switch {
+	case text == "Paused":
+		s.Status = "Paused"
+	case a.onlyPreviews():
+		s.Status = "Preview"
 	}
 	return s
 }
 
-// outputDevice is the dropdown, meter and volume of one output role.
-func (a *App) outputDevice(role string) ui.FlowDevice {
-	if role == audio.RoleCable {
-		opts := []ui.Option{{Label: "Off"}}
-		sel := 0
-		for i, dev := range a.devices {
-			o := ui.Option{Label: dev.Name}
-			if dev.IsVirtualCable() {
-				o.Detail = "cable"
-			}
-			opts = append(opts, o)
-			if dev.ID == a.cfg.CableDeviceID {
-				sel = i + 1
-			}
-		}
-		return ui.FlowDevice{
-			ID: "cable", Caption: "Others hear", Value: fmt.Sprintf("%d%%", a.cfg.CableVolume),
-			Options: opts, Selected: sel,
-			OnSelect: func(i int) {
-				if i == 0 {
-					a.selectCable("")
-				} else {
-					a.selectCable(a.devices[i-1].ID)
-				}
-			},
-			Level:  a.flowLevel(&a.levels.others),
-			Volume: &ui.FlowVolume{Value: a.cfg.CableVolume, OnChange: func(v int, done bool) { a.setVolume(audio.RoleCable, v, done) }},
+// onlyPreviews reports whether everything playing is a preview, which only
+// the user hears (the flow lights only the pipe to "You hear").
+func (a *App) onlyPreviews() bool {
+	for _, v := range a.engine.Voices() {
+		if m, ok := a.playback.voice(v.ID); !ok || !m.preview {
+			return false
 		}
 	}
+	return true
+}
+
+// cableEnd is the cable's far end, "CABLE Output": the microphone others'
+// apps listen to. It isn't a choice; the volume is the sounds' into the cable.
+func (a *App) cableEnd() ui.FlowCable {
+	c := ui.FlowCable{
+		Caption: "Others hear", Value: fmt.Sprintf("%d%%", a.cfg.CableVolume),
+		Hint:  "Choose it as your mic in games and chat apps",
+		Level: a.flowLevel(&a.levels.others),
+		Volume: &ui.FlowVolume{Value: a.cfg.CableVolume,
+			Tip:      "Volume of your sounds for others. Your voice isn't changed.",
+			OnChange: func(v int, done bool) { a.setVolume(audio.RoleCable, v, done) }},
+	}
+	switch out := a.route.CableOutput; {
+	case out != nil && a.cableSelected():
+		c.Name = "CABLE Output"
+		c.Tip = "Others hear you and your sounds through VB-Cable. In Discord, games or OBS, choose “" + out.Name + "” as your microphone."
+	case out != nil:
+		c.Name = a.cableTargetName()
+		c.Tip = "Your sounds for others go to “" + c.Name + "” (chosen in Settings → Audio & voice chat), not to VB-Cable, where your voice goes."
+		c.Hint = "Chosen in Settings"
+		c.OnClick = a.flowFix(func() {})
+	default:
+		c.Placeholder = "Not installed"
+		c.Tip = "Others hear you and your sounds through VB-Cable, a free virtual audio driver by VB-Audio. Click to install it."
+		c.OnClick = a.flowFix(a.installCable)
+		if a.cable.state != cableIdle {
+			c.Placeholder = a.cableStepInfo()
+			c.OnClick = a.flowFix(func() {})
+		}
+	}
+	return c
+}
+
+// cableTargetName is the name of the device "others hear" plays into.
+func (a *App) cableTargetName() string {
+	id := a.cableOutputID()
+	for _, d := range a.devices {
+		if d.ID == id {
+			return d.Name
+		}
+	}
+	return "another device"
+}
+
+// youDevice is the user's own output: a choice of devices.
+func (a *App) youDevice() ui.FlowDevice {
 	opts := []ui.Option{{Label: "System default"}}
 	sel := 0
 	for i, dev := range a.devices {
@@ -438,8 +476,30 @@ func (a *App) outputDevice(role string) ui.FlowDevice {
 			}
 		},
 		Level:  a.flowLevel(&a.levels.monitor),
-		Volume: &ui.FlowVolume{Value: a.cfg.MonitorVolume, OnChange: func(v int, done bool) { a.setVolume(audio.RoleMonitor, v, done) }},
+		Volume: &ui.FlowVolume{Value: a.cfg.MonitorVolume, Tip: "Volume of your sounds for you.", OnChange: func(v int, done bool) { a.setVolume(audio.RoleMonitor, v, done) }},
 	}
+}
+
+// cableOutputDropdown is the advanced choice of where sounds for others go:
+// automatically VB-Cable, or another device such as a virtual mixer's input.
+func (a *App) cableOutputDropdown() ui.Row {
+	auto := ui.Option{Label: "Automatic: VB-Cable", Detail: "recommended"}
+	if a.route.CableInput == nil {
+		auto.Label = "Automatic: VB-Cable (not installed)"
+	}
+	opts, ids := []ui.Option{auto}, []string{""}
+	sel := 0
+	for _, dev := range a.devices {
+		if a.route.CableInput != nil && dev.ID == a.route.CableInput.ID {
+			continue // that's the automatic choice
+		}
+		if dev.ID == a.cfg.CableDeviceID {
+			sel = len(opts)
+		}
+		opts = append(opts, ui.Option{Label: dev.Name})
+		ids = append(ids, dev.ID)
+	}
+	return ui.Dropdown("cable-target", "Sounds for others play into", "", opts, sel, func(i int) { a.selectCable(ids[i]) })
 }
 
 // micPipe is the microphone's way into the cable: Windows' "Listen to this
@@ -479,36 +539,29 @@ func (a *App) micPipe(setupLater bool) ui.Pipe {
 	return ui.Pipe{State: ui.PipeOn, Level: a.flowLevel(&a.levels.micLvl)}
 }
 
-// cablePipe is the sounds' way into the cable: Resound's "others hear"
-// output, which should be VB-Cable's CABLE Input.
+// cablePipe is the soundboard's stream into the cable: Resound's "others
+// hear" output, automatically VB-Cable's CABLE Input.
 func (a *App) cablePipe(setupLater bool) ui.Pipe {
-	st := a.route
 	cable, _ := a.outputStatus(audio.RoleCable)
 	switch {
-	case !st.CableInstalled() && a.cfg.CableDeviceID == "":
-		return ui.Pipe{State: ui.PipeOff} // the cable side explains
+	case a.cableOutputID() == "":
+		return ui.Pipe{State: ui.PipeOff} // no VB-Cable: the cable explains
 	case cable.Err != nil && !cable.Running:
 		return ui.Pipe{State: ui.PipeBroken, Badge: &ui.Badge{Icon: ui.IconAlert, Label: "Output failed", Tone: ui.ToneBad,
 			Tip:     "Others don't hear your sounds: " + cable.Err.Error() + ". Click to restart the outputs.",
 			OnClick: a.restartOutputs}}
-	case a.cfg.CableDeviceID == "" && setupLater:
-		return ui.Pipe{State: ui.PipeOff, Badge: &ui.Badge{Icon: ui.IconUnplugged, Label: "Next step",
-			Tip: "Your sounds are connected to voice chat in the next step."}}
-	case a.cfg.CableDeviceID == "":
-		return ui.Pipe{State: ui.PipeBroken, Badge: &ui.Badge{Icon: ui.IconAlert, Label: "Off", Tone: ui.ToneWarning,
-			Tip:     "Others don't hear your sounds: “Others hear” is off. Click to play them into VB-Cable's CABLE Input.",
-			OnClick: a.flowFix(a.useCableAsOutput)}}
-	case st.CableInstalled() && !a.cableSelected():
-		return ui.Pipe{State: ui.PipeBroken, Badge: &ui.Badge{Icon: ui.IconAlert, Label: "Not the cable", Tone: ui.ToneWarning,
-			Tip:     "Your sounds go to another device than VB-Cable's CABLE Input, where your voice goes. That's only right if your voice chat listens there. Click to use CABLE Input.",
-			OnClick: a.flowFix(a.useCableAsOutput)}}
+	case !a.cableSelected():
+		return ui.Pipe{State: ui.PipeOff, Badge: &ui.Badge{Icon: ui.IconUnplugged, Label: "Elsewhere",
+			Tip:     "Your sounds for others play into “" + a.cableTargetName() + "”, not into VB-Cable (chosen in Settings → Audio & voice chat).",
+			OnClick: a.flowFix(func() {})}}
 	}
 	return ui.Pipe{State: ui.PipeOn, Level: a.flowLevel(&a.levels.cableSend)}
 }
 
-// othersPipe is what reaches the cable, mic and sounds together, and what
-// Resound does for the game: hold push-to-talk.
-func (a *App) othersPipe(setupLater bool) ui.Pipe {
+// cableLine is the cable itself: the mic and the sounds together on their
+// way to CABLE Output, and what Resound does for the game meanwhile: hold
+// push-to-talk.
+func (a *App) cableLine(setupLater bool) ui.Pipe {
 	switch {
 	case a.cable.busy():
 		return ui.Pipe{State: ui.PipeBroken, Badge: &ui.Badge{Icon: ui.IconAlert, Label: "Installing…", Tone: ui.ToneWarning,

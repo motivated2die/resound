@@ -96,15 +96,14 @@ func testFlow() AudioFlow {
 	return AudioFlow{
 		Mic:    FlowDevice{ID: "mic", Caption: "Your microphone", Options: []Option{{Label: "Automatic: Headset Microphone (Realtek)"}}, Selected: 0, Level: level(0.62)},
 		Sounds: FlowSounds{Caption: "Soundboard", Status: "Playing", Playing: true, Level: level(0.8)},
-		Others: FlowDevice{ID: "cable", Caption: "Others hear", Value: "100%", Options: []Option{{Label: "CABLE Input (VB-Audio Virtual Cable)", Detail: "cable"}},
-			Level: level(0.85), Volume: &FlowVolume{Value: 100}},
+		Cable: FlowCable{Caption: "Others hear", Value: "100%", Name: "CABLE Output", Hint: "Choose it as your mic in games and chat apps",
+			Tip: "why", Level: level(0.85), Volume: &FlowVolume{Value: 100}},
 		You: FlowDevice{ID: "monitor", Caption: "You hear", Value: "80%", Options: []Option{{Label: "System default"}},
 			Level: level(0.55), Volume: &FlowVolume{Value: 80}},
-		MicPipe:    Pipe{State: PipeOn, Level: level(0.62)},
-		SoundsPipe: Pipe{State: PipeOn, Level: level(0.8)},
-		CablePipe:  Pipe{State: PipeOn, Level: level(0.8)},
-		OthersPipe: Pipe{State: PipeOn, Level: level(0.85)},
-		YouPipe:    Pipe{State: PipeOn, Level: level(0.55)},
+		MicPipe:   Pipe{State: PipeOn, Level: level(0.62)},
+		CablePipe: Pipe{State: PipeOn, Level: level(0.8)},
+		CableLine: Pipe{State: PipeOn, Level: level(0.85)},
+		YouPipe:   Pipe{State: PipeOn, Level: level(0.55)},
 	}
 }
 
@@ -115,44 +114,50 @@ func TestFlowRender(t *testing.T) {
 	setup := testFlow()
 	setup.Sounds = FlowSounds{Caption: "Soundboard"}
 	setup.Mic.Level = level(0.4)
-	setup.Others.Level, setup.You.Level = level(0), level(0)
+	setup.Cable.Level, setup.You.Level = level(0), level(0)
 	setup.MicPipe = Pipe{State: PipeBroken, Badge: alert("Not routed", ToneWarning)}
-	setup.SoundsPipe = Pipe{State: PipeOn, Level: level(0)}
-	setup.CablePipe = Pipe{State: PipeBroken, Badge: alert("Off", ToneWarning)}
-	setup.OthersPipe = Pipe{State: PipeOn, Level: level(0)}
+	setup.CablePipe = Pipe{State: PipeOn, Level: level(0)}
+	setup.CableLine = Pipe{State: PipeOn, Level: level(0)}
 	setup.YouPipe = Pipe{State: PipeOn, Level: level(0)}
+
+	preview := setup
+	preview.MicPipe = Pipe{State: PipeOn, Level: level(0)}
+	preview.Sounds = FlowSounds{Caption: "Soundboard", Status: "Preview", Playing: true, Level: level(0.7)}
+	preview.YouPipe = Pipe{State: PipeOn, Level: level(0.7)}
+	preview.You.Level = level(0.7)
 
 	held := testFlow()
 	held.MicPipe = Pipe{State: PipeHeld, Badge: &Badge{Icon: IconMicOff, Label: "Muted for sounds", Tip: "why"}}
 	held.Mic.Level = level(0)
-	held.OthersPipe.Badge = &Badge{Icon: IconKeyboard, Label: "Holding F13", Tone: ToneGood, Tip: "why"}
+	held.CableLine.Badge = &Badge{Icon: IconKeyboard, Label: "Holding F13", Tone: ToneGood, Tip: "why"}
 
 	paused := testFlow()
 	paused.Sounds.Status = "Paused"
-	paused.SoundsPipe = Pipe{State: PipeHeld, Badge: &Badge{Icon: IconPause, Label: "Talking", Tip: "why"}}
-	paused.CablePipe.Level, paused.YouPipe.Level = level(0), level(0)
+	paused.CablePipe = Pipe{State: PipeHeld, Badge: &Badge{Icon: IconPause, Label: "Talking", Tip: "why"}}
+	paused.YouPipe = Pipe{State: PipeHeld}
 
 	missing := testFlow()
 	missing.Sounds = FlowSounds{Caption: "Soundboard"}
 	missing.MicPipe = Pipe{State: PipeOff}
 	missing.CablePipe = Pipe{State: PipeOff}
-	missing.OthersPipe = Pipe{State: PipeBroken, Badge: alert("VB-Cable missing", ToneWarning)}
+	missing.CableLine = Pipe{State: PipeBroken, Badge: alert("VB-Cable missing", ToneWarning)}
 	missing.YouPipe = Pipe{State: PipeBroken, Badge: alert("Output failed", ToneBad)}
-	missing.Others.Options, missing.Others.Selected = []Option{{Label: "Off"}}, 0
+	missing.Cable.Name, missing.Cable.Placeholder, missing.Cable.Level = "", "Not installed", level(0)
 
-	for name, f := range map[string]AudioFlow{"flow-playing": testFlow(), "flow-setup": setup, "flow-held": held, "flow-paused": paused, "flow-missing": missing} {
+	for name, f := range map[string]AudioFlow{"flow-playing": testFlow(), "flow-setup": setup, "flow-preview": preview,
+		"flow-held": held, "flow-paused": paused, "flow-missing": missing} {
 		for _, scale := range []float64{1, 1.5} {
 			img := renderRows(t, f.Rows(), scale, nil)
 			if scale == 1.5 {
 				name += "@1.5x"
 			}
 			savePNG(t, img, name)
-			// The pipes join across rows: the left lane is drawn in the
-			// last pixel row of the mic row and the first of the next one.
+			// The pipes join across rows: the mic lane is drawn in the last
+			// pixel row of the mic row and the first of the next one.
 			if f.MicPipe.State == PipeOn {
 				c := &canvas{scale: scale}
 				micH := c.px(flowMicRow{}.height())
-				lane, _ := flowLanes(c, rect{0, 0, c.px(popupWidthL), 1})
+				lane, _, _ := flowLanes(c, rect{0, 0, c.px(popupWidthL), 1})
 				y := c.px(popupPadL) + micH
 				bg := color.RGBA{0x1C, 0x1D, 0x22, 255}
 				if img.RGBAAt(int(lane), int(y-1)) == bg || img.RGBAAt(int(lane), int(y)) == bg {
@@ -173,8 +178,8 @@ func TestFlowSegments(t *testing.T) {
 	if n := len(rows[1].segments(c, r)); n != 2 {
 		t.Errorf("sounds row: %d segments, want 2", n)
 	}
-	if n := len(rows[2].segments(c, r)); n != 4 {
-		t.Errorf("junction row: %d segments, want 4", n)
+	if n := len(rows[2].segments(c, r)); n != 3 {
+		t.Errorf("junction row: %d segments, want 3", n)
 	}
 	for i, s := range rows[2].segments(c, r) {
 		if s.w() != 0 {
@@ -182,19 +187,16 @@ func TestFlowSegments(t *testing.T) {
 		}
 	}
 
-	// Outputs: two fields, then two volume tracks that drag.
+	// Outputs: the cable card, the you field, then two volume tracks.
 	out := rows[3].(flowOutputsRow)
-	if f, ok := out.field(0); !ok || f.id != "cable" {
-		t.Errorf("field 0 = %q, %v; want cable", f.id, ok)
+	if _, ok := out.field(0); ok {
+		t.Error("the cable card is a dropdown")
 	}
 	if f, ok := out.field(1); !ok || f.id != "monitor" {
 		t.Errorf("field 1 = %q, %v; want monitor", f.id, ok)
 	}
-	if _, ok := out.field(2); ok {
-		t.Error("segment 2 (a track) is a field")
-	}
-	if out.dragIDAt(0) != "" || out.dragIDAt(3) != "flow-volume:monitor" {
-		t.Errorf("drag ids: %q, %q", out.dragIDAt(0), out.dragIDAt(3))
+	if out.dragIDAt(1) != "" || out.dragIDAt(3) != "flow-volume:you" {
+		t.Errorf("drag ids: %q, %q", out.dragIDAt(1), out.dragIDAt(3))
 	}
 
 	var got []int
@@ -202,9 +204,9 @@ func TestFlowSegments(t *testing.T) {
 	out = f.Rows()[3].(flowOutputsRow)
 	segs := out.segments(c, r)
 	_, x0, x1 := trackRange(c, segs[3])
-	out.dragTo(c, r, "flow-volume:monitor", x0-40, false) // clamps to 0
-	out.dragTo(c, r, "flow-volume:monitor", x1+40, false) // clamps to 100
-	out.dragTo(c, r, "flow-volume:cable", x0, false)      // the other track: not this callback
+	out.dragTo(c, r, "flow-volume:you", x0-40, false) // clamps to 0
+	out.dragTo(c, r, "flow-volume:you", x1+40, false) // clamps to 100
+	out.dragTo(c, r, "flow-volume:cable", x0, false)  // the other track: not this callback
 	if len(got) != 2 || got[0] != 0 || got[1] != 100 {
 		t.Errorf("volume drags = %v, want [0 100]", got)
 	}

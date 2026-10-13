@@ -251,6 +251,10 @@ func (a *App) audioPage() []ui.Row {
 			ui.Action{Label: "Windows sound", Icon: ui.IconExternalLink, Closes: true, OnClick: func() { _ = ui.ShellRun("control.exe", "mmsys.cpl,,1") }},
 		),
 		ui.Text("Restart outputs after plugging in a device.", "", ui.ToneMuted),
+		ui.Section("Advanced"),
+		a.cableOutputDropdown(),
+		ui.Paragraph("Only for your own routing, e.g. a virtual mixer such as Voicemeeter. "+
+			"Otherwise your sounds and your voice no longer meet in VB-Cable.", ui.ToneMuted),
 	)
 	rows = append(rows, a.cableCredit()...)
 	return append(rows, ui.Spacer(4))
@@ -277,7 +281,7 @@ func (a *App) voiceSummary() (string, ui.Tone) {
 }
 
 func (a *App) cableSelected() bool {
-	return a.route.CableInput != nil && a.cfg.CableDeviceID == a.route.CableInput.ID
+	return a.route.CableInput != nil && a.cableOutputID() == a.route.CableInput.ID
 }
 
 func (a *App) setupStepsDone() int {

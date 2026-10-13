@@ -15,7 +15,9 @@ const AppName = "Resound"
 type Config struct {
 	// MonitorDeviceID is the output the user hears. "" = system default.
 	MonitorDeviceID string `json:"monitorDeviceId"`
-	// CableDeviceID is the output others hear (e.g. "CABLE Input"). "" = off.
+	// CableDeviceID is the output others hear. "" = automatic: VB-Cable's
+	// "CABLE Input" when it is installed, else none. Another device is an
+	// advanced choice, e.g. a virtual mixer's input.
 	CableDeviceID string `json:"cableDeviceId"`
 	// Volumes in percent, 0-100, on the loudness curve (audio.Gain).
 	MonitorVolume int `json:"monitorVolume"`

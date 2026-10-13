@@ -16,6 +16,7 @@ import (
 type voiceMeta struct {
 	soundID uint64 // 0 for test sounds
 	name    string
+	preview bool // plays for the user only ("You hear")
 }
 
 // playbackState tracks what is playing, for the latency readout, the
@@ -86,6 +87,7 @@ func (a *App) start(p *audio.Prepared, opts audio.PlayOptions, meta voiceMeta, f
 		return info, err
 	}
 	pb.remaining[info.VoiceID] = info.Outputs
+	meta.preview = !forOthers
 	pb.setVoice(info.VoiceID, meta)
 	a.animate()
 	logx.Printf("play #%d %q (%v) on %d output(s) with %d decoder(s), ready in %v",

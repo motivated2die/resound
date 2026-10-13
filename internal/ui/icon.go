@@ -40,6 +40,7 @@ const (
 	IconExternalLink Icon = "external-link"
 	IconFolderPlus   Icon = "folder-plus"
 	IconKeyboard     Icon = "keyboard"
+	IconMic          Icon = "microphone"
 	IconMicOff       Icon = "microphone-off"
 	IconPause        Icon = "player-pause"
 	IconPlay         Icon = "player-play"
