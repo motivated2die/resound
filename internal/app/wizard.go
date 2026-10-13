@@ -189,12 +189,12 @@ func (a *App) wizardKeys() []ui.Row {
 func (a *App) wizardPhone() []ui.Row {
 	rows := []ui.Row{
 		a.wizardHeader("Connect your phone"),
-		ui.Paragraph("Scan the code with your phone's camera and add the page to your home screen.", ui.ToneMuted),
+		ui.Paragraph("Scan the code with your phone's camera. The Resound app opens and pairs; install it from there so it starts from your home screen.", ui.ToneMuted),
 	}
 	pair, ok := a.pairRows()
 	rows = append(rows, pair...)
-	if ok && a.srv.Auth().SessionCount() > 0 {
-		rows = append(rows, ui.Text("Connected", plural(a.srv.Auth().SessionCount(), "device"), ui.ToneGood))
+	if ok && a.srv.Auth().DeviceCount() > 0 {
+		rows = append(rows, ui.Text("Connected", plural(a.srv.Auth().DeviceCount(), "device"), ui.ToneGood))
 	}
 	rows = append(rows, a.firewallRows()...)
 	rows = append(rows, ui.Flex(), ui.Separator())

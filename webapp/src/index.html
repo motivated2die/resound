@@ -12,11 +12,12 @@
     <link rel="icon" type="image/png" sizes="192x192" href="/assets/resound-192.png">
     <link rel="apple-touch-icon" href="/assets/resound-192.png">
     <title>Resound</title>
+    <!-- The connection to the PC: loaded first, it carries the remote's fetch() calls -->
+    <script src="js/rtc.js"></script>
     <!-- Driver.js CSS (Local) -->
     <link rel="stylesheet" href="vendor/driverjs/css/driver.css"/>
     <link rel="stylesheet" href="css/styles.css">
-    <!-- NoSleep.js 0.12.0 and SortableJS 1.15.6 (Local, MIT; see vendor/*/LICENSE) -->
-    <script src="vendor/nosleep/NoSleep.min.js"></script>
+    <!-- SortableJS 1.15.6 (Local, MIT; see vendor/sortablejs/LICENSE) -->
     <script src="vendor/sortablejs/Sortable.min.js"></script>
     <!-- emoji-picker-element 1.29.1 (Local, Apache-2.0; data from vendor/emoji-picker-element-data) -->
     <script type="module" src="vendor/emoji-picker-element/index.js"></script>
@@ -77,8 +78,6 @@
                     <div class="server-status" id="server-status-container">
                          <span id="status-indicator" class="status-dot"></span>
                          <span id="server-status-text">Connecting...</span>
-                         <!-- Wake Lock Indicator (content managed by screen-wake.js) -->
-                         <span id="wake-lock-indicator" class="icon-button top-bar-button"><span class="icon" aria-hidden="true"></span></span>
                     </div>
                 </div>
             </div>
@@ -198,12 +197,19 @@
                  <label class="toggle-switch" id="wake-lock-toggle-label-container">
                     <input type="checkbox" id="wake-lock-toggle">
                     <span class="slider"></span>
-                    <span id="wake-lock-toggle-label">Prevent Screen Lock</span>
+                    <span id="wake-lock-toggle-label">Keep Screen On</span>
                  </label>
-                 <label class="toggle-switch">
+                 <!-- Hidden where the app is fullscreen already or the browser can't (fullscreen.js) -->
+                 <label class="toggle-switch" id="fullscreen-toggle-container">
                     <input type="checkbox" id="auto-fullscreen-toggle">
                     <span class="slider"></span>
-                     Auto Fullscreen on Interaction
+                     Fullscreen
+                 </label>
+                 <!-- Hidden where the device can't vibrate (device.js) -->
+                 <label class="toggle-switch" id="haptics-toggle-container" hidden>
+                    <input type="checkbox" id="haptics-toggle">
+                    <span class="slider"></span>
+                     Vibrate on Tap
                  </label>
                  <label class="toggle-switch">
                     <input type="checkbox" id="swap-button-position-toggle">
@@ -232,17 +238,18 @@
                 </div>
             </div>
 
-            <!-- Only in the installable app (webapp/, js/rtc.js shows it). -->
-            <div id="app-connection-section" hidden>
-                <div class="divider"></div>
-                <div class="settings-section">
-                    <h3>PC</h3>
-                    <p class="modal-info">Connected to <strong id="app-connection-name">your PC</strong> directly over your network.</p>
-                    <div class="modal-actions vertical">
-                        <button id="app-connection-switch" class="action-button">
-                            <span>Switch or pair a PC</span>
-                        </button>
-                    </div>
+            <div class="divider"></div>
+            <div class="settings-section">
+                <h3>PC</h3>
+                <p class="modal-info">Connected to <strong id="app-connection-name">your PC</strong> directly over your network.</p>
+                <div class="modal-actions vertical">
+                    <button id="app-connection-switch" class="action-button">
+                        <span>Switch or pair a PC</span>
+                    </button>
+                    <!-- Shown while the browser offers to install the app (device.js) -->
+                    <button id="install-app-button" class="action-button" hidden>
+                        <span>Install the app</span>
+                    </button>
                 </div>
             </div>
 
@@ -266,6 +273,7 @@
     <script src="js/persistence.js" defer></script>
     <script src="js/screen-wake.js" defer></script>
     <script src="js/fullscreen.js" defer></script>
+    <script src="js/device.js" defer></script>
     <script src="js/editMode.js" defer></script>
     <script src="js/layout.js" defer></script>
     <script src="js/dragDrop.js" defer></script>

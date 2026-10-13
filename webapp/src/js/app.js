@@ -170,7 +170,7 @@ async function apiFetch(endpoint, options = {}) {
         }
         if (response.status === 401) {
             console.warn(`API request unauthorized (${endpoint}). Redirecting to login.`);
-            if (window.location.pathname !== '/login.html') { window.location.href = '/login.html'; }
+            window.location.href = '/connect.html'; // this device was signed out on the PC
         }
         const error = new Error(errorMsg);
         error.status = response.status; // the server answered: not a connection problem
@@ -1246,10 +1246,8 @@ function updateSoundCardDisplay(soundId, cardElement = null, tabId = state.curre
 
 // --- Playback Control ---
 async function playSound(soundId) {
-
-  
     if (editMode.isActive()) return; // Don't play in edit mode
-
+    if (window.haptics) window.haptics.tap(); // device.js
 
     try {
         if (!soundsContainerEl) throw new Error("Sounds container not found.");
@@ -1303,6 +1301,7 @@ function showPlayFailed(soundId, message) {
 }
 
 async function stopAllSounds() {
+    if (window.haptics) window.haptics.tap();
     console.log("Stopping all sounds via API...");
     try {
         await apiFetch('/api/sounds/stop', { method: 'POST' });

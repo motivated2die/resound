@@ -162,8 +162,8 @@ func TestRTCPairAndReconnect(t *testing.T) {
 	if len(device) != rtcDeviceIDLen || key == "" {
 		t.Fatalf("device %q key %q", device, key)
 	}
-	if s.auth.SessionCount() != 1 {
-		t.Fatalf("SessionCount = %d", s.auth.SessionCount())
+	if s.auth.DeviceCount() != 1 {
+		t.Fatalf("DeviceCount = %d", s.auth.DeviceCount())
 	}
 
 	c.send(t, map[string]any{"t": "req", "id": 1, "m": "POST", "p": fmt.Sprintf("/api/sounds/%d/play", soundID)})
@@ -263,7 +263,7 @@ func TestRTCChunks(t *testing.T) {
 		t.Fatalf("welcome = %v", w)
 	}
 	// A long reply comes back in frames and is put together.
-	c.send(t, map[string]any{"t": "req", "id": 1, "m": "POST", "p": "/api/auth/login", "b": strings.Repeat("x", 3*rtcChunk)})
+	c.send(t, map[string]any{"t": "req", "id": 1, "m": "POST", "p": "/api/library/import", "b": strings.Repeat("x", 3*rtcChunk)})
 	if res := c.recv(t); res["t"] != "res" {
 		t.Fatalf("res = %v", res)
 	}

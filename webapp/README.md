@@ -1,33 +1,40 @@
-# Installable app (hosted web app)
+# Resound app
 
-The phone remote as a web app on an HTTPS host, so phones can install it
-(home screen, fullscreen, screen wake lock, offline start). It talks to the PC
-directly over the local network through a WebRTC data channel; no server of
-ours is involved after the page is loaded. See
-[docs/ARCHITECTURE.md](../docs/ARCHITECTURE.md#installable-app) for how the
-connection works.
+The phone remote: a web app on an HTTPS host that phones (and the PC's
+browser) open from the PC's QR code and install. It talks to the PC directly
+over the local network through a WebRTC data channel; no server of ours is
+involved after the page is loaded. See
+[docs/ARCHITECTURE.md](../docs/ARCHITECTURE.md#the-app-and-its-connection)
+for how the connection works. It started as the Soundux Remote front end and
+is maintained here; don't copy the old project over it.
 
-Nothing here is embedded into `Resound.exe`. The app **reuses the phone
-remote** in `internal/server/web/` and lays the files in `src/` over it:
+Nothing here is embedded into `Resound.exe`.
+
+## Files (`src/`)
 
 | File | Purpose |
 |---|---|
-| `src/js/rtc.js` | The connection: pairing, reconnecting, and `fetch()` for `/api/` over the data channel. Injected before the remote's scripts in `index.html` |
-| `src/connect.html`, `js/connect.js`, `css/connect.css` | Pairing (link, in-app QR scanner, pasted link) and the list of paired PCs |
-| `src/login.html` | Replaces the PIN page: forwards to the connect page |
-| `src/manifest.json`, `src/sw.js` | Install and offline start; the build fills in the service worker's file list |
-| `src/_headers` | Netlify headers (CSP: nothing from other hosts) |
-| `src/vendor/jsqr/` | QR decoder for browsers without `BarcodeDetector` (Safari, Firefox) |
+| `index.html`, `js/app.js`, `js/*.js`, `css/styles.css` | The remote: tabs, sound cards, layouts, settings |
+| `js/rtc.js` | The connection: pairing, reconnecting, and `fetch()` for `/api/` over the data channel. The first script on every page |
+| `connect.html`, `js/connect.js`, `css/connect.css` | Pairing (link, in-app QR scanner, pasted link) and the list of paired PCs |
+| `js/screen-wake.js` | Keeps the screen on (Screen Wake Lock API), on by default |
+| `js/fullscreen.js` | Fullscreen in a browser tab; the installed app opens fullscreen by itself (`manifest.json`) |
+| `js/device.js` | Vibration on play and stop, "Install the app", persistent storage for the pairing keys |
+| `manifest.json`, `sw.js` | Installation and offline start; the build fills in the service worker's file list |
+| `_headers` | Netlify headers (CSP: nothing from other hosts) |
+| `vendor/` | Libraries, each with its license and a README naming the source |
 
-Change the remote in `internal/server/web/`; both the PC's page and this app
-get it. Code only for the app goes in `src/`.
+- **Look:** the colours in `css/styles.css` (`:root`) and `css/connect.css` match the desktop panel (`internal/ui/canvas_windows.go`): background `#1c1d22`, accent `#50dea8` with dark text `#102a20` on it, berry red `#f2416f`. Change them together.
+- **App icons:** `assets/resound-192.png`, `-512.png`, `resound-maskable-512.png` and `favicon.ico` are generated from the repo's `assets/` folder. Run `go run ./scripts/icons` after changing the logo.
+- **UI icons:** Material Symbols SVGs in `assets/icons/`, used as `<span class="icon" data-icon="name"></span>`; see `assets/icons/README.md` for adding one.
+- **Nothing external.** Libraries live in `vendor/`, and the Content-Security-Policy blocks other hosts. Don't add CDN links; vendor the file instead. `go test ./cmd/webapp` fails on URLs in our own files and on icons without SVG or CSS rule.
 
 ## Build and try
 
 ```powershell
-go run ./cmd/webapp                     # builds webapp/dist (git-ignored)
-go run ./cmd/webapp -serve :8095        # builds and serves it on http://localhost:8095
-go run ./cmd/devremote -folder D:\Sounds   # prints a pairing link for http://localhost:8095
+go run ./cmd/webapp                         # builds webapp/dist (git-ignored)
+go run ./cmd/webapp -serve :8095            # builds and serves it on http://localhost:8095
+go run ./cmd/devremote -folder D:\Sounds    # the PC side; prints a pairing link for localhost:8095
 ```
 
 `localhost` is a secure context, so the app works there in a desktop browser.
@@ -35,10 +42,13 @@ Phones need the HTTPS deployment.
 
 ## Deploy (Netlify)
 
-`netlify.toml` in the repository root builds and publishes `webapp/dist`:
-connect the repository in Netlify, nothing else to set. The site is currently
-`https://getresound.netlify.app`, which is the default of `app.AppURL` (the
-address in the PC's QR code). For another deployment, set it at build time
-(`-ldflags "-X github.com/motivated2die/resound/internal/app.AppURL=https://…"`),
+Upload `webapp/dist` after `go run ./cmd/webapp`, or connect the repository:
+`netlify.toml` in the repository root builds and publishes `webapp/dist`.
+The site is currently `https://getresound.netlify.app`, which is the default
+of `app.AppURL` (the address in the PC's QR code). For another deployment,
+set it at build time (`-ldflags "-X github.com/motivated2die/resound/internal/app.AppURL=https://…"`),
 or on one PC with the `RESOUND_APP_URL` environment variable or `appURL` in
 `config.json`.
+
+Installed apps pick up a new deployment the next time they come to the
+foreground: the service worker fetches it and the page reloads.

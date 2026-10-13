@@ -105,71 +105,10 @@ func volumeInfo(s library.Sound, defLocal, defRemote int) map[string]any {
 
 // --- auth ------------------------------------------------------------------
 
-func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
-	var body struct {
-		PIN string `json:"pin"`
-	}
-	if err := decodeBody(r, &body); err != nil {
-		writeError(w, http.StatusBadRequest, "Invalid request")
-		return
-	}
-	token, err := s.auth.Login(clientIP(r), body.PIN, r.UserAgent())
-	switch {
-	case errors.Is(err, ErrLocked):
-		writeError(w, http.StatusTooManyRequests, "Too many attempts. Please wait a minute.")
-		return
-	case errors.Is(err, ErrBadPIN):
-		s.logf("server: wrong PIN from %s", clientIP(r)) // the PIN itself is never logged
-		writeError(w, http.StatusUnauthorized, "Invalid PIN. Please try again!")
-		return
-	case err != nil:
-		writeError(w, http.StatusInternalServerError, "Could not create a session")
-		return
-	}
-	s.dropOldSession(r)
-	s.setSessionCookie(w, token)
-	s.logf("server: phone signed in with PIN from %s", clientIP(r))
-	writeJSON(w, http.StatusOK, map[string]any{"success": true})
-}
-
-// dropOldSession ends the session a re-pairing phone still carries, so one
-// phone never counts as several.
-func (s *Server) dropOldSession(r *http.Request) {
-	if c, err := r.Cookie(cookieName); err == nil && c.Value != "" {
-		s.auth.Logout(c.Value)
-	}
-}
-
-func (s *Server) handleCheck(w http.ResponseWriter, r *http.Request) {
-	if s.authenticated(r) {
-		writeJSON(w, http.StatusOK, map[string]any{"authenticated": true})
-		return
-	}
-	writeJSON(w, http.StatusUnauthorized, map[string]any{"authenticated": false})
-}
-
+// handleLogout signs the app device out (the app forgets this PC).
 func (s *Server) handleLogout(w http.ResponseWriter, r *http.Request) {
-	if id := rtcDevice(r); id != "" {
-		s.auth.ForgetDevice(id)
-	}
-	if c, err := r.Cookie(cookieName); err == nil {
-		s.auth.Logout(c.Value)
-	}
-	http.SetCookie(w, &http.Cookie{Name: cookieName, Value: "", Path: "/", MaxAge: -1, HttpOnly: true, SameSite: http.SameSiteLaxMode})
+	s.auth.ForgetDevice(rtcDevice(r))
 	writeJSON(w, http.StatusOK, map[string]any{"success": true})
-}
-
-func (s *Server) handlePair(w http.ResponseWriter, r *http.Request) {
-	token, err := s.auth.Pair(r.URL.Query().Get("code"), r.UserAgent())
-	if err != nil {
-		s.logf("server: invalid or used pairing code from %s", clientIP(r))
-		http.Redirect(w, r, "/login.html", http.StatusFound)
-		return
-	}
-	s.dropOldSession(r)
-	s.setSessionCookie(w, token)
-	s.logf("server: phone paired by QR code from %s", clientIP(r))
-	http.Redirect(w, r, "/", http.StatusFound)
 }
 
 // --- library ---------------------------------------------------------------

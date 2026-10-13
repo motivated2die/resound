@@ -27,26 +27,18 @@ Resound is licensed under the [GNU General Public License v3.0](LICENSE). It inc
 
 The full license texts are in each module's source (`go mod download`, then the module's folder in the Go module cache).
 
-## Phone remote (embedded in Resound.exe)
+## Phone app (webapp/, hosted as a web page, not in Resound.exe)
 
 | Component | License | Location |
 |---|---|---|
-| [driver.js](https://github.com/kamranahmedse/driver.js) | MIT | `internal/server/web/vendor/driverjs/` |
-| [SortableJS](https://github.com/SortableJS/Sortable) 1.15.6 | MIT | `internal/server/web/vendor/sortablejs/` |
-| [NoSleep.js](https://github.com/richtr/NoSleep.js) 0.12.0 | MIT | `internal/server/web/vendor/nosleep/` |
-| [emoji-picker-element](https://github.com/nolanlawson/emoji-picker-element) 1.29.1 | Apache-2.0 | `internal/server/web/vendor/emoji-picker-element/` |
-| [emoji-picker-element-data](https://github.com/nolanlawson/emoji-picker-element-data) 1.8.0 (English, Emojibase shortcodes) | Apache-2.0; built from [Emojibase](https://emojibase.dev) data (MIT) with names and keywords from [Unicode CLDR](https://cldr.unicode.org) (Unicode License v3) | `internal/server/web/vendor/emoji-picker-element-data/` |
-| [Material Symbols](https://github.com/google/material-design-icons) (Outlined) SVG icons by Google | Apache-2.0 | `internal/server/web/assets/icons/` |
-
-Each folder contains the component's license file(s) and a README naming the exact source. The phone remote loads nothing from outside Resound.
-
-## Installable app (hosted web app, not in Resound.exe)
-
-The app in `webapp/` is the phone remote above plus:
-
-| Component | License | Location |
-|---|---|---|
+| [driver.js](https://github.com/kamranahmedse/driver.js) | MIT | `webapp/src/vendor/driverjs/` |
+| [SortableJS](https://github.com/SortableJS/Sortable) 1.15.6 | MIT | `webapp/src/vendor/sortablejs/` |
+| [emoji-picker-element](https://github.com/nolanlawson/emoji-picker-element) 1.29.1 | Apache-2.0 | `webapp/src/vendor/emoji-picker-element/` |
+| [emoji-picker-element-data](https://github.com/nolanlawson/emoji-picker-element-data) 1.8.0 (English, Emojibase shortcodes) | Apache-2.0; built from [Emojibase](https://emojibase.dev) data (MIT) with names and keywords from [Unicode CLDR](https://cldr.unicode.org) (Unicode License v3) | `webapp/src/vendor/emoji-picker-element-data/` |
 | [jsQR](https://github.com/cozmo/jsQR) 1.4.0 | Apache-2.0 | `webapp/src/vendor/jsqr/` |
+| [Material Symbols](https://github.com/google/material-design-icons) (Outlined) SVG icons by Google | Apache-2.0 | `webapp/src/assets/icons/` |
+
+Each folder contains the component's license file(s) and a README naming the exact source. The app loads nothing from other hosts.
 
 ## Icons
 

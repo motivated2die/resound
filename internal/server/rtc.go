@@ -1,9 +1,8 @@
 package server
 
-// The installable app's connection. The app is a static web page on an HTTPS
-// host, so it cannot fetch from this PC's plain-HTTP server; it opens a
-// WebRTC data channel straight to the PC instead, without a signaling server
-// (the technique of libp2p's "WebRTC Direct"):
+// The app's connection. The app is a static web page on an HTTPS host
+// (webapp/); it opens a WebRTC data channel straight to the PC, without a
+// signaling server (the technique of libp2p's "WebRTC Direct"):
 //
 //   - The QR code gives the app this PC's addresses, the UDP port and the
 //     SHA-256 fingerprint of a long-lived DTLS certificate.
@@ -19,8 +18,8 @@ package server
 //
 // Messages are JSON text. A message longer than rtcChunk is split into frames
 // that start with '+'; the last frame of a message starts with '.'. Requests
-// ({"t":"req"}) run through the same handler as HTTP requests, so the app
-// speaks the existing API.
+// ({"t":"req"}) are HTTP requests in a message, served by Handler, so the API
+// is the REST API the remote was written for.
 
 import (
 	"bytes"

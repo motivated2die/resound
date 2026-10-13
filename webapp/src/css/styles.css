@@ -244,7 +244,6 @@ body {
 .icon[data-icon="close"] { --icon: url("../assets/icons/close.svg"); }
 .icon[data-icon="delete"] { --icon: url("../assets/icons/delete.svg"); }
 .icon[data-icon="delete_sweep"] { --icon: url("../assets/icons/delete_sweep.svg"); }
-.icon[data-icon="disabled_visible"] { --icon: url("../assets/icons/disabled_visible.svg"); }
 .icon[data-icon="done"] { --icon: url("../assets/icons/done.svg"); }
 .icon[data-icon="edit"] { --icon: url("../assets/icons/edit.svg"); }
 .icon[data-icon="favorite"] { --icon: url("../assets/icons/favorite.svg"); }
@@ -260,8 +259,6 @@ body {
 .icon[data-icon="view_comfy"] { --icon: url("../assets/icons/view_comfy.svg"); }
 .icon[data-icon="view_list"] { --icon: url("../assets/icons/view_list.svg"); }
 .icon[data-icon="view_module"] { --icon: url("../assets/icons/view_module.svg"); }
-.icon[data-icon="visibility"] { --icon: url("../assets/icons/visibility.svg"); }
-.icon[data-icon="visibility_off"] { --icon: url("../assets/icons/visibility_off.svg"); }
 .icon[data-icon="volume_down"] { --icon: url("../assets/icons/volume_down.svg"); }
 .icon[data-icon="volume_up"] { --icon: url("../assets/icons/volume_up.svg"); }
 
@@ -2568,48 +2565,10 @@ emoji-picker section#favorites
   border-radius: 20px;
 }
 
-/* --- Wake Lock Indicator Styles --- */
-#wake-lock-indicator .icon {
-  font-size: 14px;
-}
 
-#wake-lock-indicator {
-  order: 3;
-  /* Position after status text */
-  font-size: 14px;
-  /* Match nearby text/icons */
-  color: var(--text-secondary);
-  /* Default: Grey (Inactive) */
-  transition: color var(--transition-speed) ease;
-  cursor: pointer;
-  /* Clickable by default */
-  display: inline-flex;
-  /* Align icon properly */
-  align-items: center;
-  vertical-align: middle;
-  /* Align with text */
-  background-color: unset;
-  /* Removed button-like styles: padding, border-radius, width, height, background-hover */
-}
 
-#wake-lock-indicator.active {
-  color: var(--success-color);
-  /* Active: Green */
-  background-color: unset;
+/* The hidden attribute wins over display rules (toggles and buttons the
+   browser or device does not support are hidden). */
+[hidden] {
+  display: none !important;
 }
-
-#wake-lock-indicator.failed {
-  color: var(--text-secondary);
-  /* Failed: Grey */
-  opacity: 0.6;
-  /* Dimmed */
-  cursor: default;
-  /* Not clickable */
-  background-color: unset;
-}
-
-/* Remove hover effect */
-#wake-lock-indicator:hover {
-  background-color: unset;
-}
-

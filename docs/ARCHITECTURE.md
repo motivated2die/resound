@@ -4,11 +4,11 @@ State as of v0.6.0-dev (library index, streaming playback). For building and ico
 
 ## What it is
 
-Resound is a Windows tray app that plays sounds into a virtual audio cable (so others hear them in games or voice chat) and to your own speakers. It is controlled from a phone browser over the local network. It replaces the Soundux desktop app (C++/WebView2) with one Go executable: no cgo and no UI framework, ~9k lines.
+Resound is a Windows tray app that plays sounds into a virtual audio cable (so others hear them in games or voice chat) and to your own speakers. It is controlled from a phone app (a web app installed from an HTTPS host) that connects to the PC directly over the local network. It replaces the Soundux desktop app (C++/WebView2) with one Go executable: no cgo and no UI framework, ~9k lines.
 
 ```
- phone browser ──HTTP──▶ server ──Player──▶ app (UI thread) ──▶ audio.Engine ─┬─▶ "You hear"   WASAPI stream ─▶ speakers
- (embedded web app)        │                  │                                └─▶ "Others hear" WASAPI stream ─▶ CABLE Input
+ phone app ──WebRTC────▶ server ──Player──▶ app (UI thread) ──▶ audio.Engine ─┬─▶ "You hear"   WASAPI stream ─▶ speakers
+ (webapp/, hosted)         │                  │                                └─▶ "Others hear" WASAPI stream ─▶ CABLE Input
                          library           routing / input                                      │
                                            (mic mute, PTT)        mic ─"Listen to this device"─▶┘ CABLE Output ─▶ game / Discord
  tray icon ─▶ popup panel (ui) ───────────────▲
@@ -20,7 +20,7 @@ Resound is a Windows tray app that plays sounds into a virtual audio cable (so o
 cmd/resound/     entry point
 cmd/devremote/     phone remote with the real library but no audio, for front-end work on any OS
 cmd/devupdate/     stand-in for GitHub's release API, for testing the in-app update locally
-cmd/webapp/        builds the installable app (webapp/) for static hosting
+cmd/webapp/        builds the phone app (webapp/) for static hosting
 internal/app/      app state, panel pages, playback holds, push-to-talk, server bridge
 internal/audio/    WASAPI outputs, mixer, progressive decoding
 internal/wincom/   Core Audio COM plumbing and go-wca fixes
@@ -28,7 +28,7 @@ internal/routing/  VB-Cable detection, mic mute, "Listen to this device" (elevat
 internal/vbcable/  automatic VB-Cable install (download, signature check, silent setup, resume after restart)
 internal/input/    push-to-talk via SendInput, key presets, pause/stop hotkeys (keyboard hook)
 internal/library/  sound folders → tabs/sounds with stable IDs
-internal/server/   phone API, PIN/QR auth, embedded web app (web/), WebRTC for the installable app
+internal/server/   phone API over WebRTC, pairing
 internal/install/  install/update/uninstall, autostart, firewall
 internal/update/   latest GitHub release, version comparison, checked download
 internal/backup/   settings backups (zip), restore, backup index
@@ -39,7 +39,7 @@ internal/ui/icons/ embedded SVG icons (scripts/add-icon.ps1)
 assets/            app icon (exe/tray) and the panel logo (embedded)
 winres/            icon/manifest/version resources (go-winres)
 scripts/           build-release.ps1, add-icon.ps1, icons/ (icon generator)
-webapp/            the installable app: files laid over the phone remote, hosted on Netlify
+webapp/            the phone app (remote), hosted on Netlify
 docs/              BUILDING.md, RELEASING.md, ARCHITECTURE.md
 .github/           CI and release workflows, Dependabot
 ```
@@ -70,7 +70,7 @@ Helper roles run before the single-instance mutex (`Local\Resound.SingleInstance
 | `vbcable` | Automatic VB-Cable install: download, signature check, silent elevated setup, default-device snapshot/restore, the pending-install state across the restart |
 | `input` | `SendInput` key and mouse presses with scan codes, key names, quick-pick presets; hotkeys: the portable `Matcher` (tested) and the `Watcher` keyboard hook (`hook_windows.go`) |
 | `library` | Sound index (`library.json`): folders → tabs → sounds with stable IDs, rename/move matching (`reconcile.go`), per-sound settings and phone layouts, background indexer (`indexer.go`) |
-| `server` | HTTP API (Soundux Remote compatible), auth (PIN, sessions, QR pairing), LAN addresses, embedded `web/`, the installable app's WebRTC connection (`rtc.go`) |
+| `server` | The app's WebRTC connection (`rtc.go`), the API it carries (Soundux Remote compatible), pairing and devices, LAN addresses |
 | `install` | Drop-in install/update, Installed-apps entry, Start Menu shortcut, autostart, uninstall, firewall helper |
 | `update` | The latest published full release on GitHub, semver comparison, download of `Resound.exe` checked against the release's `SHA256SUMS.txt` (portable, unit-tested against a fake GitHub) |
 | `elevate` | Runs this exe with `runas` and returns its exit code |
@@ -176,43 +176,46 @@ Failures (no network, declined UAC, bad signature) leave the manual "Install man
   - Progress shows in the panel; sounds are playable before they are indexed.
 - `GET /api/tabs` and `GET /api/library` rescan when the last scan is more than 5 s old.
 
-## Server and authentication
+## The app and its connection
 
-- **Routes:** all 14 Soundux Remote endpoints (`/api/tabs`, `/api/sounds/{id}/play|preview|favorite|volume[/reset]`, `/api/sounds/progress|settings|stop`, `/api/playback/toggle`, `/api/talkthrough/start|stop`, `/api/status`) plus `/api/auth/login|check|logout` and `/pair?code=`.
+The phone remote is a web app on an HTTPS host (`webapp/`, built by `cmd/webapp`, hosted on Netlify; nothing of it is in the exe). Being a secure context, it can be installed, keep the screen on and start offline. It connects to the PC with a **WebRTC data channel, without a signaling server**, the technique of libp2p's "WebRTC Direct" (`server/rtc.go`, `webapp/src/js/rtc.js`). The PC runs no web server.
+
+- **Pairing QR code:** `<app>/#pair&v=1&a=<IPs>&p=<port>&f=<certificate fingerprint>&c=<pairing code>&n=<PC name>`. Everything after `#` stays in the browser; the host never sees it.
+  - **Addresses.** `LocalAddresses` ranks private addresses of physical adapters first and labels each adapter ("Ethernet", "Wi-Fi", "WSL", "Hyper-V", "VPN", …); virtual adapters and public addresses are marked `Other`. The code carries up to three, `Other` ones only when there is nothing else, and the app tries them all.
+  - **Codes** are single-use and valid for 10 minutes; the panel shows a fresh one after each pairing. A device that is paired with this PC already (same certificate fingerprint) keeps its pairing when it opens a pairing link, leaves the code unused and takes the link's addresses, so scanning again also fixes a changed IP address.
+- **The app writes both sides.** It creates its offer as usual, then sets an answer it built itself: the PC is an ICE-lite agent at the QR code's addresses (UDP, `serverPort`, 8080 by default), with the PC's DTLS fingerprint and ICE credentials the app picks:
+  - pairing: ufrag `p`+nonce, password derived from the pairing code (`pairPassword`);
+  - a paired device: ufrag `d`+device ID+nonce, password = the device key (HMAC of `deviceSecret` and the ID).
+- **The PC** reads the socket under pion's UDP mux (`rtcConn`). The first STUN check with an unknown ufrag is verified (MESSAGE-INTEGRITY with that password) before anything is set up; then a pion peer connection is created with the same credentials and a made-up offer carrying the app's ufrag, and the mux delivers the check to it. Wrong or outdated keys get no answer at all.
+- **Trust.** DTLS authenticates the PC to the app (fingerprint from the QR code). The app's certificate isn't checked; the app authenticates with its first message: `hello` with its key, or `pair` with the code (answered by `welcome` with a new device ID and key). Devices expire after 180 days without use; keys and codes are never logged.
+- **Certificate.** ECDSA P-256, self-signed, 30 years, created once and kept in `remote.json` (`rtcCert`), so the fingerprint in paired phones stays valid. "Sign out all devices" replaces `deviceSecret` and so every device key; the certificate stays.
+- **Protocol** (version 1): JSON text messages; anything longer than 16 KiB is split into frames starting with `+`, the last one with `.`. `req` (method, path, headers, body) is an HTTP request served by `Server.Handler`, marked with the device, and comes back as `res` (status, `Content-Type`, `ETag`, body); requests without a device are refused. So the remote speaks a REST API: `rtc.js` replaces `fetch()` for `/api/` and reconnects when needed. A failed connection looks like a failed fetch, and the remote's own retry logic takes over.
+- **Remote on this PC.** The home page's tile button and the Phone remote page open the pairing link in Edge's app mode (a separate phone-sized window), or the default browser without Edge. A browser that is paired already just connects.
+- **Measured** (Chrome, Edge 155, Firefox 157 on the dev PC): pairing ~80 ms, reconnecting ~70 ms, an API round trip under 1 ms.
+- **Limits.** Phones must be on the same network (no TURN). iOS keeps a home-screen app's storage separate from Safari's, so the connect page has its own QR scanner (BarcodeDetector, else vendored jsQR) to pair inside the installed app. Chrome plans to put WebRTC to local addresses behind its Local Network Access permission; that adds a prompt, nothing else.
+- **Older versions** served the remote over plain HTTP with a PIN and cookies. Their `remote.json` fields (`pin`, `sessions`) are dropped on the next save; those phones pair again with the app.
+
+### API
+
+- **Routes:** the 14 Soundux Remote endpoints (`/api/tabs`, `/api/sounds/{id}/play|preview|favorite|volume[/reset]`, `/api/sounds/progress|settings|stop`, `/api/playback/toggle`, `/api/talkthrough/start|stop`, `/api/status`) plus `/api/auth/logout` (the device is signed out).
 - **Resound additions:**
   - `GET /api/library`: tabs (with sound IDs in order), sounds (with favorite, custom-volume flag, color, emoji, duration) and layouts in one response. It carries an `ETag` (`"<server start nonce>-<revision>"`) and answers `If-None-Match` with 304, so phones can poll it cheaply.
   - `POST /api/sounds/{id}/appearance` `{color, emoji}`, `POST /api/layouts/{tabId|favorites}` `{mode, orders}`: phone card looks and layouts, stored on the PC and shared by all phones. Colors and emoji are validated because the phone puts them into class names and CSS strings.
   - `POST /api/library/import` `{overwrite, sounds, layouts}` accepts sound IDs or file paths, so settings from earlier phone versions (path-keyed) and exported files can be adopted. Without `overwrite`, only empty values are filled.
   - `POST /api/library/reset-appearance` clears all colors, emoji and layouts.
-- **Phone persistence (v3).** Device preferences (last tab, fullscreen, button position) stay in `localStorage`; everything about sounds and tabs lives on the PC, keyed by ID, with an in-memory mirror for synchronous reads. On first connect after the update, a phone sends its old path-keyed settings to the PC once.
 - **Response shapes** match the C++ server, including the volume slider model (−50…+50 scales both default volumes from 0× to 2×).
-- **Addresses.** `LocalAddresses` ranks private addresses of physical adapters first and labels each adapter ("Ethernet", "Wi-Fi", "WSL", "Hyper-V", "VPN", …). Virtual adapters and public addresses are marked `Other`; the panel folds them behind "Show other addresses".
-- **Remote on this PC.** The home page's tile button and the Phone remote page open `http://127.0.0.1:<port>/pair?code=…` in Edge's app mode (a separate phone-sized window), or the default browser without Edge. The one-time pairing code signs that browser in and replaces its older session, so it counts as one paired device.
-- **Auth.**
-  - The 6-digit PIN persists until reset.
-  - A login or QR pairing creates a 32-byte token in an HttpOnly `SameSite=Lax` cookie. Sessions expire after 180 days of inactivity, and only SHA-256 hashes are stored (`remote.json`).
-  - Five wrong PINs from one address cause a 1-minute lockout.
-  - QR codes are single-use and valid for 10 minutes. Re-pairing replaces the phone's old session.
-  - There are no CORS headers (same-origin only), and the PIN and tokens are never logged.
-- **Web app.** `internal/server/web/` is embedded with `go:embed all:web`. Without `index.html`, a placeholder page is served.
-  - **Self-contained.** Every script, style, icon and the emoji data are embedded; a `Content-Security-Policy` (`default-src 'self'`, plus `data:` for NoSleep's video and inline code for `login.html`) makes the browser refuse anything from another host. `TestWebSelfContained` fails on any URL in our own web files.
-  - **Icons** are Material Symbols SVGs (`web/assets/icons/`), painted in the text colour through a CSS mask: `<span class="icon" data-icon="name">`, switched with `el.dataset.icon`. `TestWebIcons` checks that every name used has its SVG and CSS rule.
-  - **ETags.** Embedded files have no modification time, so each gets a content-hash `ETag` at start-up and browsers revalidate with `304`. The vendored emoji picker relies on it: without an ETag it re-downloads its 440 KB data on every load and checksums it with `crypto.subtle`, which browsers only offer over HTTPS.
 
-## Installable app
+### The app (`webapp/src`)
 
-The remote served by the PC is plain HTTP on the LAN, so browsers treat it as insecure: no installation as an app, no Wake Lock API, no service worker. The installable app (`webapp/`, built by `cmd/webapp`, hosted on Netlify) is the same remote on an HTTPS host. An HTTPS page can't fetch from `http://<LAN IP>` on every browser, so it connects to the PC with a **WebRTC data channel, without a signaling server**, the technique of libp2p's "WebRTC Direct" (`server/rtc.go`, `webapp/src/js/rtc.js`):
-
-- **Pairing QR code** (when "The QR code opens: Resound app" is chosen): `<app>/#pair&v=1&a=<IPs>&p=<port>&f=<certificate fingerprint>&c=<pairing code>&n=<PC name>`. Everything after `#` stays in the browser; the host never sees it.
-- **The app writes both sides.** It creates its offer as usual, then sets an answer it built itself: the PC is an ICE-lite agent at the QR code's addresses (UDP, same port number as the HTTP server), with the PC's DTLS fingerprint and ICE credentials the app picks:
-  - pairing: ufrag `p`+nonce, password derived from the pairing code (`pairPassword`);
-  - a paired device: ufrag `d`+device ID+nonce, password = the device key (HMAC of `deviceSecret` and the ID).
-- **The PC** reads the socket under pion's UDP mux (`rtcConn`). The first STUN check with an unknown ufrag is verified (MESSAGE-INTEGRITY with that password) before anything is set up; then a pion peer connection is created with the same credentials and a made-up offer carrying the app's ufrag, and the mux delivers the check to it. Wrong or outdated keys get no answer at all.
-- **Trust.** DTLS authenticates the PC to the app (fingerprint from the QR code). The app's certificate isn't checked; the app authenticates with its first message: `hello` with its key, or `pair` with the code (answered by `welcome` with a new device ID and key). Pairing codes are the same one-time codes as the browser QR code.
-- **Certificate.** ECDSA P-256, self-signed, 30 years, created once and kept in `remote.json` (`rtcCert`), so the fingerprint in paired phones stays valid. "New PIN & sign out all devices" replaces `deviceSecret` and so every device key; the certificate stays.
-- **Protocol** (version 1): JSON text messages; anything longer than 16 KiB is split into frames starting with `+`, the last one with `.`. `req` (method, path, headers, body) runs through the same `http.Handler` as HTTP requests, marked as authenticated by the device, and comes back as `res` (status, `Content-Type`, `ETag`, body). Only `/api/` paths. So the remote's code is unchanged: `rtc.js` replaces `fetch()` for `/api/` and reconnects when needed. A failed connection looks like a failed fetch, and the remote's own retry logic takes over.
-- **Measured** (Chrome, Edge 155, Firefox 157 on the dev PC): pairing ~80 ms, reconnecting ~70 ms, an API round trip under 1 ms.
-- **Limits.** Phones must be on the same network (no TURN). iOS keeps a home-screen app's storage separate from Safari's, so the connect page has its own QR scanner (BarcodeDetector, else vendored jsQR) to pair inside the installed app. Chrome plans to put WebRTC to local addresses behind its Local Network Access permission; that adds a prompt, nothing else.
+- **Phone persistence (v3).** Device preferences (last tab, fullscreen, keep the screen on, vibration, button position) stay in `localStorage`; everything about sounds and tabs lives on the PC, keyed by ID, with an in-memory mirror for synchronous reads. On first connect after the update, a phone sends its old path-keyed settings to the PC once. Paired PCs and their keys are in `localStorage` (`resound.pcs`); the app asks for persistent storage so the browser doesn't clear them.
+- **Platform features:**
+  - **Keep the screen on** (`screen-wake.js`): the Screen Wake Lock API, on by default, requested again whenever the app becomes visible (browsers drop it in the background), and retried on the next tap where a browser wants one first.
+  - **Fullscreen:** the installed app opens fullscreen (`display_override` in `manifest.json`; iOS falls back to standalone). In a browser tab, the "Fullscreen" setting enters fullscreen with a tap, which browsers require (`fullscreen.js`); the setting is hidden where the app is fullscreen already or the browser can't.
+  - **Vibration** on play and stop (`device.js`, Vibration API: Android), "Vibrate on Tap", shown only where the browser offers it.
+  - **Install:** Chromium's install prompt is offered on the connect page and in the settings. `launch_handler` makes a pairing link reuse the open app window; a maskable icon fills Android's icon shapes.
+  - **Updates:** `sw.js` caches every file at install (the list and version come from `cmd/webapp`). When the app comes to the foreground it checks for a new deployment; a new service worker takes over at once and the page reloads into it.
+- **Self-contained.** Every script, style, icon and the emoji data come from the app's own host; the `Content-Security-Policy` in `_headers` (`default-src 'self'`) makes the browser refuse anything else. `TestWebSelfContained` (`cmd/webapp`) fails on any URL in our own files.
+- **Icons** are Material Symbols SVGs (`webapp/src/assets/icons/`), painted in the text colour through a CSS mask: `<span class="icon" data-icon="name">`, switched with `el.dataset.icon`. `TestWebIcons` checks that every name used has its SVG and CSS rule.
 
 ## UI framework
 
@@ -264,7 +267,7 @@ The remote served by the PC is plain HTTP on the LAN, so browsers treat it as in
 | `config.json` | Devices, volumes, mic, PTT keys and options, folders, server port |
 | `library.json` | Sound index: records with stable IDs, fingerprints, lengths, settings, phone layouts, tombstones |
 | `sounds.json.migrated` | Per-sound settings of earlier versions, kept after migration |
-| `remote.json` | PIN, session token hashes, paired app devices, the app connection's certificate and device secret |
+| `remote.json` | Paired devices, the device secret their keys derive from, the connection's certificate |
 | `installed_version.txt` | Version of the installed copy |
 | `update\` | A downloaded update, only until the updated copy has started |
 | `vbcable-install.json` | A VB-Cable install waiting for the Windows restart (removed after it) |
@@ -289,7 +292,7 @@ The remote served by the PC is plain HTTP on the LAN, so browsers treat it as in
 | Elevated one-shot helpers | The app never runs as admin; only the two admin writes do |
 | IDs assigned once (initially the path hash) | Stable across restarts, removed tabs, renames and moves, unlike Soundux's list indexes |
 | JSON index instead of a database | Thousands of sounds are a few hundred KB; loads in milliseconds, readable when debugging, no dependency |
-| Phone controls via existing web UI | Reuses the Soundux Remote front end unchanged |
+| Phone app on an HTTPS host, WebRTC to the PC | A secure context (install, wake lock, offline start) without certificates on the PC or a server in between; the remote speaks the Soundux Remote API, so its front end carried over |
 
 **go-wca workarounds** (all in `wincom` or `routing`; avoid the go-wca versions of these calls):
 - `IMMDevice.Activate` passes a pointer where the class-context flag belongs. Use `wincom.Activate`.
@@ -310,7 +313,7 @@ Ordered by impact on reliability. None blocks normal use. Fixed in 0.6: concurre
 5. **Version info.** `winres.json` and `app.Version` hold development defaults. Release builds must override both; `scripts/build-release.ps1` does (and the release workflow uses it).
 6. **A broken `config.json` resets silently** to defaults and is overwritten on the next save. Fix: back up the broken file and log it.
 7. **Output failure releases holds for both outputs.** `EventOutputFailed` clears all held voices, releasing the mic and PTT even if the other output is still playing.
-8. **Plain HTTP on the LAN.** The browser remote's session cookies travel unencrypted; acceptable on a home network. The installable app (encrypted, installable) avoids this.
+8. **The app comes from its host.** Installing it, and updates, need the host (Netlify); an installed app starts from its cache. Phones must be on the PC's network: there is no relay for other networks.
 9. **Elevation with a different admin account.** When a standard user approves UAC with another account, the helper's log goes to that account's `%LOCALAPPDATA%`.
 10. **Front end** (planned): talk-through button bounces, 250 ms polling instead of live updates.
 11. **No live file watching.** Changes on disk are picked up by the 5 s rescan on phone requests, the panel's "Rescan", and the check on every play. Fix if needed: `ReadDirectoryChangesW`.

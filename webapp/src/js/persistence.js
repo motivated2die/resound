@@ -1,7 +1,8 @@
 // Settings persistence (v3).
 //
-// Device-only preferences (last tab, auto fullscreen, button position) are
-// kept in this browser's localStorage. Everything about sounds and tabs -
+// Device-only preferences (last tab, fullscreen, keep the screen on,
+// vibration, button position) are kept in this browser's localStorage.
+// Everything about sounds and tabs -
 // card colors, emoji, layout modes and custom orders - is stored on the PC
 // and shared by every paired phone. It is keyed by stable sound and tab IDs,
 // so it survives renaming or moving files and folders on the PC.
@@ -25,6 +26,8 @@ const persistence = (() => {
         version: CURRENT_VERSION,
         lastTabId: 'favorites',
         autoFullscreenEnabled: true,
+        keepScreenOn: true,
+        haptics: true,
         swapButtonPosition: false,
         // Mirror of the PC's data (also cached here for a fast first paint).
         soundSettings: {}, // key: sound ID (string) -> { color, emoji, favorite, hasCustomVolume }
@@ -94,7 +97,7 @@ const persistence = (() => {
             body: body !== undefined ? JSON.stringify(body) : undefined,
         });
         if (response.status === 401) {
-            if (window.location.pathname !== '/login.html') window.location.href = '/login.html';
+            window.location.href = '/connect.html'; // this device was signed out on the PC
             throw new Error('Unauthorized');
         }
         if (!response.ok) throw new Error(`${method} ${url} failed: ${response.status}`);

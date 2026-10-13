@@ -1,6 +1,6 @@
 # Privacy policy
 
-*Last updated: 2026-10-12*
+*Last updated: 2026-10-13*
 
 Resound is a soundboard that runs on your Windows PC. It has no user accounts, no analytics or telemetry, no ads and no servers of its own. The project and its maintainers receive no data from it.
 
@@ -10,16 +10,16 @@ Resound stores its settings and data only on your PC, in `%LOCALAPPDATA%\Resound
 
 - settings (`config.json`): chosen audio devices, volumes, push-to-talk keys, sound folders;
 - the sound library index (`library.json`): file names, paths, lengths and fingerprints of your sounds and their settings;
-- phone pairing (`remote.json`): the remote PIN, hashes of paired phones' session tokens, the IDs of phones paired with the app, and the keys the app connection uses;
+- phone pairing (`remote.json`): the IDs of paired phones and the keys the connection uses;
 - backups you make, and a log file (`debug.log`) for troubleshooting.
 
 None of this is sent anywhere. Uninstalling Resound deletes this folder.
 
 ## Network connections
 
-**Your phone and your PC.** Resound runs a small web server on your PC (port 8080 by default) so your phone can control it over your local network. Only browsers that paired with your PIN or QR code can use it. The connection is plain HTTP inside your network and never goes through the internet or a third party. Everything the remote's page needs (icons, the emoji picker and its emoji list) comes from Resound itself, and the page tells the browser not to load anything from elsewhere, so your phone contacts no other server while you use it.
+**Your phone and your PC.** You control Resound with the Resound app, a web app your phone loads from a static web host (currently Netlify, `getresound.netlify.app`) and can install. Like any website, the host sees your phone's IP address and browser when the app's files are downloaded; an installed app starts from your phone's cache and checks the host for a new version when you open it. Everything the app needs (icons, the emoji picker and its emoji list) comes from that host, and the app tells the browser not to load anything from elsewhere.
 
-**The installable app (preview).** If you choose "The QR code opens: Resound app" on the PC, your phone loads the Resound app from a static web host (currently Netlify, `getresound.netlify.app`). Like any website, the host sees your phone's IP address and browser when the app's files are downloaded; after that the app starts from your phone's cache. The pairing details in the QR code (your PC's local addresses, a one-time code, the PC's name) come after a `#` in the link, which browsers never send to the host. The app then talks to your PC directly over your local network, encrypted (WebRTC); nothing about your sounds or your use passes through the host or any other server. The app stores the list of paired PCs and their keys on your phone only.
+The pairing details in the PC's QR code (your PC's local addresses, a one-time code, the PC's name) come after a `#` in the link, which browsers never send to the host. The app then talks to your PC directly over your local network (UDP port 8080 by default), encrypted (WebRTC); nothing about your sounds or your use passes through the host or any other server. Only devices paired with a QR code can connect. The app stores the list of paired PCs and their keys on your phone only.
 
 **Connections Resound makes itself:**
 

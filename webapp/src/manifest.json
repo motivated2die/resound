@@ -6,9 +6,12 @@
     "start_url": "/",
     "scope": "/",
     "display": "standalone",
+    "display_override": ["fullscreen", "standalone"],
+    "launch_handler": { "client_mode": ["navigate-existing", "auto"] },
     "background_color": "#1c1d22",
     "theme_color": "#2a2c33",
     "orientation": "any",
+    "categories": ["music", "utilities", "entertainment"],
     "icons": [
         {
             "src": "/assets/resound-192.png",
@@ -21,6 +24,12 @@
             "sizes": "512x512",
             "type": "image/png",
             "purpose": "any"
+        },
+        {
+            "src": "/assets/resound-maskable-512.png",
+            "sizes": "512x512",
+            "type": "image/png",
+            "purpose": "maskable"
         }
     ]
 }

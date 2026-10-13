@@ -4,5 +4,5 @@
 [build]
   command = "go run ./cmd/webapp -out webapp/dist"
   publish = "webapp/dist"
-  # Skip the deploy when neither the app nor the remote it reuses changed.
-  ignore = "git diff --quiet $CACHED_COMMIT_REF $COMMIT_REF -- webapp/ internal/server/web/ cmd/webapp/ netlify.toml"
+  # Skip the deploy when the app did not change.
+  ignore = "git diff --quiet $CACHED_COMMIT_REF $COMMIT_REF -- webapp/ cmd/webapp/ netlify.toml"

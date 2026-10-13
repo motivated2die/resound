@@ -14,6 +14,4 @@ You can expect a first answer within a week. Once a fix is released, the advisor
 
 ## Scope
 
-In scope, for example: the phone remote's API and pairing (PIN, QR codes, sessions), the installable app and its WebRTC connection (`webapp/`, `internal/server/rtc.go`), the elevated helpers (`--apply-routing`, `--allow-firewall`), the installer and updater, and the VB-Cable download and signature check.
-
-Known limitation, not a vulnerability: the phone remote uses plain HTTP on the local network (see [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md#known-issues-and-gaps)).
+In scope, for example: the phone app and its connection and pairing (`webapp/`, `internal/server/`: QR codes, device keys, the WebRTC connection), the elevated helpers (`--apply-routing`, `--allow-firewall`), the installer and updater, and the VB-Cable download and signature check.

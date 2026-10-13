@@ -3,7 +3,6 @@ package app
 import (
 	"fmt"
 	"path/filepath"
-	"slices"
 
 	"github.com/skip2/go-qrcode"
 
@@ -136,7 +135,7 @@ func (a *App) homePage() []ui.Row {
 	remoteDetail, remoteTone := a.remoteSummary()
 	rows = append(rows,
 		ui.Section("Phone"),
-		ui.NavTool(ui.IconExternalLink, "Open the remote in a browser window on this PC", a.openRemoteHereAction(),
+		ui.NavTool(ui.IconExternalLink, "Open the app in a window on this PC", a.openRemoteHereAction(),
 			"Phone remote", remoteDetail, remoteTone, func() { a.openPage(pageRemote) }),
 		ui.Flex(),
 		ui.Separator(),
@@ -619,7 +618,7 @@ func (a *App) remoteSummary() (string, ui.Tone) {
 	if a.srv == nil || a.serverErr != nil {
 		return "Not running", ui.ToneBad
 	}
-	if n := a.srv.Auth().SessionCount(); n > 0 {
+	if n := a.srv.Auth().DeviceCount(); n > 0 {
 		return plural(n, "device") + " paired", ui.ToneGood
 	}
 	return "Ready to pair", ui.ToneWarning
@@ -629,129 +628,71 @@ func (a *App) remotePage() []ui.Row {
 	rows := []ui.Row{ui.Header("Phone remote", a.back)}
 	pair, ok := a.pairRows()
 	rows = append(rows, pair...)
-	if !ok {
-		return append(rows, ui.Spacer(4))
+	if ok {
+		rows = append(rows,
+			ui.Section("On this PC"),
+			ui.Paragraph("The app also runs on this PC, for example as a button board on a second or touch screen.", ui.ToneMuted),
+			ui.Buttons(ui.Action{Label: "Open the app on this PC", Icon: ui.IconExternalLink, OnClick: a.openRemoteHere}),
+		)
 	}
-	rows = append(rows,
-		ui.Section("On this PC"),
-		ui.Paragraph("The remote also works in a browser on this PC, for example as a button board on a second or touch screen.", ui.ToneMuted),
-		ui.Buttons(ui.Action{Label: "Open remote on this PC", Icon: ui.IconExternalLink, OnClick: a.openRemoteHere}),
-		ui.Separator(),
-		ui.Text("Paired devices", fmt.Sprint(a.srv.Auth().SessionCount()), ui.ToneNormal),
-		ui.Button("New PIN & sign out all devices", ui.ButtonDanger, false, a.resetRemote),
-	)
+	if a.srv != nil {
+		n := a.srv.Auth().DeviceCount()
+		rows = append(rows,
+			ui.Separator(),
+			ui.Text("Paired devices", fmt.Sprint(n), ui.ToneNormal),
+			ui.Button("Sign out all devices", ui.ButtonDanger, n == 0, a.resetRemote),
+		)
+	}
 	rows = append(rows, a.firewallRows()...)
 	return append(rows, ui.Spacer(4))
 }
 
-// pairRows show the pairing QR code, the addresses and the PIN. ok is false
-// when the server isn't running; the rows then explain why.
+// pairRows show the pairing QR code. ok is false when phones can't connect;
+// the rows then explain why.
 func (a *App) pairRows() (rows []ui.Row, ok bool) {
 	if a.srv == nil || a.serverErr != nil {
-		msg := "The server is not running."
+		msg := "Phones can't connect right now."
 		if a.serverErr != nil {
 			msg = a.serverErr.Error()
 		}
 		return []ui.Row{
 			ui.Paragraph(msg, ui.ToneBad),
-			ui.Text(fmt.Sprintf("Port %d may be used by another app.", a.cfg.ServerPort), "", ui.ToneMuted),
+			ui.Text(fmt.Sprintf("UDP port %d may be used by another app.", a.cfg.ServerPort), "", ui.ToneMuted),
 			ui.Button("Try again", ui.ButtonPrimary, false, func() { a.restartServer(); a.render() }),
 		}, false
 	}
-	if len(a.addresses) == 0 {
+	link, ok := a.srv.PairURL(a.appURL(), a.appAddresses())
+	if !ok {
 		return []ui.Row{ui.Text("No network connection found.", "", ui.ToneBad)}, false
 	}
-	if a.qrAddress >= len(a.addresses) {
-		a.qrAddress = 0
-	}
-	auth := a.srv.Auth()
-	base := fmt.Sprintf("http://%s:%d", a.addresses[a.qrAddress].IP, a.cfg.ServerPort)
-	link := base + "/pair?code=" + auth.PairCode()
-
-	rows = append(rows, ui.Section("The QR code opens"),
-		ui.Radio("Resound app", "Installable, fullscreen, keeps the screen on (preview)", a.cfg.PairWithApp, func() { a.setPairWithApp(true) }),
-		ui.Radio("Browser page", "This PC's page, no install", !a.cfg.PairWithApp, func() { a.setPairWithApp(false) }),
-	)
-	if a.cfg.PairWithApp {
-		if appLink, ok := a.srv.AppPairURL(a.appURL(), a.appAddresses()); ok {
-			link = appLink
-		} else {
-			_, _, err := a.srv.AppStatus()
-			rows = append(rows, ui.Paragraph(fmt.Sprintf("The app can't connect: %v. The code opens the browser page.", err), ui.ToneBad))
-		}
-	}
-
 	rows = append(rows, ui.Section("Scan with your phone's camera"))
 	if qr, err := qrcode.New(link, qrcode.Medium); err == nil {
 		rows = append(rows, ui.QRCode(qr.Bitmap()))
 	}
-	rows = append(rows, ui.Text("Same Wi-Fi as this PC. Each code works once.", "", ui.ToneMuted))
-
-	rows = append(rows, ui.Section("Or open in the phone's browser"))
-	rows = append(rows, a.addressRows()...)
-	pin := auth.PIN()
-	return append(rows, ui.Text("PIN", pin[:3]+" "+pin[3:], ui.ToneNormal)), true
+	return append(rows, ui.Paragraph("The Resound app opens; install it from there. "+
+		"Your phone must be on the same Wi-Fi as this PC. Each code works once.", ui.ToneMuted)), true
 }
 
-func (a *App) setPairWithApp(on bool) {
-	a.cfg.PairWithApp = on
-	a.save()
-	a.render()
-}
-
-// appAddresses are the addresses the app tries, in order: the one picked
-// for the QR code, then the other likely ones (a few, the QR code grows).
+// appAddresses are this PC's addresses in the QR code, most likely first.
+// The app tries each, so a few are listed (each makes the code denser);
+// virtual adapters' addresses only when there is nothing else.
 func (a *App) appAddresses() []string {
-	addrs := []string{a.addresses[a.qrAddress].IP}
-	for i, ad := range a.addresses {
-		if i != a.qrAddress && !ad.Other && len(addrs) < 3 {
-			addrs = append(addrs, ad.IP)
-		}
-	}
-	return addrs
-}
-
-// addressRows lets the user pick the address in the QR code. Addresses of
-// virtual adapters (WSL, Hyper-V, VMs, VPNs) are rarely reachable from a
-// phone, so they stay folded away unless they are all there is.
-func (a *App) addressRows() []ui.Row {
-	var main, other []int
-	for i, ad := range a.addresses {
+	var main, other []string
+	for _, ad := range a.addresses {
 		if ad.Other {
-			other = append(other, i)
+			other = append(other, ad.IP)
 		} else {
-			main = append(main, i)
+			main = append(main, ad.IP)
 		}
 	}
 	if len(main) == 0 {
-		main, other = other, nil
+		main = other
 	}
-	radio := func(i int) ui.Row {
-		ad := a.addresses[i]
-		return ui.Radio(fmt.Sprintf("http://%s:%d", ad.IP, a.cfg.ServerPort), ad.Label, i == a.qrAddress,
-			func() { a.qrAddress = i; a.render() })
-	}
-	var rows []ui.Row
-	for _, i := range main {
-		rows = append(rows, radio(i))
-	}
-	if len(other) == 0 {
-		return rows
-	}
-	if !a.showOtherAddrs && !slices.Contains(other, a.qrAddress) {
-		return append(rows, ui.Button(fmt.Sprintf("Show %s", plural(len(other), "other address")), ui.ButtonNormal, false,
-			func() { a.showOtherAddrs = true; a.render() }))
-	}
-	rows = append(rows, ui.Paragraph("Other addresses belong to virtual adapters (WSL, Hyper-V, virtual machines) or VPNs. "+
-		"A phone on your Wi-Fi usually can't reach them.", ui.ToneMuted))
-	for _, i := range other {
-		rows = append(rows, radio(i))
-	}
-	return rows
+	return main[:min(len(main), 3)]
 }
 
-// openRemoteHereAction is openRemoteHere, or nil (disabled) while the
-// server isn't running.
+// openRemoteHereAction is openRemoteHere, or nil (disabled) while phones
+// can't connect.
 func (a *App) openRemoteHereAction() func() {
 	if a.srv == nil || a.serverErr != nil {
 		return nil
@@ -759,19 +700,22 @@ func (a *App) openRemoteHereAction() func() {
 	return a.openRemoteHere
 }
 
-// openRemoteHere opens the remote on this PC, signed in through a one-time
-// pairing link (a browser that was signed in before keeps one session).
-// Edge's app mode gives it a window of its own, sized like a phone; without
-// Edge the default browser opens it.
+// openRemoteHere opens the app on this PC with a pairing link. A browser
+// that is paired already just connects; the code stays unused. Edge's app
+// mode gives it a window of its own, sized like a phone; without Edge the
+// default browser opens it.
 func (a *App) openRemoteHere() {
 	if a.srv == nil || a.serverErr != nil {
 		return
 	}
-	url := fmt.Sprintf("http://127.0.0.1:%d/pair?code=%s", a.cfg.ServerPort, a.srv.Auth().PairCode())
+	url, ok := a.srv.PairURL(a.appURL(), a.appAddresses())
+	if !ok {
+		return
+	}
 	if err := ui.ShellRun("msedge.exe", "--app="+url+" --window-size=430,860"); err != nil {
-		logx.Printf("remote on this PC: Edge: %v; using the default browser", err)
+		logx.Printf("app on this PC: Edge: %v; using the default browser", err)
 		if err := ui.ShellOpen(url); err != nil {
-			logx.Printf("remote on this PC: %v", err)
+			logx.Printf("app on this PC: %v", err)
 		}
 	}
 }

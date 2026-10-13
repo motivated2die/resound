@@ -1,10 +1,10 @@
-# Netlify response headers. Like the PC's server: nothing loads from another
-# host. WebRTC to the PC is not governed by connect-src.
+# Netlify response headers. Nothing loads from another host (WebRTC to the
+# PC is not governed by connect-src).
 /*
-  Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' data: blob:; connect-src 'self'; font-src 'self'; worker-src 'self'; manifest-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'
+  Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self'; font-src 'self'; worker-src 'self'; manifest-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'
   X-Content-Type-Options: nosniff
   Referrer-Policy: no-referrer
-  Permissions-Policy: camera=(self), microphone=(), geolocation=()
+  Permissions-Policy: camera=(self), screen-wake-lock=(self), fullscreen=(self), microphone=(), geolocation=()
 
 /sw.js
   Cache-Control: no-cache

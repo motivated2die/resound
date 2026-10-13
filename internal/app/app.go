@@ -26,14 +26,14 @@ import (
 // Version is set at build time with -ldflags "-X .../internal/app.Version=...".
 var Version = "0.6.0-dev"
 
-// AppURL is the installable app's address (webapp/, built by cmd/webapp).
+// AppURL is the app's address (webapp/, built by cmd/webapp).
 // Set at build time with -ldflags "-X .../internal/app.AppURL=..."; the
 // RESOUND_APP_URL environment variable and config.json's appURL replace it.
 var AppURL = "https://getresound.netlify.app"
 
 const appURLEnv = "RESOUND_APP_URL"
 
-// appURL returns the installable app's address in use.
+// appURL returns the app's address in use.
 func (a *App) appURL() string {
 	if a.cfg.AppURL != "" {
 		return a.cfg.AppURL
@@ -97,10 +97,7 @@ type App struct {
 	wasPlaying       bool      // playback state at the last tick
 	srv              *server.Server
 	serverErr        error
-	addresses        []server.Address
-	qrAddress        int // index into addresses shown as QR code
-
-	showOtherAddrs bool // virtual-adapter addresses unfolded on the remote page
+	addresses        []server.Address // in the pairing QR code
 
 	portable bool   // development build: never installs itself
 	fwBusy   bool   // waiting for the elevated firewall helper
@@ -259,7 +256,6 @@ func Run() int {
 // is kept, so a setup in progress continues where the user left it.
 func (a *App) onPanelOpen() {
 	a.ptt.capturing = false // a capture ends when the panel closes
-	a.showOtherAddrs = false
 	if !a.keepNote {
 		a.libNote, a.backupNote = "", ""
 	}
