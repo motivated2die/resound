@@ -73,9 +73,13 @@ func (s sliderRow) click(seg int) {
 }
 func (sliderRow) keepsOpen() bool { return true }
 
-func (s sliderRow) dragID() string   { return "slider:" + s.id }
-func (s sliderRow) dragSegment() int { return 1 }
-func (s sliderRow) dragTo(c *canvas, r rect, x int32, done bool) {
+func (s sliderRow) dragIDAt(seg int) string {
+	if seg != 1 {
+		return ""
+	}
+	return "slider:" + s.id
+}
+func (s sliderRow) dragTo(c *canvas, r rect, _ string, x int32, done bool) {
 	_, _, _, x0, x1 := s.geometry(c, r)
 	v := s.pos
 	if x1 > x0 {
@@ -109,15 +113,20 @@ func (s sliderRow) paint(c *canvas, r rect, st rowState) {
 		c.text(b.glyph, b.box, fontBold, colText, dtCenter)
 	}
 
-	// The track: as tall as the buttons, filled from its left end to the
-	// knob, full accent at the knob and darker with every pixel to the left.
-	// No part of the fill is flat: where a flat colour meets a ramp, the
-	// eye sees a dark seam (Mach banding). Measured from the knob, the
-	// whole gradient moves with it.
-	radius := c.px(8)
+	paintTrack(c, track, c.px(8), x0, x1, s.pos, s.max, st.hover == 1, st.press == 1)
+}
+
+// paintTrack draws a slider track with its fill and knob at pos of max;
+// x0 and x1 are where the knob sits at 0 and at max. Shared by Slider and
+// the audio flow's compact volume tracks.
+func paintTrack(c *canvas, track rect, radius, x0, x1 int32, pos, maxValue int, hover, press bool) {
+	// The track is filled from its left end to the knob, full accent at the
+	// knob and darker with every pixel to the left. No part of the fill is
+	// flat: where a flat colour meets a ramp, the eye sees a dark seam (Mach
+	// banding). Measured from the knob, the whole gradient moves with it.
 	c.roundRect(track, radius, colControl)
-	kx := x0 + int32(int64(x1-x0)*int64(s.pos)/int64(s.max))
-	if fill := (rect{track.Left, track.Top, kx, track.Bottom}); s.pos > 0 && fill.w() > 0 {
+	kx := x0 + int32(int64(x1-x0)*int64(pos)/int64(max(1, maxValue)))
+	if fill := (rect{track.Left, track.Top, kx, track.Bottom}); pos > 0 && fill.w() > 0 {
 		n := max(8, int(fill.w()/max(1, c.px(3)))) // pieces of about 3 px
 		stops := make([]uint32, n+1)
 		fade, span := float64(c.px(sliderFadeL)), float64(track.w())
@@ -131,9 +140,9 @@ func (s sliderRow) paint(c *canvas, r rect, st rowState) {
 	// The knob: a thin line over the whole height (clipped to the rounded
 	// ends), accent while dragged.
 	kw, knobCol := c.px(sliderKnobWL), colText
-	if st.press == 1 {
+	if press {
 		knobCol = colAccent
-	} else if st.hover == 1 {
+	} else if hover {
 		kw = c.px(sliderKnobWL + 1)
 	}
 	c.hGradient(rect{kx - kw/2, track.Top, kx - kw/2 + kw, track.Bottom}, knobCol, knobCol, track, radius)
@@ -479,7 +488,7 @@ type dropZoneRow struct {
 }
 
 // DropZone is a dashed field that invites dragging files or folders onto
-// the panel (see Popup.SetPinned); clicking it runs onClick, e.g. a picker.
+// the panel (see Popup.SetAcceptDrops); clicking it runs onClick, e.g. a picker.
 func DropZone(title, hint string, onClick func()) Row { return dropZoneRow{title, hint, onClick} }
 
 func (dropZoneRow) height() int { return 100 }

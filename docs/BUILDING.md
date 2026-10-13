@@ -162,7 +162,7 @@ Check, within about 10 s: the home page's header shows `v0.7.0` and a dot with "
 |---|---|
 | Exits right after start | End of `debug.log` (crash trace), or start the debug build from a terminal |
 | No sound / output "Error" | `… output open` lines, Settings → Diagnostics; "Restart outputs" after unplugging |
-| Others don't hear the voice | Settings → Voice chat step 3; `input: … listen=… target=…` lines |
+| Others don't hear the voice | Settings → Audio & voice chat: a broken mic pipe ("Not routed"); `input: … listen=… target=…` lines |
 | Phone can't connect | `app: reachable at …` and `app: device … connected` lines; Phone remote → "Allow phones through the firewall"; same Wi-Fi, not a guest network |
 | Game ignores push-to-talk | `push-to-talk down/up` lines; games running as admin don't see input from normal apps |
 | Pause/stop key does nothing | `hotkeys: watching …` at start, `hotkey: …` lines when pressed; inside a game running as admin, Resound sees no keys |

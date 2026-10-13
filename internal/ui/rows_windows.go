@@ -1,7 +1,5 @@
 package ui
 
-import "fmt"
-
 // Row is one line of the popup panel. Rows are cheap, immutable values:
 // the app rebuilds the whole list whenever state changes (see Popup.SetRows).
 type Row interface {
@@ -18,8 +16,8 @@ type Row interface {
 }
 
 type rowState struct {
-	hover, press int  // segment index or -1
-	open         bool // this row's dropdown list is open
+	hover, press int // segment index or -1
+	open         int // segment whose dropdown list is open, or -1
 }
 
 // Tone colors informational text.
@@ -169,7 +167,14 @@ const buttonIconL = 16 // logical icon size inside buttons
 // paintButton draws a push button with an optional icon before the label
 // (or alone when the label is empty); shared by Button, Buttons, NavTool.
 func paintButton(c *canvas, box rect, label string, icon Icon, style ButtonStyle, disabled, hover, press bool) {
-	bg, fg := colControl, colText
+	bg, fg := buttonColors(style, disabled, hover, press)
+	c.roundRect(box, c.px(10), bg)
+	paintButtonFace(c, box, label, icon, fg)
+}
+
+// buttonColors are a button's background and text colour.
+func buttonColors(style ButtonStyle, disabled, hover, press bool) (bg, fg uint32) {
+	bg, fg = colControl, colText
 	switch {
 	case disabled:
 		bg, fg = colRowHover, colMuted
@@ -185,7 +190,11 @@ func paintButton(c *canvas, box rect, label string, icon Icon, style ButtonStyle
 			bg = shade(bg, 14)
 		}
 	}
-	c.roundRect(box, c.px(10), bg)
+	return bg, fg
+}
+
+// paintButtonFace draws a button's icon and label centred in box.
+func paintButtonFace(c *canvas, box rect, label string, icon Icon, fg uint32) {
 	switch {
 	case icon == "":
 		c.text(label, box, fontBold, fg, dtCenter)
@@ -499,38 +508,6 @@ func (t toggleRow) paint(c *canvas, r rect, st rowState) {
 	}
 	c.circle(cx, track.Top+h/2, knobR, knobCol)
 	c.text(t.label, rect{in.Left, r.Top, track.Left - c.px(8), r.Bottom}, fontBody, colText, dtLeft)
-}
-
-// --- Setup step --------------------------------------------------------------
-
-type stepRow struct {
-	number      int
-	label, info string
-	done        bool
-}
-
-// Step is one item of a setup checklist: a numbered dot (green when done)
-// with a label and a short state on the right.
-func Step(number int, label, info string, done bool) Row { return stepRow{number, label, info, done} }
-
-func (stepRow) height() int                   { return 32 }
-func (stepRow) segments(*canvas, rect) []rect { return nil }
-func (stepRow) click(int)                     {}
-func (stepRow) keepsOpen() bool               { return true }
-func (s stepRow) paint(c *canvas, r rect, _ rowState) {
-	in := inset(c, r)
-	rad := c.px(10)
-	cx, cy := in.Left+rad, r.Top+r.h()/2
-	dot, fg, infoCol := colControl, colText, colWarning
-	if s.done {
-		dot, fg, infoCol = colAccent, colAccentText, colAccent
-	}
-	c.circle(cx, cy, rad, dot)
-	c.text(fmt.Sprint(s.number), rect{cx - rad, cy - rad, cx + rad + 1, cy + rad + 1}, fontCaption, fg, dtCenter)
-	left := cx + rad + c.px(10)
-	split := in.Right - c.px(90)
-	c.text(s.label, rect{left, r.Top, split, r.Bottom}, fontBold, colText, dtLeft)
-	c.text(s.info, rect{split, r.Top, in.Right, r.Bottom}, fontBody, infoCol, dtRight)
 }
 
 // --- QR code -----------------------------------------------------------------

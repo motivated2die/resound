@@ -50,8 +50,7 @@ const (
 	pageHome   page = iota
 	pageWizard      // guided first-run setup, step in App.wizardStep
 	pageSettings
-	pageOutputs
-	pageVoice // VB-Cable and microphone
+	pageAudio // the audio flow, VB-Cable and the microphone
 	pageKeys  // push-to-talk
 	pageLibrary
 	pageRemote
@@ -69,19 +68,23 @@ type App struct {
 	logo   *ui.Image // header logo, nil if it can't be decoded
 	page   page
 
-	parent     page // where a detail page's back button returns to
-	wizardStep int  // current step of the guided setup (pageWizard)
+	parents    []page // where detail pages' back buttons return to, innermost last
+	wizardStep int    // current step of the guided setup (pageWizard)
 
-	devices []audio.Device
-	devErr  error
+	devices     []audio.Device
+	devErr      error
+	outputsOpen bool   // openOutputs ran: the automatic cable output follows VB-Cable
+	cableOpenID string // the device the cable output was last opened on
 
 	route    routing.Status
 	routeErr error
 	busy     string // non-empty while waiting for the elevated helper
 	cable    cableInstall
 
-	playback playbackState
-	ptt      pttState
+	playback   playbackState
+	ptt        pttState
+	levels     levelState // the audio flow's meters (flow.go)
+	flowOnPage bool       // the current page shows the audio flow
 
 	lib      *library.Library
 	indexer  *library.Indexer
@@ -93,8 +96,9 @@ type App struct {
 	backupFailed     bool
 	restoreCandidate string    // backup awaiting the restore confirmation
 	lastIndex        time.Time // last panel refresh for indexer progress
-	watching         bool      // watchPlayback is running
+	watching         bool      // animate is running
 	wasPlaying       bool      // playback state at the last tick
+	wasHeld          string    // heldKey at the last tick
 	srv              *server.Server
 	serverErr        error
 	addresses        []server.Address // in the pairing QR code
@@ -171,6 +175,7 @@ func Run() int {
 	}
 
 	a := &App{cfg: config.Load(), engine: audio.NewEngine(), portable: portable}
+	a.migrateSetupStep()
 	// Configured before the guided setup existed. A setup in progress has
 	// a step and may have folders already (e.g. after VB-Cable's restart).
 	if !a.cfg.SetupComplete && a.cfg.SetupStep == 0 && (len(a.cfg.Folders) > 0 || a.cfg.CableDeviceID != "") {
@@ -204,6 +209,7 @@ func Run() int {
 		}
 	}
 	a.tray.Popup().OnKey = a.onPanelKey
+	a.tray.Popup().OnEscape = a.onEscape
 	a.tray.OnQuitRequest = func() {
 		logx.Printf("quit requested by another process (update or uninstall)")
 		a.quit()
@@ -244,6 +250,7 @@ func Run() int {
 	}
 	a.tray.Run()
 
+	a.closeLevels()
 	a.closeHotkeys()
 	a.releasePlayback() // never leave the mic muted or a key held behind
 	a.releaseAllPTT()
@@ -264,6 +271,26 @@ func (a *App) onPanelOpen() {
 	a.addresses = server.LocalAddresses()
 	a.wasPlaying = len(a.engine.Voices()) > 0
 	a.render()
+}
+
+// onEscape handles Esc while the panel is open, focused or not: it cancels
+// recording a key, or goes back a page as the back button would, up to the
+// home page. It returns false where the panel should close: on the home
+// page and in the guided setup (which keeps its step). Closing keeps the
+// page, so the tray icon reopens it where the user was.
+func (a *App) onEscape() bool {
+	switch {
+	case a.ptt.capturing:
+		a.ptt.capturing = false
+		a.render()
+	case a.page == pageHome || a.page == pageWizard:
+		return false
+	case a.page == pageSettings:
+		a.showPage(pageHome)
+	default:
+		a.back()
+	}
+	return true
 }
 
 // reopenPanel shows the panel again after a dialog (folder or file picker)
@@ -291,6 +318,9 @@ func (a *App) quit() {
 }
 
 func (a *App) showPage(p page) {
+	if p == pageHome {
+		a.parents = nil
+	}
 	a.page = p
 	a.tray.Popup().ScrollToTop()
 	a.render()
@@ -299,10 +329,11 @@ func (a *App) showPage(p page) {
 // render rebuilds the panel rows from the current state.
 func (a *App) render() {
 	a.updateTooltip()
+	a.flowOnPage = false // set again by flowRows
 	a.tray.Popup().SetRows(a.rows())
-	a.tray.Popup().SetPinned(a.acceptsDrops()) // stays open for dragging folders in
-	if a.page == pageHome && len(a.engine.Voices()) > 0 {
-		a.watchPlayback() // animate the progress bar under the title
+	a.tray.Popup().SetAcceptDrops(a.acceptsDrops()) // folders can be dragged in
+	if a.flowOnPage || (a.page == pageHome && len(a.engine.Voices()) > 0) {
+		a.animate() // the flow's level bars, the progress bar under the title
 	}
 }
 

@@ -26,7 +26,34 @@ func (a *App) refreshDevices(verbose bool) {
 
 func (a *App) openOutputs() {
 	a.setOutput(audio.RoleMonitor, a.cfg.MonitorDeviceID, true)
-	a.setOutput(audio.RoleCable, a.cfg.CableDeviceID, a.cfg.CableDeviceID != "")
+	a.openCableOutput()
+	a.outputsOpen = true
+}
+
+// cableOutputID is the device "others hear" plays into: the chosen one, or
+// automatically VB-Cable's CABLE Input. "" = none (no cable installed).
+func (a *App) cableOutputID() string {
+	if a.cfg.CableDeviceID != "" {
+		return a.cfg.CableDeviceID
+	}
+	if a.route.CableInput != nil {
+		return a.route.CableInput.ID
+	}
+	return ""
+}
+
+func (a *App) openCableOutput() {
+	id := a.cableOutputID()
+	a.cableOpenID = id
+	a.setOutput(audio.RoleCable, id, id != "")
+}
+
+// syncCableOutput opens the automatic cable output once VB-Cable appears
+// (after its install, or plugged in later) and closes it when it goes.
+func (a *App) syncCableOutput() {
+	if a.outputsOpen && a.cableOutputID() != a.cableOpenID {
+		a.openCableOutput()
+	}
 }
 
 func (a *App) setOutput(role, id string, enabled bool) {
@@ -51,10 +78,11 @@ func (a *App) selectMonitor(id string) {
 	a.render()
 }
 
+// selectCable chooses the "others hear" output: "" = automatic (VB-Cable).
 func (a *App) selectCable(id string) {
 	a.cfg.CableDeviceID = id
 	a.save()
-	a.setOutput(audio.RoleCable, id, id != "")
+	a.openCableOutput()
 	a.render()
 }
 
@@ -74,6 +102,7 @@ func (a *App) refreshRouting(verbose bool) {
 		logx.Printf("routing check: %v", err)
 		return
 	}
+	a.syncCableOutput()
 	if !verbose {
 		return
 	}
@@ -107,12 +136,9 @@ func (a *App) toggleMuteWhilePlaying() {
 	a.render()
 }
 
-// useCableAsOutput selects VB-Cable's input as the "others hear" output.
-func (a *App) useCableAsOutput() {
-	if a.route.CableInput != nil {
-		a.selectCable(a.route.CableInput.ID)
-	}
-}
+// useCableAsOutput goes back to the automatic "others hear" output,
+// VB-Cable's CABLE Input.
+func (a *App) useCableAsOutput() { a.selectCable("") }
 
 // setMicRouting switches "Listen to this device" on the microphone through
 // the elevated helper. The UAC prompt can take a while, so it runs off the

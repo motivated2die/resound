@@ -26,8 +26,8 @@ const defaultStopTimeout = 5 * time.Second
 func RunUninstall(dataDir string, closeLog func()) int {
 	if !ui.Confirm(ui.DialogSpec{
 		Title: "Uninstall Resound?",
-		Message: "This removes Resound, its Start Menu entry, autostart and its settings " +
-			"(sound folders, devices, paired phones). Your sound files are not touched.\n\n" +
+		Message: "WARNING: This removes Resound, its Start Menu entry, autostart and its settings " +
+			"(INCLUDING BACKUPS stored in the default folders, sound index and custom settings, devices, paired phones) Copy your backups if you want to restore them later. Your actual sound files are NOT deleted.\n\n" +
 			"Windows sound settings Resound changed for you, like \u201cListen to this device\u201d " +
 			"on your microphone, stay as they are.",
 		Confirm: "Uninstall",

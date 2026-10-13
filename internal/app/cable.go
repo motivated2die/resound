@@ -291,10 +291,12 @@ func (a *App) resumeCableInstall() (title, msg, confirm string) {
 // returnTo opens the page the install was started from.
 func (a *App) returnTo(p vbcable.Pending) {
 	if p.ReturnTo == vbcable.ReturnWizard {
-		a.page, a.wizardStep = pageWizard, max(0, min(p.WizardStep, wizardSteps))
+		// By name, not p.WizardStep: the setup installs VB-Cable only in
+		// its audio step, whose number changed when steps were merged.
+		a.page, a.wizardStep = pageWizard, wizardAudioStep
 		return
 	}
-	a.page, a.parent = pageVoice, pageSettings
+	a.page, a.parents = pageAudio, []page{pageSettings}
 }
 
 // --- rows --------------------------------------------------------------------

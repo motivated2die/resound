@@ -1,8 +1,12 @@
 package audio
 
 import (
+	"bytes"
+	"encoding/binary"
 	"io"
 	"math"
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
 )
@@ -55,16 +59,17 @@ func TestMixerClips(t *testing.T) {
 }
 
 func TestChimeSource(t *testing.T) {
-	c := ChimeSource(48000)
+	const rate = 48000
+	c := ChimeSource(rate)
 	pcm := c.static
-	if d := c.Length(); d < 400*time.Millisecond || d > 500*time.Millisecond {
-		t.Fatalf("length = %v, want about 0.45 s", d)
+	if d := c.Length(); d < 2900*time.Millisecond || d > 3100*time.Millisecond {
+		t.Fatalf("length = %v, want about 3 s", d)
 	}
 	var peak, left, right float64
 	for i, v := range pcm {
 		a := math.Abs(float64(v))
 		peak = max(peak, a)
-		if i < 0.07*48000*2 { // first note only
+		if i < 0.15*rate*2 { // the first note leans left
 			if i%2 == 0 {
 				left += a
 			} else {
@@ -72,16 +77,71 @@ func TestChimeSource(t *testing.T) {
 			}
 		}
 	}
-	if peak < 0.3 || peak > 0.33 {
-		t.Fatalf("peak = %.3f, want 0.32", peak)
+	if peak < 0.29 || peak > 0.31 {
+		t.Fatalf("peak = %.3f, want 0.30", peak)
 	}
-	if left < 1.5*right {
+	if left < 1.2*right {
 		t.Fatalf("first note should lean left (L %.0f, R %.0f)", left, right)
 	}
 	for _, v := range []float32{pcm[0], pcm[1], pcm[len(pcm)-2], pcm[len(pcm)-1]} {
 		if math.Abs(float64(v)) > 0.01 {
 			t.Fatalf("edges must be silent to avoid clicks, got %v", v)
 		}
+	}
+	// It rings out: still audible two seconds in, quieter than the phrase.
+	rms := func(from, to float64) float64 {
+		var sum float64
+		a, b := int(from*rate)*2, int(to*rate)*2
+		for _, v := range pcm[a:b] {
+			sum += float64(v) * float64(v)
+		}
+		return math.Sqrt(sum / float64(b-a))
+	}
+	phrase, tail := rms(0, 1.3), rms(2.0, 2.5)
+	if tail < 0.005 || tail > phrase {
+		t.Fatalf("rms: phrase %.4f, tail %.4f; want an audible, quieter tail", phrase, tail)
+	}
+	// Mellow: little energy in the sample-to-sample differences (high
+	// frequencies) compared with the signal.
+	var sig, diff float64
+	for i := 2; i < len(pcm); i += 2 {
+		sig += float64(pcm[i]) * float64(pcm[i])
+		d := float64(pcm[i] - pcm[i-2])
+		diff += d * d
+	}
+	if r := diff / sig; r > 0.02 {
+		t.Fatalf("high-frequency ratio %.4f, want a muted sound (< 0.02)", r)
+	}
+	writeWAV(t, "test-sound", pcm, rate)
+}
+
+// writeWAV saves stereo float samples as a 16-bit WAV to
+// $RESOUND_RENDER_DIR/name.wav when that is set, to listen to them.
+func writeWAV(t *testing.T, name string, pcm []float32, rate int) {
+	dir := os.Getenv("RESOUND_RENDER_DIR")
+	if dir == "" {
+		return
+	}
+	var b bytes.Buffer
+	le := func(v any) { _ = binary.Write(&b, binary.LittleEndian, v) }
+	data := uint32(len(pcm) * 2)
+	b.WriteString("RIFF")
+	le(36 + data)
+	b.WriteString("WAVEfmt ")
+	le(uint32(16))
+	le(uint16(1)) // PCM
+	le(uint16(2))
+	le(uint32(rate))
+	le(uint32(rate * 4))
+	le(uint16(4))
+	le(uint16(16))
+	b.WriteString("data")
+	le(data)
+	for _, v := range pcm {
+		le(int16(max(-1, min(1, v)) * 32767))
+	}
+	if err := os.WriteFile(filepath.Join(dir, name+".wav"), b.Bytes(), 0o644); err != nil {
+		t.Fatal(err)
 	}
 }
 

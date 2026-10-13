@@ -16,6 +16,7 @@ import (
 type voiceMeta struct {
 	soundID uint64 // 0 for test sounds
 	name    string
+	preview bool // plays for the user only ("You hear")
 }
 
 // playbackState tracks what is playing, for the latency readout, the
@@ -27,6 +28,9 @@ type playbackState struct {
 	// mutedMic is the capture device Resound muted, "" when none. A mic
 	// the user muted themselves is never unmuted by Resound.
 	mutedMic string
+	// muteGen counts Resound's mute changes, so a routing check that read
+	// the mic's mute state before one is discarded (flow.go).
+	muteGen int
 
 	// paused holds the voices paused by the play/pause toggle; talk the
 	// voices paused by talk-through. wasHolding remembers that mic/PTT were
@@ -86,8 +90,9 @@ func (a *App) start(p *audio.Prepared, opts audio.PlayOptions, meta voiceMeta, f
 		return info, err
 	}
 	pb.remaining[info.VoiceID] = info.Outputs
+	meta.preview = !forOthers
 	pb.setVoice(info.VoiceID, meta)
-	a.watchPlayback()
+	a.animate()
 	logx.Printf("play #%d %q (%v) on %d output(s) with %d decoder(s), ready in %v",
 		info.VoiceID, info.Name, info.Length.Round(time.Millisecond), info.Outputs, info.Decoders, info.Decode.Round(100*time.Microsecond))
 	return info, nil
@@ -235,6 +240,7 @@ func (a *App) onEngineEvent(ev audio.Event) {
 		}
 		if len(pb.remaining) == 0 {
 			a.releasePlayback()
+			a.render() // the flow's mic and push-to-talk badges go
 		}
 	case audio.EventOutputFailed:
 		logx.Printf("%s output failed: %v", ev.Output, ev.Err)
@@ -278,6 +284,7 @@ func (a *App) holdMic() {
 		return
 	}
 	pb.mutedMic = id
+	a.setRouteMuted(id, true)
 	logx.Printf("mic muted for playback in %v", time.Since(start).Round(100*time.Microsecond))
 }
 
@@ -291,8 +298,24 @@ func (a *App) releaseMic() {
 		logx.Printf("unmuting mic: %v", err)
 	} else {
 		logx.Printf("mic unmuted")
+		a.setRouteMuted(pb.mutedMic, false)
 	}
 	pb.mutedMic = ""
+}
+
+// setRouteMuted records a mute change Resound made in the routing state, so
+// the panel doesn't show the mute Windows reported before it (until the
+// next check) as the user's own.
+func (a *App) setRouteMuted(id string, muted bool) {
+	a.playback.muteGen++
+	for i := range a.route.Inputs {
+		if a.route.Inputs[i].ID == id {
+			a.route.Inputs[i].Muted = muted
+		}
+	}
+	if a.route.Mic != nil && a.route.Mic.ID == id {
+		a.route.Mic.Muted = muted
+	}
 }
 
 func (a *App) chooseTestSound() {
@@ -376,52 +399,6 @@ func (a *App) playbackProgress() float64 {
 		}
 	}
 	return best
-}
-
-// watchPlayback keeps the home page's progress bar moving while the panel
-// is open and sounds play: it repaints about 20 times a second and renders
-// the page again when playback starts or stops (the status text changes).
-// It ends by itself when the panel closes or playback ends. UI thread.
-func (a *App) watchPlayback() {
-	if a.watching {
-		return
-	}
-	a.watching = true
-	go func() {
-		t := time.NewTicker(50 * time.Millisecond)
-		defer t.Stop()
-		for range t.C {
-			keep := make(chan bool, 1)
-			a.tray.Post(func() { keep <- a.tickPlayback() })
-			select {
-			case k := <-keep:
-				if !k {
-					return
-				}
-			case <-time.After(time.Second): // UI thread gone (quitting)
-				return
-			}
-		}
-	}()
-}
-
-func (a *App) tickPlayback() bool {
-	visible := a.tray.Popup().Visible() && a.page == pageHome
-	playing := len(a.engine.Voices()) > 0
-	switch {
-	case playing != a.wasPlaying:
-		a.wasPlaying = playing
-		if visible {
-			a.render()
-		}
-	case visible && playing:
-		a.tray.Popup().Repaint()
-	}
-	keep := visible && playing
-	if !keep {
-		a.watching = false
-	}
-	return keep
 }
 
 // migrateVolumeScale converts volumes saved on the linear scale of versions

@@ -15,7 +15,9 @@ const AppName = "Resound"
 type Config struct {
 	// MonitorDeviceID is the output the user hears. "" = system default.
 	MonitorDeviceID string `json:"monitorDeviceId"`
-	// CableDeviceID is the output others hear (e.g. "CABLE Input"). "" = off.
+	// CableDeviceID is the output others hear. "" = automatic: VB-Cable's
+	// "CABLE Input" when it is installed, else none. Another device is an
+	// advanced choice, e.g. a virtual mixer's input.
 	CableDeviceID string `json:"cableDeviceId"`
 	// Volumes in percent, 0-100, on the loudness curve (audio.Gain).
 	MonitorVolume int `json:"monitorVolume"`
@@ -52,6 +54,9 @@ type Config struct {
 	// complete, so it continues there after a restart (e.g. the one
 	// VB-CABLE's install needs). 0 = the welcome page.
 	SetupStep int `json:"setupStep,omitempty"`
+	// SetupFlow is the numbering SetupStep uses (app.setupFlow); 0 is the
+	// five-step setup of earlier versions, migrated once at start.
+	SetupFlow int `json:"setupFlow,omitempty"`
 	// PauseHotkeys are key combinations that, while held anywhere in
 	// Windows, pause playback and let go of push-to-talk and the mic.
 	// StopHotkeys stop all sounds when pressed. Each is a list of

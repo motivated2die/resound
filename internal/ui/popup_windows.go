@@ -17,6 +17,9 @@ const (
 	// make the panel jump; short pages leave room at the bottom (or at a
 	// Flex row). Taller pages grow it, up to the work area.
 	popupMinL = 560
+	// popupMaxL is the maximum logical height; longer pages scroll. Small
+	// work areas lower it further, leaving room for the close tab.
+	popupMaxL = 680
 )
 
 type slot struct {
@@ -44,7 +47,10 @@ type Popup struct {
 	tracking           bool
 	lastHidden         time.Time
 
-	shadow *shadow // drop shadow window beneath the popup
+	measureDC uintptr // memory DC for measuring text outside painting
+
+	shadow *shadow   // drop shadow window beneath the popup
+	tab    *closeTab // the "Close" tab above its top right corner
 
 	dd   *dropdownState // open dropdown list, if any
 	drag *dragState     // slider being dragged, if any
@@ -56,11 +62,15 @@ type Popup struct {
 	// OnKey receives keys and mouse buttons 3-5 while the popup has focus
 	// (used to record a push-to-talk key). Returning true consumes it.
 	OnKey func(KeyEvent) bool
+	// OnEscape runs when Esc is pressed while the popup is open, focused or
+	// not (and no dropdown list is open). It returns true when it handled
+	// the key, e.g. went back a page; otherwise the popup closes.
+	OnEscape func() bool
 	// OnDrop receives the paths of files and folders dropped on the popup
-	// while it is pinned (see SetPinned).
+	// while it accepts drops (see SetAcceptDrops).
 	OnDrop func(paths []string)
 
-	pinned bool
+	drops bool
 }
 
 // KeyEvent is a key or mouse button press/release seen by the popup. VK is
@@ -116,6 +126,7 @@ func keyEvent(m uint32, w, l uintptr) (KeyEvent, bool) {
 
 func newPopup() (*Popup, error) {
 	p := &Popup{hoverRow: -1, pressRow: -1, scale: 1}
+	p.measureDC, _, _ = procCreateCompatibleDC.Call(0)
 	if err := registerClass(popupClass, 0, windows.NewCallback(p.wndProc)); err != nil {
 		return nil, err
 	}
@@ -130,6 +141,9 @@ func newPopup() (*Popup, error) {
 	}
 	// The drop shadow is a window of its own (CS_DROPSHADOW is too faint).
 	if p.shadow, err = newShadow(); err != nil {
+		return nil, err
+	}
+	if p.tab, err = newCloseTab(p); err != nil {
 		return nil, err
 	}
 	return p, nil
@@ -174,6 +188,7 @@ func (p *Popup) ShowAt(pt point) {
 	}
 	p.layoutAndPlace()
 	procSetForegroundWindow.Call(p.hwnd)
+	watchEscape(p.hwnd)
 }
 
 // Hide closes the popup.
@@ -183,8 +198,10 @@ func (p *Popup) Hide() {
 	}
 	p.dd = nil
 	p.hideTip()
+	unwatchEscape()
 	procShowWindow.Call(p.hwnd, swHide)
 	p.shadow.hide()
+	p.tab.hide()
 	p.lastHidden = time.Now()
 	p.endDrag() // after hiding, so its re-render doesn't show the popup again
 	p.hoverRow, p.pressRow = -1, -1
@@ -224,14 +241,16 @@ func (p *Popup) layoutAndPlace() {
 	}
 	c = p.canvas(0)
 	gap := c.px(popupGapL)
-	if minH := min(c.px(popupMinL), work.h()-2*gap) - 2*c.px(popupPadL); y < minH {
+	tabRoom := c.px(closeTabHL - closeTabUnderL)
+	maxH := min(c.px(popupMaxL), work.h()-2*gap-tabRoom)
+	if minH := min(c.px(popupMinL), maxH) - 2*c.px(popupPadL); y < minH {
 		p.grow(minH - y)
 		y = minH
 	}
 	p.contentH = y
 	defer p.syncDropdown() // keep an open list attached to its row
 
-	p.height = min(p.contentH+2*c.px(popupPadL), work.h()-2*gap)
+	p.height = min(p.contentH+2*c.px(popupPadL), maxH)
 	p.scroll = max(0, min(p.scroll, p.maxScroll()))
 
 	// Horizontally centred on the anchor, kept inside the work area.
@@ -242,10 +261,11 @@ func (p *Popup) layoutAndPlace() {
 	if p.anchor.Y > work.Top+work.h()/2 {
 		yPos = work.Bottom - gap - p.height
 	} else {
-		yPos = work.Top + gap
+		yPos = work.Top + gap + tabRoom
 	}
 	procSetWindowPos.Call(p.hwnd, hwndTopmost, uintptr(x), uintptr(yPos), uintptr(p.width), uintptr(p.height), swpShowWindow)
 	p.shadow.place(p.hwnd, rect{x, yPos, x + p.width, yPos + p.height}, p.scale)
+	p.tab.place(rect{x, yPos, x + p.width, yPos + p.height}) // between the popup and its shadow
 	procInvalidateRect.Call(p.hwnd, 0, 0)
 }
 
@@ -254,7 +274,15 @@ func (p *Popup) maxScroll() int32 {
 	return max(0, p.contentH+2*c.px(popupPadL)-p.height)
 }
 
-func (p *Popup) canvas(dc uintptr) *canvas { return &canvas{dc: dc, scale: p.scale, fonts: p.fonts} }
+// canvas returns a canvas on dc, or, for dc 0, on the popup's measuring DC:
+// hit testing and tooltips need text widths too (a badge's label), or
+// their segments come out narrower than what was painted.
+func (p *Popup) canvas(dc uintptr) *canvas {
+	if dc == 0 {
+		dc = p.measureDC
+	}
+	return &canvas{dc: dc, scale: p.scale, fonts: p.fonts}
+}
 
 // rowRect returns slot i's rectangle in window coordinates.
 func (p *Popup) rowRect(i int) rect {
@@ -301,9 +329,8 @@ func (p *Popup) wndProc(hwnd uintptr, m uint32, w, l uintptr) uintptr {
 		}
 		return 0
 	case wmActivate:
-		if loword(w) == waInactive && !p.pinned {
-			p.Hide()
-		}
+		// The popup stays open when another window gets the focus: closing
+		// is a deliberate click on its close tab, Esc or the tray icon.
 		return 0
 	case wmDropFiles:
 		paths := droppedFiles(w)
@@ -374,9 +401,11 @@ func (p *Popup) wndProc(hwnd uintptr, m uint32, w, l uintptr) uintptr {
 		if row >= 0 && row == pressedRow && seg == pressedSeg {
 			r := p.slots[row].row
 			p.hideTip()
-			if o, ok := r.(opener); ok {
-				o.open(p, row)
-				return 0
+			if fh, ok := r.(fieldHost); ok {
+				if f, ok := fh.field(seg); ok {
+					p.openDropdown(row, seg, f)
+					return 0
+				}
 			}
 			keep := r.keepsOpen()
 			if k, ok := r.(segmentKeeper); ok {
@@ -396,11 +425,25 @@ func (p *Popup) wndProc(hwnd uintptr, m uint32, w, l uintptr) uintptr {
 		return 0
 	case wmKeyDown:
 		if w == vkEscape {
-			p.Hide()
+			p.escape()
+		}
+		return 0
+	case wmGlobalEscape: // Esc while another window has the focus
+		if p.dd != nil {
+			p.closeDropdown()
+		} else {
+			p.escape()
 		}
 		return 0
 	}
 	return defWindowProc(hwnd, m, w, l)
+}
+
+// escape lets the app go back a page; when it doesn't, the popup closes.
+func (p *Popup) escape() {
+	if p.OnEscape == nil || !p.OnEscape() {
+		p.Hide()
+	}
 }
 
 func (p *Popup) paint() {
@@ -426,14 +469,16 @@ func (p *Popup) paint() {
 		if r.Bottom < 0 || r.Top > p.height {
 			continue
 		}
-		st := rowState{hover: -1, press: -1}
+		st := rowState{hover: -1, press: -1, open: -1}
 		if i == p.hoverRow {
 			st.hover = p.hoverSeg
 		}
 		if i == p.pressRow {
 			st.press = p.pressSeg
 		}
-		st.open = p.dd != nil && p.dd.row == i
+		if p.dd != nil && p.dd.row == i {
+			st.open = p.dd.seg
+		}
 		s.row.paint(c, r, st)
 	}
 	// Scroll indicator.
@@ -472,14 +517,14 @@ type segmentKeeper interface {
 	keepsOpenAt(seg int) bool
 }
 
-// dragger is implemented by rows with a segment that follows the mouse
-// while the left button is held, such as a slider's track. Rows are rebuilt
-// on every change, so an ongoing drag finds its row again by dragID.
+// dragger is implemented by rows with segments that follow the mouse while
+// the left button is held, such as a slider's track. Rows are rebuilt on
+// every change, so an ongoing drag finds its row again by its id.
 type dragger interface {
-	dragID() string
-	dragSegment() int
-	// dragTo moves to window x; done is true once, when the drag ends.
-	dragTo(c *canvas, r rect, x int32, done bool)
+	// dragIDAt returns the drag id of segment seg, "" if it doesn't drag.
+	dragIDAt(seg int) string
+	// dragTo moves drag id to window x; done is true once, when it ends.
+	dragTo(c *canvas, r rect, id string, x int32, done bool)
 }
 
 type dragState struct {
@@ -498,10 +543,10 @@ func (p *Popup) startDrag(x int32) {
 		return
 	}
 	d, ok := p.slots[p.pressRow].row.(dragger)
-	if !ok || d.dragSegment() != p.pressSeg {
+	if !ok || d.dragIDAt(p.pressSeg) == "" {
 		return
 	}
-	p.drag = &dragState{id: d.dragID(), x: x}
+	p.drag = &dragState{id: d.dragIDAt(p.pressSeg), x: x}
 	p.hideTip()
 	procSetCapture.Call(p.hwnd)
 	p.dragTo(x, false)
@@ -514,11 +559,18 @@ func (p *Popup) dragTo(x int32, done bool) {
 		return
 	}
 	p.drag.x = x
+	c := p.canvas(0)
 	for i, s := range p.slots {
-		if d, ok := s.row.(dragger); ok && d.dragID() == p.drag.id {
-			p.pressRow, p.pressSeg = i, d.dragSegment()
-			d.dragTo(p.canvas(0), p.rowRect(i), x, done) // may call SetRows
-			return
+		d, ok := s.row.(dragger)
+		if !ok {
+			continue
+		}
+		for seg := range s.row.segments(c, p.rowRect(i)) {
+			if d.dragIDAt(seg) == p.drag.id {
+				p.pressRow, p.pressSeg = i, seg
+				d.dragTo(c, p.rowRect(i), p.drag.id, x, done) // may call SetRows
+				return
+			}
 		}
 	}
 }
@@ -555,32 +607,23 @@ func (p *Popup) grow(extra int32) {
 const wmDropFiles = 0x0233
 
 var (
-	procDragAcceptFiles     = shell32.NewProc("DragAcceptFiles")
-	procDragQueryFileW      = shell32.NewProc("DragQueryFileW")
-	procDragFinish          = shell32.NewProc("DragFinish")
-	procGetForegroundWindow = user32.NewProc("GetForegroundWindow")
+	procDragAcceptFiles = shell32.NewProc("DragAcceptFiles")
+	procDragQueryFileW  = shell32.NewProc("DragQueryFileW")
+	procDragFinish      = shell32.NewProc("DragFinish")
 )
 
-// SetPinned keeps the popup open when another window gets the focus, so the
-// user can click into Explorer and drag folders onto it, or use a dialog
-// without the panel closing. While pinned it accepts file drops (OnDrop).
-// Clicking the tray icon still closes it. Unpinning hides it if it no
-// longer has the focus.
-func (p *Popup) SetPinned(on bool) {
-	if p.pinned == on {
+// SetAcceptDrops makes the popup accept dropped files and folders
+// (OnDrop), e.g. on the sound library page.
+func (p *Popup) SetAcceptDrops(on bool) {
+	if p.drops == on {
 		return
 	}
-	p.pinned = on
+	p.drops = on
 	accept := uintptr(0)
 	if on {
 		accept = 1
 	}
 	procDragAcceptFiles.Call(p.hwnd, accept)
-	if !on && p.Visible() {
-		if fg, _, _ := procGetForegroundWindow.Call(); fg != p.hwnd {
-			p.Hide()
-		}
-	}
 }
 
 // Hwnd returns the popup window, e.g. as the owner of a dialog so the

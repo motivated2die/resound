@@ -301,6 +301,23 @@ func (e *Engine) SetVoiceVolume(id uint64, vol map[string]float32) {
 	}
 }
 
+// Levels returns the peaks since the last call, for the panel's meters.
+// Sounds is the loudest of the outputs' voices before their volume.
+func (e *Engine) Levels() Levels {
+	var l Levels
+	for _, o := range e.liveOutputs() {
+		src, out := o.Mixer.takePeaks()
+		l.Sounds = max(l.Sounds, src)
+		switch o.role {
+		case RoleMonitor:
+			l.Monitor = out
+		case RoleCable:
+			l.Cable = out
+		}
+	}
+	return l
+}
+
 // StopAll stops every voice on every output.
 func (e *Engine) StopAll() {
 	for _, o := range e.liveOutputs() {
