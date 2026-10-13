@@ -240,6 +240,7 @@ func (a *App) onEngineEvent(ev audio.Event) {
 		}
 		if len(pb.remaining) == 0 {
 			a.releasePlayback()
+			a.render() // the flow's mic and push-to-talk badges go
 		}
 	case audio.EventOutputFailed:
 		logx.Printf("%s output failed: %v", ev.Output, ev.Err)

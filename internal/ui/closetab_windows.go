@@ -22,7 +22,7 @@ type closeTab struct {
 
 const (
 	closeTabClass  = "ResoundCloseTab"
-	closeTabWL     = 84 // logical size
+	closeTabWL     = 128 // logical size
 	closeTabHL     = 36
 	closeTabUnderL = 12 // the part hidden under the popup
 	closeTabInsetL = 14 // from the popup's right edge
@@ -136,19 +136,29 @@ func (t *closeTab) paint() {
 // draw paints the tab: its background, then the X icon and "Close", centred
 // in the part above the popup.
 func (t *closeTab) draw(c *canvas) {
-	bg, fg := colBackground, colMuted
+	// Lighter than the panel, so it reads as a button peeking out.
+	bg, fg := colControl, colText
 	switch {
 	case t.press:
-		bg, fg = colRowPress, colText
+		bg = shade(colControl, -18)
 	case t.hover:
-		bg, fg = colRowHover, colText
+		bg = shade(colControl, 14)
 	}
 	c.fill(rect{0, 0, t.w, t.h}, bg)
 	vis := rect{0, 0, t.w, t.visibleH(c) + c.px(1)}
-	label := "Close"
+
+	// ✕ CLOSE [ESC], centred: Esc closes Resound too.
+	label, key := "CLOSE", "ESC"
 	iw, gap := c.px(14), c.px(5)
 	tw := c.textWidth(label, fontCaption)
-	left := (t.w - iw - gap - tw) / 2
+	kw := c.textWidth(key, fontCaption) + c.px(10)
+	left := (t.w - (iw + gap + tw + c.px(8) + kw)) / 2
 	c.icon(IconClose, rect{left, vis.Top, left + iw, vis.Bottom}, 14, fg)
-	c.text(label, rect{left + iw + gap, vis.Top, left + iw + gap + tw + c.px(2), vis.Bottom}, fontCaption, fg, dtLeft)
+	x := left + iw + gap
+	c.text(label, rect{x, vis.Top, x + tw + c.px(2), vis.Bottom}, fontCaption, fg, dtLeft)
+	x += tw + c.px(8)
+	kh := c.px(16)
+	keycap := rect{x, vis.Top + (vis.h()-kh)/2, x + kw, vis.Top + (vis.h()-kh)/2 + kh}
+	c.roundRect(keycap, c.px(6), shade(bg, -22))
+	c.text(key, keycap, fontCaption, colMuted, dtCenter)
 }

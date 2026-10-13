@@ -152,7 +152,7 @@ func level(v float64) func() float64 { return func() float64 { return v } }
 func testFlow() AudioFlow {
 	return AudioFlow{
 		Mic:    FlowDevice{ID: "mic", Caption: "Your microphone", Options: []Option{{Label: "Automatic: Headset Microphone (Realtek)"}}, Selected: 0, Level: level(0.62)},
-		Sounds: FlowSounds{Caption: "Soundboard", Status: "Playing", Playing: true, Level: level(0.8)},
+		Sounds: FlowSounds{Caption: "Soundboard", Playing: true, Level: level(0.8)},
 		Cable:  FlowCable{Caption: "Others hear", Value: "100%", Name: "CABLE Output", Info: "why", Level: level(0.85), Volume: &FlowVolume{Value: 100}},
 		You: FlowDevice{ID: "monitor", Caption: "You hear", Value: "80%", Options: []Option{{Label: "System default"}},
 			Level: level(0.55), Volume: &FlowVolume{Value: 80}},

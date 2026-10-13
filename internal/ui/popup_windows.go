@@ -62,6 +62,10 @@ type Popup struct {
 	// OnKey receives keys and mouse buttons 3-5 while the popup has focus
 	// (used to record a push-to-talk key). Returning true consumes it.
 	OnKey func(KeyEvent) bool
+	// OnEscape runs when Esc is pressed while the popup is open, focused or
+	// not (and no dropdown list is open). It returns true when it handled
+	// the key, e.g. went back a page; otherwise the popup closes.
+	OnEscape func() bool
 	// OnDrop receives the paths of files and folders dropped on the popup
 	// while it accepts drops (see SetAcceptDrops).
 	OnDrop func(paths []string)
@@ -184,6 +188,7 @@ func (p *Popup) ShowAt(pt point) {
 	}
 	p.layoutAndPlace()
 	procSetForegroundWindow.Call(p.hwnd)
+	watchEscape(p.hwnd)
 }
 
 // Hide closes the popup.
@@ -193,6 +198,7 @@ func (p *Popup) Hide() {
 	}
 	p.dd = nil
 	p.hideTip()
+	unwatchEscape()
 	procShowWindow.Call(p.hwnd, swHide)
 	p.shadow.hide()
 	p.tab.hide()
@@ -419,11 +425,25 @@ func (p *Popup) wndProc(hwnd uintptr, m uint32, w, l uintptr) uintptr {
 		return 0
 	case wmKeyDown:
 		if w == vkEscape {
-			p.Hide()
+			p.escape()
+		}
+		return 0
+	case wmGlobalEscape: // Esc while another window has the focus
+		if p.dd != nil {
+			p.closeDropdown()
+		} else {
+			p.escape()
 		}
 		return 0
 	}
 	return defWindowProc(hwnd, m, w, l)
+}
+
+// escape lets the app go back a page; when it doesn't, the popup closes.
+func (p *Popup) escape() {
+	if p.OnEscape == nil || !p.OnEscape() {
+		p.Hide()
+	}
 }
 
 func (p *Popup) paint() {

@@ -98,6 +98,7 @@ type App struct {
 	lastIndex        time.Time // last panel refresh for indexer progress
 	watching         bool      // animate is running
 	wasPlaying       bool      // playback state at the last tick
+	wasHeld          string    // heldKey at the last tick
 	srv              *server.Server
 	serverErr        error
 	addresses        []server.Address // in the pairing QR code
@@ -207,6 +208,7 @@ func Run() int {
 		}
 	}
 	a.tray.Popup().OnKey = a.onPanelKey
+	a.tray.Popup().OnEscape = a.onEscape
 	a.tray.OnQuitRequest = func() {
 		logx.Printf("quit requested by another process (update or uninstall)")
 		a.quit()
@@ -268,6 +270,26 @@ func (a *App) onPanelOpen() {
 	a.addresses = server.LocalAddresses()
 	a.wasPlaying = len(a.engine.Voices()) > 0
 	a.render()
+}
+
+// onEscape handles Esc while the panel is open, focused or not: it cancels
+// recording a key, or goes back a page as the back button would, up to the
+// home page. It returns false where the panel should close: on the home
+// page and in the guided setup (which keeps its step). Closing keeps the
+// page, so the tray icon reopens it where the user was.
+func (a *App) onEscape() bool {
+	switch {
+	case a.ptt.capturing:
+		a.ptt.capturing = false
+		a.render()
+	case a.page == pageHome || a.page == pageWizard:
+		return false
+	case a.page == pageSettings:
+		a.showPage(pageHome)
+	default:
+		a.back()
+	}
+	return true
 }
 
 // reopenPanel shows the panel again after a dialog (folder or file picker)
