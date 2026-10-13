@@ -34,12 +34,17 @@ type Icon string
 
 // Icons used by the app. Any file in icons/ also works as Icon("name").
 const (
+	IconAlert        Icon = "alert-triangle"
 	IconChevronLeft  Icon = "chevron-left"
 	IconChevronRight Icon = "chevron-right"
 	IconExternalLink Icon = "external-link"
 	IconFolderPlus   Icon = "folder-plus"
+	IconKeyboard     Icon = "keyboard"
+	IconMicOff       Icon = "microphone-off"
+	IconPause        Icon = "player-pause"
 	IconPlay         Icon = "player-play"
 	IconPower        Icon = "power"
+	IconUnplugged    Icon = "plug-connected-x"
 	IconRefresh      Icon = "refresh"
 	IconRestore      Icon = "restore"
 	IconSave         Icon = "device-floppy"

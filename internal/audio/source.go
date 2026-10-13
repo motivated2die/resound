@@ -46,6 +46,7 @@ type Source struct {
 
 	static []float32 // whole sound (static sources only)
 	spos   int       // samples consumed from static (render thread only)
+	peak   float32   // loudest sample mixed from static since takePeak (render thread only)
 
 	ring      *ring
 	p         *producer
@@ -204,6 +205,7 @@ func (s *Source) mixInto(out []float32, gain float32) int {
 		n := min(len(src), len(out)) &^ 1
 		for i, v := range src[:n] {
 			out[i] += v * gain
+			s.peak = max(s.peak, abs32(v))
 		}
 		s.spos += n
 		return n / 2
@@ -213,6 +215,26 @@ func (s *Source) mixInto(out []float32, gain float32) int {
 		s.p.signal() // let the producer refill
 	}
 	return n / 2
+}
+
+// takePeak returns the loudest sample (before gain) mixed since the last
+// call, for the level meters. Render thread only.
+func (s *Source) takePeak() float32 {
+	if s.ring == nil {
+		p := s.peak
+		s.peak = 0
+		return p
+	}
+	p := s.ring.peak
+	s.ring.peak = 0
+	return p
+}
+
+func abs32(v float32) float32 {
+	if v < 0 {
+		return -v
+	}
+	return v
 }
 
 // finished reports whether everything was produced and consumed.
@@ -228,6 +250,7 @@ func (s *Source) finished() bool {
 type ring struct {
 	buf  []float32
 	r, w atomic.Uint64
+	peak float32 // loudest sample mixed since Source.takePeak (consumer only)
 }
 
 func newRing(samples int) *ring {
@@ -257,12 +280,16 @@ func (q *ring) mixInto(out []float32, gain float32) int {
 	}
 	i := int(r % uint64(len(q.buf)))
 	first := min(n, len(q.buf)-i)
+	peak := q.peak
 	for k, v := range q.buf[i : i+first] {
 		out[k] += v * gain
+		peak = max(peak, abs32(v))
 	}
 	for k, v := range q.buf[:n-first] {
 		out[first+k] += v * gain
+		peak = max(peak, abs32(v))
 	}
+	q.peak = peak
 	q.r.Store(r + uint64(n))
 	return n
 }

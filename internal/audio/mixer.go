@@ -53,6 +53,10 @@ type Mixer struct {
 
 	volume atomic.Uint32 // math.Float32bits of the master gain
 
+	// Level meters: the voices before the master volume (the sounds
+	// themselves) and the final mix sent to the device.
+	srcPeak, outPeak peakHold
+
 	mu     sync.Mutex
 	voices []*voice
 }
@@ -181,6 +185,7 @@ func (m *Mixer) Read(out []float32) {
 	}
 	master := m.Volume()
 	now := time.Now()
+	var srcPeak float32
 
 	m.mu.Lock()
 	kept := m.voices[:0]
@@ -197,6 +202,11 @@ func (m *Mixer) Read(out []float32) {
 		// voice is silent for a moment (an underrun), never blocking.
 		n := v.src.mixInto(out, g)
 		v.pos += n
+		if p := v.src.takePeak(); v.absolute {
+			srcPeak = max(srcPeak, p) // a custom volume replaces the master: show the sound as it is
+		} else {
+			srcPeak = max(srcPeak, p*v.gain)
+		}
 		if !v.started && n > 0 {
 			v.started = true
 			m.emit(Event{Kind: EventFirstBuffer, Output: m.role, VoiceID: v.id, Delay: now.Sub(v.queuedAt)})
@@ -216,14 +226,22 @@ func (m *Mixer) Read(out []float32) {
 	m.mu.Unlock()
 
 	// Hard clip. A limiter can replace this later.
+	var outPeak float32
 	for i, s := range out {
 		if s > 1 {
 			out[i] = 1
 		} else if s < -1 {
 			out[i] = -1
 		}
+		outPeak = max(outPeak, abs32(out[i]))
 	}
+	m.srcPeak.raise(srcPeak)
+	m.outPeak.raise(outPeak)
 }
+
+// takePeaks returns the loudest voice before the master volume and the
+// loudest sample of the mix since the last call, and resets both.
+func (m *Mixer) takePeaks() (src, out float32) { return m.srcPeak.take(), m.outPeak.take() }
 
 func (m *Mixer) emit(e Event) {
 	if m.events == nil {
