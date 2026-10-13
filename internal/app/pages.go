@@ -666,9 +666,23 @@ func (a *App) pairRows() (rows []ui.Row, ok bool) {
 	}
 	auth := a.srv.Auth()
 	base := fmt.Sprintf("http://%s:%d", a.addresses[a.qrAddress].IP, a.cfg.ServerPort)
+	link := base + "/pair?code=" + auth.PairCode()
+
+	rows = append(rows, ui.Section("The QR code opens"),
+		ui.Radio("Resound app", "Installable, fullscreen, keeps the screen on (preview)", a.cfg.PairWithApp, func() { a.setPairWithApp(true) }),
+		ui.Radio("Browser page", "This PC's page, no install", !a.cfg.PairWithApp, func() { a.setPairWithApp(false) }),
+	)
+	if a.cfg.PairWithApp {
+		if appLink, ok := a.srv.AppPairURL(a.appURL(), a.appAddresses()); ok {
+			link = appLink
+		} else {
+			_, _, err := a.srv.AppStatus()
+			rows = append(rows, ui.Paragraph(fmt.Sprintf("The app can't connect: %v. The code opens the browser page.", err), ui.ToneBad))
+		}
+	}
 
 	rows = append(rows, ui.Section("Scan with your phone's camera"))
-	if qr, err := qrcode.New(base+"/pair?code="+auth.PairCode(), qrcode.Medium); err == nil {
+	if qr, err := qrcode.New(link, qrcode.Medium); err == nil {
 		rows = append(rows, ui.QRCode(qr.Bitmap()))
 	}
 	rows = append(rows, ui.Text("Same Wi-Fi as this PC. Each code works once.", "", ui.ToneMuted))
@@ -677,6 +691,24 @@ func (a *App) pairRows() (rows []ui.Row, ok bool) {
 	rows = append(rows, a.addressRows()...)
 	pin := auth.PIN()
 	return append(rows, ui.Text("PIN", pin[:3]+" "+pin[3:], ui.ToneNormal)), true
+}
+
+func (a *App) setPairWithApp(on bool) {
+	a.cfg.PairWithApp = on
+	a.save()
+	a.render()
+}
+
+// appAddresses are the addresses the app tries, in order: the one picked
+// for the QR code, then the other likely ones (a few, the QR code grows).
+func (a *App) appAddresses() []string {
+	addrs := []string{a.addresses[a.qrAddress].IP}
+	for i, ad := range a.addresses {
+		if i != a.qrAddress && !ad.Other && len(addrs) < 3 {
+			addrs = append(addrs, ad.IP)
+		}
+	}
+	return addrs
 }
 
 // addressRows lets the user pick the address in the QR code. Addresses of

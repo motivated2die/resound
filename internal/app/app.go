@@ -26,6 +26,24 @@ import (
 // Version is set at build time with -ldflags "-X .../internal/app.Version=...".
 var Version = "0.6.0-dev"
 
+// AppURL is the installable app's address (webapp/, built by cmd/webapp).
+// Set at build time with -ldflags "-X .../internal/app.AppURL=..."; the
+// RESOUND_APP_URL environment variable and config.json's appURL replace it.
+var AppURL = "https://getresound.netlify.app"
+
+const appURLEnv = "RESOUND_APP_URL"
+
+// appURL returns the installable app's address in use.
+func (a *App) appURL() string {
+	if a.cfg.AppURL != "" {
+		return a.cfg.AppURL
+	}
+	if u := os.Getenv(appURLEnv); u != "" {
+		return u
+	}
+	return AppURL
+}
+
 type page int
 
 const (

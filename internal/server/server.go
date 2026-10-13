@@ -11,6 +11,8 @@ import (
 	"io/fs"
 	"net"
 	"net/http"
+	neturl "net/url"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -85,10 +87,18 @@ type Server struct {
 	logf   func(format string, args ...any)
 	epoch  string // distinguishes library revisions across restarts
 
+	// Name is this PC's name, shown in the app.
+	Name string
+
+	handlerOnce sync.Once
+	handlerVal  http.Handler
+
 	mu       sync.Mutex
 	httpSrv  *http.Server
 	port     int
 	startErr error
+	rtc      *RTC
+	rtcErr   error
 }
 
 // New creates a server. logf receives diagnostic lines.
@@ -99,10 +109,13 @@ func New(lib *library.Library, player Player, auth *Auth, web fs.FS, logf func(s
 // Auth returns the server's authentication state.
 func (s *Server) Auth() *Auth { return s.auth }
 
-// Start listens on all interfaces at port. A port conflict is reported
-// immediately; serving continues in the background.
+// Start listens on all interfaces at port: TCP for the browser remote, UDP
+// (the same number) for the app's WebRTC connections. A TCP port conflict is
+// reported immediately; serving continues in the background. A UDP problem
+// only disables the app (AppStatus).
 func (s *Server) Start(port int) error {
 	s.Close()
+	s.startRTC(port)
 	ln, err := net.Listen("tcp", fmt.Sprintf(":%d", port))
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -113,7 +126,7 @@ func (s *Server) Start(port int) error {
 	}
 	s.startErr = nil
 	srv := &http.Server{
-		Handler:           s.Handler(),
+		Handler:           s.handler(),
 		ReadHeaderTimeout: 10 * time.Second,
 		IdleTimeout:       2 * time.Minute,
 	}
@@ -130,15 +143,73 @@ func (s *Server) Start(port int) error {
 	return nil
 }
 
+func (s *Server) startRTC(port int) {
+	s.mu.Lock()
+	rtc := s.rtc
+	s.mu.Unlock()
+	var err error
+	if rtc == nil {
+		if rtc, err = newRTC(s); err != nil {
+			s.logf("app: %v", err)
+		}
+	}
+	if err == nil {
+		if err = rtc.listen(port); err != nil {
+			s.logf("app: cannot listen on UDP port %d: %v", port, err)
+		}
+	}
+	s.mu.Lock()
+	s.rtc, s.rtcErr = rtc, err
+	s.mu.Unlock()
+}
+
 // Close stops the server immediately.
 func (s *Server) Close() {
 	s.mu.Lock()
-	srv := s.httpSrv
+	srv, rtc := s.httpSrv, s.rtc
 	s.httpSrv = nil
 	s.mu.Unlock()
 	if srv != nil {
 		_ = srv.Close()
 	}
+	if rtc != nil {
+		rtc.close()
+	}
+}
+
+// AppStatus reports whether the app's connections are accepted, and the UDP port and
+// certificate fingerprint for the QR code.
+func (s *Server) AppStatus() (fingerprint string, port int, err error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.rtcErr != nil {
+		return "", 0, s.rtcErr
+	}
+	if s.rtc == nil || s.rtc.Port() == 0 {
+		return "", 0, errors.New("the server is not running")
+	}
+	return s.rtc.Fingerprint(), s.rtc.Port(), nil
+}
+
+// AppPairURL is the link in the app's pairing QR code: the app's address,
+// then, in the fragment (which browsers never send to the host), this PC's
+// addresses, port, certificate fingerprint, a one-time pairing code and
+// name. ok is false while the app can't connect.
+func (s *Server) AppPairURL(appURL string, addrs []string) (url string, ok bool) {
+	fp, port, err := s.AppStatus()
+	if err != nil || len(addrs) == 0 {
+		return "", false
+	}
+	q := neturl.Values{}
+	q.Set("v", strconv.Itoa(rtcProtocol))
+	q.Set("a", strings.Join(addrs, ","))
+	q.Set("p", strconv.Itoa(port))
+	q.Set("f", fp)
+	q.Set("c", s.auth.PairCode())
+	if s.Name != "" {
+		q.Set("n", s.Name)
+	}
+	return strings.TrimRight(appURL, "/") + "/#pair&" + q.Encode(), true
 }
 
 // Status reports the port and whether the server is running.
@@ -153,6 +224,12 @@ func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
 	s.routes(mux)
 	return s.middleware(mux)
+}
+
+// handler is Handler, built once (the web files are hashed for it).
+func (s *Server) handler() http.Handler {
+	s.handlerOnce.Do(func() { s.handlerVal = s.Handler() })
+	return s.handlerVal
 }
 
 // publicPath reports paths reachable without a session: the login page and
@@ -197,6 +274,9 @@ func (s *Server) middleware(next http.Handler) http.Handler {
 }
 
 func (s *Server) authenticated(r *http.Request) bool {
+	if rtcDevice(r) != "" {
+		return true // the app's connection authenticated itself (rtc.go)
+	}
 	c, err := r.Cookie(cookieName)
 	return err == nil && s.auth.Valid(c.Value)
 }

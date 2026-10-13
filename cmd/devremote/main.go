@@ -4,6 +4,9 @@
 // Playing a sound only logs it.
 //
 //	go run ./cmd/devremote -folder D:\Sounds -port 8090
+//
+// It also accepts the installable app over WebRTC and prints its pairing
+// link (go run ./cmd/webapp -serve :8095 serves the app on localhost).
 package main
 
 import (
@@ -55,7 +58,8 @@ func deref(v *int) any {
 func main() {
 	var dirs folders
 	data := flag.String("data", filepath.Join(os.TempDir(), "resound-dev"), "data folder (library.json, remote.json)")
-	port := flag.Int("port", 8090, "HTTP port")
+	port := flag.Int("port", 8090, "HTTP port (and UDP port for the app)")
+	appURL := flag.String("app", "http://localhost:8095", "address of the installable app (go run ./cmd/webapp -serve :8095)")
 	flag.Var(&dirs, "folder", "sound folder (repeatable)")
 	flag.Parse()
 
@@ -73,9 +77,21 @@ func main() {
 		log.Fatal(err)
 	}
 	srv := server.New(lib, logPlayer{lib}, auth, server.WebFS(), log.Printf)
+	srv.Name, _ = os.Hostname()
 	if err := srv.Start(*port); err != nil {
 		log.Fatal(err)
 	}
 	fmt.Printf("PIN %s\nhttp://localhost:%d/pair?code=%s\n", auth.PIN(), *port, auth.PairCode())
+	var addrs []string
+	for _, a := range server.LocalAddresses() {
+		if !a.Other {
+			addrs = append(addrs, a.IP)
+		}
+	}
+	if link, ok := srv.AppPairURL(*appURL, addrs); ok {
+		fmt.Printf("app (same pairing code, works once): %s\n", link)
+	} else {
+		fmt.Println("app: not available (see the log)")
+	}
 	select {}
 }

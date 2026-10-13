@@ -149,6 +149,9 @@ func (s *Server) handleCheck(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleLogout(w http.ResponseWriter, r *http.Request) {
+	if id := rtcDevice(r); id != "" {
+		s.auth.ForgetDevice(id)
+	}
 	if c, err := r.Cookie(cookieName); err == nil {
 		s.auth.Logout(c.Value)
 	}

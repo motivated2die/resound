@@ -10,7 +10,7 @@ Resound stores its settings and data only on your PC, in `%LOCALAPPDATA%\Resound
 
 - settings (`config.json`): chosen audio devices, volumes, push-to-talk keys, sound folders;
 - the sound library index (`library.json`): file names, paths, lengths and fingerprints of your sounds and their settings;
-- phone pairing (`remote.json`): the remote PIN and hashes of paired phones' session tokens;
+- phone pairing (`remote.json`): the remote PIN, hashes of paired phones' session tokens, the IDs of phones paired with the app, and the keys the app connection uses;
 - backups you make, and a log file (`debug.log`) for troubleshooting.
 
 None of this is sent anywhere. Uninstalling Resound deletes this folder.
@@ -18,6 +18,8 @@ None of this is sent anywhere. Uninstalling Resound deletes this folder.
 ## Network connections
 
 **Your phone and your PC.** Resound runs a small web server on your PC (port 8080 by default) so your phone can control it over your local network. Only browsers that paired with your PIN or QR code can use it. The connection is plain HTTP inside your network and never goes through the internet or a third party. Everything the remote's page needs (icons, the emoji picker and its emoji list) comes from Resound itself, and the page tells the browser not to load anything from elsewhere, so your phone contacts no other server while you use it.
+
+**The installable app (preview).** If you choose "The QR code opens: Resound app" on the PC, your phone loads the Resound app from a static web host (currently Netlify, `getresound.netlify.app`). Like any website, the host sees your phone's IP address and browser when the app's files are downloaded; after that the app starts from your phone's cache. The pairing details in the QR code (your PC's local addresses, a one-time code, the PC's name) come after a `#` in the link, which browsers never send to the host. The app then talks to your PC directly over your local network, encrypted (WebRTC); nothing about your sounds or your use passes through the host or any other server. The app stores the list of paired PCs and their keys on your phone only.
 
 **Connections Resound makes itself:**
 
@@ -37,7 +39,7 @@ Resound changes Windows settings only when you ask it to, and tells you before i
 - updating itself when you choose "Update now";
 - installing VB-Cable (with Windows' permission prompt), and restoring your default audio devices if VB-Cable's setup changed them;
 - turning on "Listen to this device" for your microphone so it reaches the virtual cable (with Windows' permission prompt);
-- a Windows Firewall rule that lets your phone connect (with Windows' permission prompt);
+- a Windows Firewall rule that lets your phone connect (with Windows' permission prompt; it covers the app's UDP connection too);
 - muting your microphone and pressing your push-to-talk key while a sound plays, if you turn these on;
 - watching the keyboard for your pause and stop keys, only while you have set at least one. Resound looks only for those keys; it doesn't record, store or send anything you type.
 

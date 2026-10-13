@@ -1,0 +1,153 @@
+/* The connect page. Same palette as the remote and the desktop panel
+   (internal/server/web/css/styles.css). */
+:root {
+    --accent: #50dea8;
+    --accent-light: #7ae8bf;
+    --on-accent: #102a20;
+    --secondary: #3a3d46;
+    --secondary-dark: #2a2c33;
+    --background: #1c1d22;
+    --surface: #25272d;
+    --text: #ececf0;
+    --text-secondary: #9a9ca6;
+    --error: #f2416f;
+    --radius: 10px;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+    font-family: "Segoe UI", system-ui, -apple-system, Roboto, sans-serif;
+    background: var(--background);
+    color: var(--text);
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: max(20px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right))
+             max(20px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+}
+
+.card {
+    width: 100%;
+    max-width: 380px;
+    background: var(--surface);
+    border-radius: 14px;
+    padding: 28px 24px;
+    box-shadow: 0 12px 36px rgba(0, 0, 0, 0.45);
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.logo { width: 72px; height: 72px; margin: 0 auto; }
+h1 { font-size: 22px; font-weight: 600; letter-spacing: 0.12em; }
+.lead { color: var(--text-secondary); font-size: 15px; }
+.lead strong { color: var(--text); }
+
+.steps {
+    text-align: left;
+    color: var(--text-secondary);
+    font-size: 14px;
+    line-height: 1.5;
+    padding-left: 20px;
+    margin-top: 10px;
+}
+.steps li + li { margin-top: 6px; }
+.steps strong { color: var(--text); }
+
+.message { min-height: 20px; font-size: 14px; color: var(--text-secondary); }
+.message.error { color: var(--error); }
+
+.actions { display: flex; flex-direction: column; gap: 10px; }
+
+button {
+    font: inherit;
+    font-size: 16px;
+    font-weight: 600;
+    border: none;
+    border-radius: var(--radius);
+    height: 48px;
+    padding: 0 16px;
+    cursor: pointer;
+    background: var(--secondary);
+    color: var(--text);
+}
+button.primary { background: var(--accent); color: var(--on-accent); }
+button.primary:hover { background: var(--accent-light); }
+button:disabled { opacity: 0.6; cursor: default; }
+
+.hint { font-size: 13px; color: var(--text-secondary); line-height: 1.5; }
+.hint strong { color: var(--text); }
+
+.pc-list { list-style: none; display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
+.pc-list li { display: flex; gap: 8px; }
+.pc-list .open {
+    flex: 1;
+    background: var(--accent);
+    color: var(--on-accent);
+    text-align: left;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.pc-list .open.other { background: var(--secondary-dark); color: var(--text); }
+.pc-list .forget { width: 48px; padding: 0; background: var(--secondary-dark); color: var(--text-secondary); }
+
+.paste summary { cursor: pointer; color: var(--text-secondary); font-size: 14px; }
+.paste form { display: flex; gap: 8px; margin-top: 10px; }
+.paste input {
+    flex: 1;
+    min-width: 0;
+    font: inherit;
+    font-size: 14px;
+    height: 48px;
+    padding: 0 12px;
+    border-radius: var(--radius);
+    border: 2px solid transparent;
+    background: var(--secondary-dark);
+    color: var(--text);
+}
+.paste input:focus { outline: none; border-color: var(--accent); }
+
+.spinner {
+    width: 28px;
+    height: 28px;
+    margin: 4px auto 0;
+    border: 3px solid rgba(255, 255, 255, 0.2);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.scanner {
+    position: fixed;
+    inset: 0;
+    background: #000;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    z-index: 10;
+}
+.scanner video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.scanner-frame {
+    position: relative;
+    width: min(70vw, 70vh, 300px);
+    aspect-ratio: 1;
+    border: 3px solid var(--accent);
+    border-radius: 18px;
+    box-shadow: 0 0 0 100vmax rgba(0, 0, 0, 0.45);
+}
+.scanner-hint { position: relative; margin-top: 24px; font-size: 15px; }
+.scanner button {
+    position: absolute;
+    bottom: max(24px, env(safe-area-inset-bottom));
+    left: 50%;
+    transform: translateX(-50%);
+    min-width: 160px;
+}
+
+[hidden] { display: none !important; }

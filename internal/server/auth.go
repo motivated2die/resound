@@ -1,6 +1,7 @@
 package server
 
 import (
+	"crypto/hmac"
 	"crypto/rand"
 	"crypto/sha256"
 	"crypto/subtle"
@@ -38,9 +39,24 @@ type session struct {
 	LastSeen time.Time `json:"lastSeen"`
 }
 
+// device is a phone paired with the installable app, which connects over
+// WebRTC (rtc.go). Its key is derived from DeviceSecret, never stored.
+type device struct {
+	ID       string    `json:"id"`
+	Agent    string    `json:"agent,omitempty"`
+	Created  time.Time `json:"created"`
+	LastSeen time.Time `json:"lastSeen"`
+}
+
 type authState struct {
 	PIN      string    `json:"pin"`
 	Sessions []session `json:"sessions"`
+	// DeviceSecret derives the app devices' keys; replacing it signs them all out.
+	DeviceSecret string   `json:"deviceSecret,omitempty"`
+	Devices      []device `json:"devices,omitempty"`
+	// RTCCert is the app connection's certificate and key (PEM).
+	// Its fingerprint is in the pairing QR code, so it is kept across starts.
+	RTCCert string `json:"rtcCert,omitempty"`
 }
 
 type failure struct {
@@ -76,8 +92,13 @@ func NewAuth(dataDir string) (*Auth, error) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	a.dropExpiredLocked()
-	if len(a.state.PIN) != 6 {
-		a.state.PIN = randomPIN()
+	if len(a.state.PIN) != 6 || a.state.DeviceSecret == "" {
+		if len(a.state.PIN) != 6 {
+			a.state.PIN = randomPIN()
+		}
+		if a.state.DeviceSecret == "" {
+			a.state.DeviceSecret = randomHex(32)
+		}
 		if err := a.saveLocked(); err != nil {
 			return nil, err
 		}
@@ -97,7 +118,7 @@ func (a *Auth) SessionCount() int {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	a.dropExpiredLocked()
-	return len(a.state.Sessions)
+	return len(a.state.Sessions) + len(a.state.Devices)
 }
 
 // ResetAll creates a new PIN and signs out every phone.
@@ -105,6 +126,8 @@ func (a *Auth) ResetAll() error {
 	a.mu.Lock()
 	a.state.PIN = randomPIN()
 	a.state.Sessions = nil
+	a.state.DeviceSecret = randomHex(32)
+	a.state.Devices = nil
 	a.pairCode = ""
 	err := a.saveLocked()
 	a.mu.Unlock()
@@ -236,6 +259,124 @@ func (a *Auth) dropExpiredLocked() {
 		}
 	}
 	a.state.Sessions = kept
+	devices := a.state.Devices[:0]
+	for _, d := range a.state.Devices {
+		if a.now().Sub(d.LastSeen) <= sessionLifetime {
+			devices = append(devices, d)
+		}
+	}
+	a.state.Devices = devices
+}
+
+// --- app devices (WebRTC) ---------------------------------------------------
+
+// PairPassword returns the ICE password of the current pairing code, which
+// the app proves it knows (from the QR code) before a connection is set up.
+// ok is false when no code is active.
+func (a *Auth) PairPassword() (pwd string, ok bool) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	if a.pairCode == "" || a.now().After(a.pairExpires) {
+		return "", false
+	}
+	return pairPassword(a.pairCode), true
+}
+
+// pairPassword turns a pairing code into an ICE password; the app does the
+// same (rtc.js). ICE passwords allow only letters, digits, + and /.
+func pairPassword(code string) string {
+	sum := sha256.Sum256([]byte("resound-pair:" + code))
+	return hex.EncodeToString(sum[:16])
+}
+
+// DeviceKey returns the key of a paired app device, which is also its ICE
+// password, and renews the device.
+func (a *Auth) DeviceKey(id string) (key string, ok bool) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	now := a.now()
+	for i := range a.state.Devices {
+		d := &a.state.Devices[i]
+		if d.ID != id {
+			continue
+		}
+		if now.Sub(d.LastSeen) > sessionLifetime {
+			return "", false
+		}
+		if now.Sub(d.LastSeen) > lastSeenPersist {
+			d.LastSeen = now
+			_ = a.saveLocked()
+		}
+		return a.deviceKeyLocked(id), true
+	}
+	return "", false
+}
+
+func (a *Auth) deviceKeyLocked(id string) string {
+	mac := hmac.New(sha256.New, []byte(a.state.DeviceSecret))
+	mac.Write([]byte("device:" + id))
+	return hex.EncodeToString(mac.Sum(nil)[:16])
+}
+
+// PairDevice redeems a one-time pairing code for the app and returns the new
+// device's ID and key.
+func (a *Auth) PairDevice(code, agent string) (id, key string, err error) {
+	a.mu.Lock()
+	if a.pairCode == "" || a.now().After(a.pairExpires) ||
+		subtle.ConstantTimeCompare([]byte(code), []byte(a.pairCode)) != 1 {
+		a.mu.Unlock()
+		return "", "", ErrBadPIN
+	}
+	a.pairCode = ""
+	if len(agent) > 200 {
+		agent = agent[:200]
+	}
+	id = randomHex(6)
+	now := a.now()
+	a.state.Devices = append(a.state.Devices, device{ID: id, Agent: agent, Created: now, LastSeen: now})
+	key = a.deviceKeyLocked(id)
+	err = a.saveLocked()
+	a.mu.Unlock()
+	if err == nil {
+		a.changed()
+	}
+	return id, key, err
+}
+
+// ForgetDevice signs out an app device (it asked to, or it was removed).
+func (a *Auth) ForgetDevice(id string) {
+	a.mu.Lock()
+	kept := a.state.Devices[:0]
+	for _, d := range a.state.Devices {
+		if d.ID != id {
+			kept = append(kept, d)
+		}
+	}
+	removed := len(kept) != len(a.state.Devices)
+	a.state.Devices = kept
+	if removed {
+		_ = a.saveLocked()
+	}
+	a.mu.Unlock()
+	if removed {
+		a.changed()
+	}
+}
+
+// rtcCertPEM returns the stored certificate, creating one with create
+// when there is none yet.
+func (a *Auth) rtcCertPEM(create func() (string, error)) (string, error) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	if a.state.RTCCert != "" {
+		return a.state.RTCCert, nil
+	}
+	key, err := create()
+	if err != nil {
+		return "", err
+	}
+	a.state.RTCCert = key
+	return key, a.saveLocked()
 }
 
 func (a *Auth) saveLocked() error {
@@ -270,6 +411,14 @@ func randomToken(n int) string {
 		panic(err) // crypto/rand never fails on supported platforms
 	}
 	return base64.RawURLEncoding.EncodeToString(b)
+}
+
+func randomHex(n int) string {
+	b := make([]byte, n)
+	if _, err := rand.Read(b); err != nil {
+		panic(err)
+	}
+	return hex.EncodeToString(b)
 }
 
 func randomPIN() string {
