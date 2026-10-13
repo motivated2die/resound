@@ -1,21 +1,47 @@
 package app
 
 import (
-	"github.com/motivated2die/resound/internal/audio"
+	"github.com/motivated2die/resound/internal/config"
 	"github.com/motivated2die/resound/internal/install"
 	"github.com/motivated2die/resound/internal/logx"
 	"github.com/motivated2die/resound/internal/ui"
 )
 
 // The guided setup runs on first start (until config.SetupComplete) and
-// from Settings. A welcome page is followed by five steps, each a plain
+// from Settings. A welcome page is followed by four steps, each a plain
 // page of rows shared with the settings pages; every step can be skipped
-// and redone later.
+// and redone later: sounds, audio and voice chat, push-to-talk, phone.
 
-const wizardSteps = 5
+const wizardSteps = 4
 
-// wizardVoiceStep is the step that connects voice chat (VB-Cable).
-const wizardVoiceStep = 3
+// wizardAudioStep is the step with the audio flow: devices, VB-Cable and
+// routing the microphone into it.
+const wizardAudioStep = 2
+
+// setupFlow is the numbering of the setup's steps that config.SetupStep
+// uses. Flow 0 had five steps: speakers (2) and voice chat (3) were apart.
+const setupFlow = 1
+
+// migrateSetupStep moves a setup in progress from the five-step numbering
+// to the current one, once: the old speakers and voice chat steps are both
+// the audio step now, and the steps after them move up by one.
+func (a *App) migrateSetupStep() {
+	if migrateSetupStep(&a.cfg) {
+		a.save()
+	}
+}
+
+// migrateSetupStep renumbers c's setup step; it reports whether c changed.
+func migrateSetupStep(c *config.Config) bool {
+	if c.SetupFlow >= setupFlow {
+		return false
+	}
+	if !c.SetupComplete && c.SetupStep >= 3 {
+		c.SetupStep--
+	}
+	c.SetupFlow = setupFlow
+	return true
+}
 
 func (a *App) startWizard() {
 	a.wizardStep = 0
@@ -45,13 +71,11 @@ func (a *App) wizardPage() []ui.Row {
 	switch a.wizardStep {
 	case 1:
 		return a.wizardSounds()
-	case 2:
-		return a.wizardSpeakers()
-	case wizardVoiceStep:
-		return a.wizardVoice()
-	case 4:
+	case wizardAudioStep:
+		return a.wizardAudio()
+	case 3:
 		return a.wizardKeys()
-	case 5:
+	case 4:
 		return a.wizardPhone()
 	}
 	return a.wizardWelcome()
@@ -78,7 +102,7 @@ func (a *App) wizardWelcome() []ui.Row {
 		ui.Brand(a.logo, "RESOUND", "", "Guided setup · about 2 minutes", nil, nil),
 		ui.Paragraph("Welcome! Play sounds into games and voice chat, controlled from your phone. "+
 			"You hear them on your speakers; the others hear them through your microphone.", ui.ToneNormal),
-		ui.Paragraph("Five short steps: add your sounds, check your audio, connect voice chat, set your push-to-talk key and pair your phone.", ui.ToneMuted),
+		ui.Paragraph("Four short steps: add your sounds, set up your audio and voice chat, set your push-to-talk key and pair your phone.", ui.ToneMuted),
 		ui.Flex(),
 		ui.Button("Start setup", ui.ButtonPrimary, false, func() { a.wizardGo(1) }),
 		ui.Button("Skip, I'll set it up myself", ui.ButtonNormal, false, a.finishWizard),
@@ -102,42 +126,32 @@ func (a *App) wizardSounds() []ui.Row {
 	return append(rows, ui.Flex(), ui.Separator(), a.wizardNext(len(a.cfg.Folders) > 0), ui.Spacer(4))
 }
 
-func (a *App) wizardSpeakers() []ui.Row {
+// wizardAudio sets up audio and voice chat in one step around the audio
+// flow: choose the devices and try them, install VB-Cable if it's missing,
+// and route the microphone into it. Each problem shows on its pipe, and
+// clicking its badge fixes it right here.
+func (a *App) wizardAudio() []ui.Row {
 	rows := []ui.Row{
-		a.wizardHeader("Check your audio"),
-		ui.Paragraph("Choose your microphone and where you hear sounds, then speak and play the test sound: "+
-			"the bars show what arrives where.", ui.ToneMuted),
+		a.wizardHeader("Audio and voice chat"),
+		ui.Paragraph("Choose your microphone and where you hear sounds, then speak and play the test sound. "+
+			"Others hear you and your sounds through VB-Cable, a free virtual audio driver by VB-Audio.", ui.ToneMuted),
 	}
-	rows = append(rows, a.flowRows(true)...)
-	running := false
-	if s, ok := a.outputStatus(audio.RoleMonitor); ok && s.Running {
-		running = true
-	}
-	return append(rows, ui.Flex(), ui.Separator(), a.wizardNext(running), ui.Spacer(4))
-}
-
-func (a *App) wizardVoice() []ui.Row {
-	rows := []ui.Row{
-		a.wizardHeader("Connect voice chat"),
-		ui.Paragraph("Others hear your sounds through VB-Cable, a free virtual audio driver by VB-Audio. "+
-			"Your microphone is passed through it as well, so they still hear you.", ui.ToneMuted),
-	}
+	rows = append(rows, a.cableNoteRows()...)
+	rows = append(rows, a.flowRows()...)
 	if !a.route.CableInstalled() {
 		rows = append(rows, ui.Section("Install VB-Cable"))
 		rows = append(rows, a.cableInstallRows()...)
-		rows = append(rows, a.cableCredit()...)
-		return append(rows, ui.Flex(), ui.Separator(), a.wizardNext(false), ui.Spacer(4))
+	} else {
+		rows = append(rows, a.connectRows()...)
+		rows = append(rows, a.cableOutputHint()...)
 	}
-	rows = append(rows, a.cableNoteRows()...)
-	rows = append(rows, a.flowRows(false)...)
-	rows = append(rows, a.connectRows()...)
-	rows = append(rows, a.cableOutputHint()...)
 	rows = append(rows, a.cableCredit()...)
-	return append(rows, ui.Flex(), ui.Separator(), a.wizardNext(a.setupStepsDone() == 3), ui.Spacer(4))
+	return append(rows, ui.Flex(), ui.Separator(), a.wizardNext(a.voiceReady()), ui.Spacer(4))
 }
 
-// connectCable does steps 2 and 3 in one go: sounds into CABLE Input, then
-// the microphone into the cable (through the elevated helper).
+// connectCable connects voice chat in one go: sounds into CABLE Input (the
+// automatic choice, unless another device was chosen), then the microphone
+// into the cable (through the elevated helper).
 func (a *App) connectCable() {
 	if !a.cableSelected() {
 		a.useCableAsOutput()

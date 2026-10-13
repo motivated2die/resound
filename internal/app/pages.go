@@ -134,7 +134,7 @@ func (a *App) homePage() []ui.Row {
 	}
 
 	rows = append(rows, ui.Spacer(6))
-	rows = append(rows, a.flowRows(false)...)
+	rows = append(rows, a.flowRows()...)
 
 	remoteDetail, remoteTone := a.remoteSummary()
 	rows = append(rows,
@@ -224,7 +224,7 @@ func (a *App) audioPage() []ui.Row {
 		ui.Paragraph("Speak and play the test sound: the bars show what arrives where. "+
 			"Others hear your microphone and sounds through VB-Cable; you hear the sounds yourself.", ui.ToneMuted),
 	}
-	rows = append(rows, a.flowRows(false)...)
+	rows = append(rows, a.flowRows()...)
 	if !a.route.CableInstalled() {
 		rows = append(rows, ui.Section("Install VB-Cable"))
 		rows = append(rows, a.cableInstallRows()...)
@@ -273,25 +273,25 @@ func (a *App) voiceSummary() (string, ui.Tone) {
 	case !a.route.CableInstalled():
 		return "VB-Cable missing", ui.ToneWarning
 	}
-	done := a.setupStepsDone()
-	if done == 3 {
+	switch {
+	case a.voiceReady():
 		return "Ready", ui.ToneGood
+	case !a.cableSelected():
+		return "Sounds go elsewhere", ui.ToneWarning
 	}
-	return fmt.Sprintf("%d of 3 done", done), ui.ToneWarning
+	return "Mic not routed", ui.ToneWarning
 }
 
 func (a *App) cableSelected() bool {
 	return a.route.CableInput != nil && a.cableOutputID() == a.route.CableInput.ID
 }
 
-func (a *App) setupStepsDone() int {
-	n := 0
-	for _, ok := range []bool{a.route.CableInstalled(), a.cableSelected(), a.route.MicRouted} {
-		if ok {
-			n++
-		}
-	}
-	return n
+// voiceReady reports whether voice chat is connected: VB-Cable installed,
+// sounds playing into it, and the microphone routed into it (or there is
+// no microphone to route: the sounds still reach the cable).
+func (a *App) voiceReady() bool {
+	st := a.route
+	return st.CableInstalled() && a.cableSelected() && (st.MicRouted || st.Mic == nil)
 }
 
 // --- push-to-talk -----------------------------------------------------------

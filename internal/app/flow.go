@@ -15,7 +15,7 @@ import (
 // the soundboard at the top; the mic and the soundboard's cable stream plug
 // into VB-Cable, whose far end ("CABLE Output") is what others hear; the
 // soundboard's second stream goes to what the user hears (a preview only
-// there). It is on the home page, the setup's audio steps and
+// there). It is on the home page, the setup's audio step and
 // Settings → Audio & voice chat. Pipes break where the routing isn't set
 // up, with a badge that explains why and leads to the fix; they show what
 // Resound does while sounds play (mic muted, push-to-talk held, paused).
@@ -272,12 +272,10 @@ func (a *App) heldKey() string {
 // --- building the flow -------------------------------------------------------------
 
 // flowRows returns the audio flow's rows and marks the page as showing it,
-// which keeps the meters running while the panel is open. setupLater is
-// true on the setup step before voice chat: what voice chat still needs is
-// shown as coming next instead of as a problem.
-func (a *App) flowRows(setupLater bool) []ui.Row {
+// which keeps the meters running while the panel is open.
+func (a *App) flowRows() []ui.Row {
 	a.flowOnPage = true
-	rows := a.audioFlow(setupLater).Rows()
+	rows := a.audioFlow().Rows()
 	if a.playback.lastError != "" {
 		rows = append(rows, ui.Paragraph(a.playback.lastError, ui.ToneBad))
 	}
@@ -294,11 +292,11 @@ func (a *App) flowRows(setupLater bool) []ui.Row {
 }
 
 // flowFix runs fix where the flow sits next to the controls it needs (the
-// audio page, the setup's voice step); elsewhere a badge click opens the
+// audio page, the setup's audio step); elsewhere a badge click opens the
 // audio page, which explains and fixes it.
 func (a *App) flowFix(fix func()) func() {
 	return func() {
-		if a.page == pageAudio || (a.page == pageWizard && a.wizardStep == wizardVoiceStep) {
+		if a.page == pageAudio || (a.page == pageWizard && a.wizardStep == wizardAudioStep) {
 			fix()
 			return
 		}
@@ -315,7 +313,7 @@ func (a *App) outputStatus(role string) (audio.OutputStatus, bool) {
 	return audio.OutputStatus{}, false
 }
 
-func (a *App) audioFlow(setupLater bool) ui.AudioFlow {
+func (a *App) audioFlow() ui.AudioFlow {
 	l := &a.levels
 	f := ui.AudioFlow{
 		Mic:    a.micDevice(),
@@ -323,9 +321,9 @@ func (a *App) audioFlow(setupLater bool) ui.AudioFlow {
 		Cable:  a.cableEnd(),
 		You:    a.youDevice(),
 	}
-	f.MicPipe = a.micPipe(setupLater)
-	f.CablePipe = a.cablePipe(setupLater)
-	f.CableLine = a.cableLine(setupLater)
+	f.MicPipe = a.micPipe()
+	f.CablePipe = a.cablePipe()
+	f.CableLine = a.cableLine()
 	f.YouPipe = ui.Pipe{State: ui.PipeOn, Level: a.flowLevel(&l.monitor)}
 
 	// Playback paused: by the phone's pause, talk-through or a pause key.
@@ -523,7 +521,7 @@ func (a *App) cableOutputDropdown() ui.Row {
 
 // micPipe is the microphone's way into the cable: Windows' "Listen to this
 // device" on the mic, playing through CABLE Input.
-func (a *App) micPipe(setupLater bool) ui.Pipe {
+func (a *App) micPipe() ui.Pipe {
 	st := a.route
 	switch {
 	case st.Mic == nil && a.cfg.MicDeviceID != "":
@@ -537,9 +535,6 @@ func (a *App) micPipe(setupLater bool) ui.Pipe {
 	case a.busy != "":
 		return ui.Pipe{State: ui.PipeOff, Badge: &ui.Badge{Icon: ui.IconAlert, Label: "Waiting…", Tone: ui.ToneWarning,
 			Tip: "Waiting for administrator approval to route your microphone."}}
-	case !st.MicRouted && setupLater:
-		return ui.Pipe{State: ui.PipeOff, Badge: &ui.Badge{Icon: ui.IconUnplugged, Label: "Next step",
-			Tip: "Your voice is connected to voice chat in the next step."}}
 	case !st.MicRouted:
 		tip := "Others don't hear your voice: it doesn't reach the cable. Click to route it through Windows' “Listen to this device” (Windows asks for administrator approval once)."
 		if st.Mic.Listening {
@@ -560,7 +555,7 @@ func (a *App) micPipe(setupLater bool) ui.Pipe {
 
 // cablePipe is the soundboard's stream into the cable: Resound's "others
 // hear" output, automatically VB-Cable's CABLE Input.
-func (a *App) cablePipe(setupLater bool) ui.Pipe {
+func (a *App) cablePipe() ui.Pipe {
 	cable, _ := a.outputStatus(audio.RoleCable)
 	switch {
 	case a.cableOutputID() == "":
@@ -580,7 +575,7 @@ func (a *App) cablePipe(setupLater bool) ui.Pipe {
 // cableLine is the cable itself: the mic and the sounds together on their
 // way to CABLE Output, and what Resound does for the game meanwhile: hold
 // push-to-talk.
-func (a *App) cableLine(setupLater bool) ui.Pipe {
+func (a *App) cableLine() ui.Pipe {
 	switch {
 	case a.cable.busy():
 		return ui.Pipe{State: ui.PipeBroken, Badge: &ui.Badge{Icon: ui.IconAlert, Label: "Installing…", Tone: ui.ToneWarning,
@@ -588,9 +583,6 @@ func (a *App) cableLine(setupLater bool) ui.Pipe {
 	case a.cable.state == cableRestart:
 		return ui.Pipe{State: ui.PipeBroken, Badge: &ui.Badge{Icon: ui.IconAlert, Label: "Restart needed", Tone: ui.ToneWarning,
 			Tip: "VB-Cable is installed. Restart your PC to finish; Resound reopens afterwards.", OnClick: a.flowFix(func() {})}}
-	case !a.route.CableInstalled() && setupLater:
-		return ui.Pipe{State: ui.PipeOff, Badge: &ui.Badge{Icon: ui.IconUnplugged, Label: "Next step",
-			Tip: "Others hear you and your sounds through VB-Cable, a free virtual audio driver. The next step installs it."}}
 	case !a.route.CableInstalled():
 		return ui.Pipe{State: ui.PipeBroken, Badge: &ui.Badge{Icon: ui.IconAlert, Label: "VB-Cable missing", Tone: ui.ToneWarning,
 			Tip:     "Others hear you and your sounds through VB-Cable, a free virtual audio driver by VB-Audio. Click to install it.",

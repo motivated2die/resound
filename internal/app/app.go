@@ -175,6 +175,7 @@ func Run() int {
 	}
 
 	a := &App{cfg: config.Load(), engine: audio.NewEngine(), portable: portable}
+	a.migrateSetupStep()
 	// Configured before the guided setup existed. A setup in progress has
 	// a step and may have folders already (e.g. after VB-Cable's restart).
 	if !a.cfg.SetupComplete && a.cfg.SetupStep == 0 && (len(a.cfg.Folders) > 0 || a.cfg.CableDeviceID != "") {
