@@ -1,5 +1,7 @@
 package ui
 
+import "math"
+
 // The audio flow: a small diagram of where audio goes, built from four rows
 // stacked like any others. At the top the microphone (full width) and the
 // soundboard (right column). The soundboard plays two streams at once: one
@@ -145,6 +147,34 @@ const (
 // flowPipePx is the width of pipes and the cable in device pixels, the
 // same at every scale, like the jacks drawn onto them.
 const flowPipePx = 3
+
+// flowBendL is the radius (logical) of the curve where the soundboard's
+// pipe turns down into the cable.
+const flowBendL = 9
+
+// paintBend draws a quarter circle of radius rad joining a horizontal pipe
+// at y, coming from the right, to the vertical one at x going down: the
+// pipe's centre line bends around (x+rad, y+rad). GDI's arcs aren't
+// anti-aliased, so each pixel is blended by how much of the pipe covers it;
+// the ends line up with pipeH and pipeV, which put their 3-pixel lines at
+// x-1…x+1 (centre x+0.5).
+func paintBend(c *canvas, x, y, rad int32, col uint32) {
+	cx, cy := float64(x)+0.5+float64(rad), float64(y)+0.5+float64(rad)
+	half := float64(flowPipePx) / 2
+	for py := y - 2; py <= y+rad; py++ {
+		for px := x - 2; px <= x+rad; px++ {
+			dx, dy := float64(px)+0.5-cx, float64(py)+0.5-cy
+			if dx > 0 || dy > 0 {
+				continue // only the upper left quarter
+			}
+			d := math.Abs(math.Hypot(dx, dy) - float64(rad))
+			cover := min(1, max(0, half+0.5-d))
+			if cover > 0 {
+				c.fill(rect{px, py, px + 1, py + 1}, mix(colBackground, col, cover))
+			}
+		}
+	}
+}
 
 // flowCols returns the left and right column of a row.
 func flowCols(c *canvas, r rect) (left, right rect) {
@@ -492,7 +522,7 @@ func (s flowSoundsRow) geometry(c *canvas, r rect) (caption, button rect, joinY 
 		micBadge = badgeOnLane(c, b, lane, (r.Top+jackLen+joinY)/2, rc.Left-c.px(10))
 	}
 	if b := s.cable.Badge; b != nil {
-		x0, x1 := lane+c.px(4), rc.Left-jackLen
+		x0, x1 := lane+c.px(flowBendL), rc.Left-jackLen
 		cableBadge = badgeCentred(c, b, (x0+x1)/2, joinY, x1-x0-c.px(8))
 	}
 	return
@@ -545,10 +575,13 @@ func (s flowSoundsRow) paint(c *canvas, r rect, st rowState) {
 	micCol, _ := pipeColor(s.mic)
 	paintJack(c, lane, r.Top, jackUp, micCol)
 	vGapped(c, lane, r.Top+jack, joinY, micBadge, s.mic)
-	// Its jack in the soundboard, and its pipe across to the join.
+	// Its jack in the soundboard, and its pipe across to the join, where it
+	// curves down into the cable: the sounds flow down like the voice.
 	cableCol, _ := pipeColor(s.cable)
 	paintJack(c, button.Left, joinY, jackRight, cableCol)
-	hGapped(c, lane, button.Left-jack, joinY, cableBadge, s.cable)
+	bend := c.px(flowBendL)
+	hGapped(c, lane+bend, button.Left-jack, joinY, cableBadge, s.cable)
+	paintBend(c, lane, joinY, bend, cableCol)
 	// From the join on, the cable carries both, down into the next row.
 	pipeV(c, lane, joinY-flowPipePx/2, r.Bottom, s.line)
 	if s.mic.Badge != nil {
