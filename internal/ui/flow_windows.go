@@ -123,7 +123,7 @@ type AudioFlow struct {
 func (f AudioFlow) Rows() []Row {
 	return []Row{
 		flowMicRow{f.Mic},
-		flowSoundsRow{f.Sounds, f.MicPipe, f.CablePipe, f.CableLine, f.YouPipe},
+		flowSoundsRow{f.Sounds, f.MicPipe, f.CablePipe, f.CableLine},
 		flowCableRow{f.CableLine, f.YouPipe},
 		flowOutputsRow{f.Cable, f.You},
 	}
@@ -153,12 +153,12 @@ func flowCols(c *canvas, r rect) (left, right rect) {
 	return rect{in.Left, r.Top, in.Left + w, r.Bottom}, rect{in.Right - w, r.Top, in.Right, r.Bottom}
 }
 
-// flowLanes returns the x of the cable (left) and of the soundboard's
-// stream to the headphones (right column, where its arrow lands between
-// the output's caption and its volume).
+// flowLanes returns the x of the cable (left column) and of the
+// soundboard's stream to the headphones (right column), each as far from
+// its column's left edge.
 func flowLanes(c *canvas, r rect) (cable, toYou int32) {
 	lc, rc := flowCols(c, r)
-	return lc.Left + c.px(flowLaneInL), rc.Left + rc.w()*5/8
+	return lc.Left + c.px(flowLaneInL), rc.Left + c.px(flowLaneInL)
 }
 
 // pipeColor is a pipe's colour and whether it is dashed. A connected pipe
@@ -471,11 +471,13 @@ func (m flowMicRow) paint(c *canvas, r rect, st rowState) {
 // --- soundboard and the cable's two jacks -----------------------------------------
 
 type flowSoundsRow struct {
-	s                     FlowSounds
-	mic, cable, line, you Pipe
+	s                FlowSounds
+	mic, cable, line Pipe
 }
 
-func (flowSoundsRow) height() int { return 72 }
+// The row ends with the soundboard's level bar: the headphones' jack
+// starts right below, like the cable's below the microphone.
+func (flowSoundsRow) height() int { return 26 + flowFieldL + flowMeterL }
 
 // geometry: the soundboard's caption and button (its level bar docks
 // below), the y where the cable's two ends join, and the mic and cable
@@ -537,7 +539,7 @@ func (s flowSoundsRow) paint(c *canvas, r rect, st rowState) {
 	paintDocked(c, button, bg, readLevel(s.s.Level))
 	paintButtonFace(c, button, label, icon, fg)
 
-	lane, toYou := flowLanes(c, r)
+	lane, _ := flowLanes(c, r)
 	jack := jackLen
 	// The cable's jack in the microphone, and its pipe down to the join.
 	micCol, _ := pipeColor(s.mic)
@@ -555,34 +557,34 @@ func (s flowSoundsRow) paint(c *canvas, r rect, st rowState) {
 	if s.cable.Badge != nil {
 		paintBadge(c, cableBadge, s.cable.Badge, st.hover == 2, st.press == 2, false)
 	}
-	// The soundboard's stream to the headphones leaves below its level bar.
-	_, bar := dockedUnit(c, button)
-	pipeV(c, toYou, bar.Bottom, r.Bottom, s.you)
 }
 
-// --- the cable down to its far end -------------------------------------------------
+// --- the cable and the headphones' stream down to the outputs -----------------------
 
+// flowCableRow carries the cable down to its far end, and the soundboard's
+// stream to the headphones from a jack in the soundboard's level bar to one
+// at "You hear". Both lanes have their badges to the right.
 type flowCableRow struct {
 	cable, you Pipe
 }
 
-func (flowCableRow) height() int { return 40 }
+func (flowCableRow) height() int { return 52 }
+
+// tipY is where the jacks at the outputs end, just above their captions.
+func (flowCableRow) tipY(c *canvas, r rect) int32 { return r.Bottom - c.px(3) }
 
 // badges returns the boxes of the cable and you badges (empty where a pipe
-// has none), side by side.
+// has none), between the jacks.
 func (j flowCableRow) badges(c *canvas, r rect) [2]rect {
 	var out [2]rect
 	lane, toYou := flowLanes(c, r)
-	cy := r.Top + c.px(11)
+	in := inset(c, r)
+	cy := (r.Top + j.tipY(c, r)) / 2
 	if b := j.cable.Badge; b != nil {
-		out[0] = badgeOnLane(c, b, lane, cy, toYou-c.px(16))
+		out[0] = badgeOnLane(c, b, lane, cy, toYou-c.px(10))
 	}
 	if b := j.you.Badge; b != nil {
-		minLeft := lane + c.px(16)
-		if out[0].w() > 0 {
-			minLeft = out[0].Right + c.px(6)
-		}
-		out[1] = badgeOnLaneLeft(c, b, toYou, cy, minLeft)
+		out[1] = badgeOnLane(c, b, toYou, cy, in.Right)
 	}
 	return out
 }
@@ -615,22 +617,24 @@ func (j flowCableRow) tip(_ *canvas, _ rect, seg int) string {
 func (j flowCableRow) paint(c *canvas, r rect, st rowState) {
 	lane, toYou := flowLanes(c, r)
 	boxes := j.badges(c, r)
-	tip := r.Bottom - c.px(3) // just above the outputs' captions
+	tip := j.tipY(c, r)
 
 	// The cable down to its jack at the far end, CABLE Output.
 	vGapped(c, lane, r.Top, tip-jackLen, boxes[0], j.cable)
 	col, _ := pipeColor(j.cable)
 	paintJack(c, lane, tip, jackDown, col)
-	// The headphones' stream, straight down.
-	vGapped(c, toYou, r.Top, tip-c.px(2), boxes[1], j.you)
+	// The headphones' stream: a jack in the soundboard's level bar, one at
+	// "You hear".
 	col, _ = pipeColor(j.you)
-	c.chevron(toYou, tip-c.px(2), c.px(4), false, col)
+	paintJack(c, toYou, r.Top, jackUp, col)
+	vGapped(c, toYou, r.Top+jackLen, tip-jackLen, boxes[1], j.you)
+	paintJack(c, toYou, tip, jackDown, col)
 
 	if j.cable.Badge != nil {
 		paintBadge(c, boxes[0], j.cable.Badge, st.hover == 0, st.press == 0, false)
 	}
 	if j.you.Badge != nil {
-		paintBadge(c, boxes[1], j.you.Badge, st.hover == 1, st.press == 1, true)
+		paintBadge(c, boxes[1], j.you.Badge, st.hover == 1, st.press == 1, false)
 	}
 }
 

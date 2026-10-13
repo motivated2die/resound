@@ -294,54 +294,96 @@ func (q *ring) mixInto(out []float32, gain float32) int {
 	return n
 }
 
-// chimeNote is one blip of the test chime.
+// chimeNote is one note of the test sound.
 type chimeNote struct {
-	from, to   float64 // Hz; the pitch bends from → to in the first 40 ms
-	start, dur float64 // seconds
-	pan        float64 // -1 left … +1 right
+	freq  float64 // Hz
+	start float64 // seconds
+	decay float64 // seconds for the note to fall to 1/e
+	gain  float64
+	pan   float64 // -1 left … +1 right
+	bass  bool    // a round bass "bubble" instead of a mallet pluck
 }
 
-// chimeNotes rise G5 → D6 → G6, bouncing left, right, centre.
+// midiHz is the frequency of MIDI note n (69 = A4 = 440 Hz).
+func midiHz(n int) float64 { return 440 * math.Pow(2, float64(n-69)/12) }
+
+// chimeNotes are a short, playful phrase in C major: a rising arpeggio, a
+// little bounce, then a soft chord that rings out, over a round bass.
 var chimeNotes = []chimeNote{
-	{from: 740, to: 784, start: 0, dur: 0.11, pan: -0.45},
-	{from: 1109, to: 1175, start: 0.075, dur: 0.11, pan: 0.45},
-	{from: 1480, to: 1568, start: 0.15, dur: 0.30, pan: 0},
+	// Bass: C, a bounce down to G, back to C under the chord.
+	{freq: midiHz(48), start: 0.00, decay: 0.30, gain: 0.55, bass: true},
+	{freq: midiHz(43), start: 0.62, decay: 0.28, gain: 0.50, bass: true},
+	{freq: midiHz(48), start: 1.30, decay: 0.75, gain: 0.55, bass: true},
+	// Arpeggio up, bouncing left and right.
+	{freq: midiHz(72), start: 0.00, decay: 0.30, gain: 0.9, pan: -0.4},
+	{freq: midiHz(76), start: 0.17, decay: 0.30, gain: 0.8, pan: 0.4},
+	{freq: midiHz(79), start: 0.34, decay: 0.34, gain: 0.8, pan: -0.2},
+	// The bounce: a step back and up again.
+	{freq: midiHz(76), start: 0.62, decay: 0.26, gain: 0.7, pan: 0.3},
+	{freq: midiHz(79), start: 0.79, decay: 0.26, gain: 0.7, pan: -0.3},
+	{freq: midiHz(81), start: 0.96, decay: 0.30, gain: 0.75, pan: 0.15},
+	// The chord settles, slightly spread.
+	{freq: midiHz(64), start: 1.30, decay: 0.70, gain: 0.55, pan: -0.25},
+	{freq: midiHz(67), start: 1.32, decay: 0.70, gain: 0.5, pan: 0.25},
+	{freq: midiHz(72), start: 1.34, decay: 0.75, gain: 0.6, pan: 0},
 }
 
-// ChimeSource generates the test sound: three quick rising FM blips that
-// bend up in pitch and bounce across the stereo field, about 0.45 s. The
-// modulation fades within each note, so every blip starts bright and
-// settles into a pure tone.
+// chimeLength is the test sound's length; the last 0.3 s fade out.
+const chimeLength = 3.0
+
+// ChimeSource generates the test sound: a short, playful phrase of soft
+// mallet notes over a round bass, about 3 s, long enough to watch it move
+// through the panel's audio flow. The notes are mostly sine with a little
+// second harmonic and a quiet, quickly fading "tine" for the attack, and
+// the mix runs through a gentle low-pass, so it stays mellow, not shrill.
 func ChimeSource(rate int) *Source {
-	const peak = 0.32
-	end := 0.0
-	for _, n := range chimeNotes {
-		end = max(end, n.start+n.dur)
-	}
-	frames := int(end * float64(rate))
-	pcm := make([]float32, frames*2)
+	const peak = 0.30
 	sr := float64(rate)
+	frames := int(chimeLength * sr)
+	pcm := make([]float32, frames*2)
 	for _, n := range chimeNotes {
 		first := int(n.start * sr)
-		count := min(int(n.dur*sr), frames-first)
-		// Equal-power pan.
-		angle := (n.pan + 1) * math.Pi / 4
-		gl, gr := math.Cos(angle), math.Sin(angle)
-		attack, release := 0.004*sr, 0.006*sr
+		angle := (n.pan + 1) * math.Pi / 4 // equal-power pan
+		gl, gr := math.Cos(angle)*n.gain, math.Sin(angle)*n.gain
+		attack := 0.006 * sr
 		phase := 0.0
-		for i := range count {
+		for i := 0; first+i < frames; i++ {
 			t := float64(i) / sr
-			bend := min(1, t/0.04)
-			freq := n.from + (n.to-n.from)*(1-(1-bend)*(1-bend)) // ease-out
-			phase += 2 * math.Pi * freq / sr
-			index := 2.2 * math.Exp(-t/0.035) // FM depth: bright attack, pure tail
-			s := math.Sin(phase + index*math.Sin(2*phase))
-			env := math.Exp(-t / (n.dur / 3))
-			env *= min(1, float64(i)/attack, float64(count-i)/release)
-			v := s * env
+			env := math.Exp(-t/n.decay) * min(1, float64(i)/attack)
+			if env < 1e-4 && t > 0.05 {
+				break
+			}
+			var v float64
+			if n.bass {
+				// A soft pitch drop at the start makes it bounce.
+				freq := n.freq * (1 + 0.12*math.Exp(-t/0.025))
+				phase += 2 * math.Pi * freq / sr
+				v = math.Sin(phase) + 0.15*math.Sin(2*phase)*math.Exp(-t/0.08)
+			} else {
+				phase += 2 * math.Pi * n.freq / sr
+				v = math.Sin(phase) +
+					0.20*math.Sin(2*phase)*math.Exp(-t/0.10) + // a little body
+					0.07*math.Sin(4.07*phase)*math.Exp(-t/0.025) // the tine: soft attack
+			}
+			v *= env
 			pcm[2*(first+i)] += float32(v * gl)
 			pcm[2*(first+i)+1] += float32(v * gr)
 		}
+	}
+	// Mellow: a one-pole low-pass at about 2.4 kHz per channel, then a fade
+	// to silence over the last 0.3 s.
+	a := math.Exp(-2 * math.Pi * 2400 / sr)
+	var yl, yr float64
+	fade := int(0.3 * sr)
+	for i := 0; i < frames; i++ {
+		yl = (1-a)*float64(pcm[2*i]) + a*yl
+		yr = (1-a)*float64(pcm[2*i+1]) + a*yr
+		g := 1.0
+		if rest := frames - i; rest < fade {
+			g = float64(rest) / float64(fade)
+			g *= g
+		}
+		pcm[2*i], pcm[2*i+1] = float32(yl*g), float32(yr*g)
 	}
 	var m float32
 	for _, v := range pcm {
@@ -352,7 +394,7 @@ func ChimeSource(rate int) *Source {
 			pcm[i] *= peak / m
 		}
 	}
-	return NewStaticSource("test chime", rate, pcm)
+	return NewStaticSource("test sound", rate, pcm)
 }
 
 // ToneSource generates a sine beep with short fades, for testing without files.

@@ -47,6 +47,8 @@ type Popup struct {
 	tracking           bool
 	lastHidden         time.Time
 
+	measureDC uintptr // memory DC for measuring text outside painting
+
 	shadow *shadow   // drop shadow window beneath the popup
 	tab    *closeTab // the "Close" tab above its top right corner
 
@@ -120,6 +122,7 @@ func keyEvent(m uint32, w, l uintptr) (KeyEvent, bool) {
 
 func newPopup() (*Popup, error) {
 	p := &Popup{hoverRow: -1, pressRow: -1, scale: 1}
+	p.measureDC, _, _ = procCreateCompatibleDC.Call(0)
 	if err := registerClass(popupClass, 0, windows.NewCallback(p.wndProc)); err != nil {
 		return nil, err
 	}
@@ -265,7 +268,15 @@ func (p *Popup) maxScroll() int32 {
 	return max(0, p.contentH+2*c.px(popupPadL)-p.height)
 }
 
-func (p *Popup) canvas(dc uintptr) *canvas { return &canvas{dc: dc, scale: p.scale, fonts: p.fonts} }
+// canvas returns a canvas on dc, or, for dc 0, on the popup's measuring DC:
+// hit testing and tooltips need text widths too (a badge's label), or
+// their segments come out narrower than what was painted.
+func (p *Popup) canvas(dc uintptr) *canvas {
+	if dc == 0 {
+		dc = p.measureDC
+	}
+	return &canvas{dc: dc, scale: p.scale, fonts: p.fonts}
+}
 
 // rowRect returns slot i's rectangle in window coordinates.
 func (p *Popup) rowRect(i int) rect {

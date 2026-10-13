@@ -271,3 +271,32 @@ func TestFlowSegments(t *testing.T) {
 		t.Errorf("volume drags = %v, want [0 100]", got)
 	}
 }
+
+// TestBadgeHitArea checks that a badge's clickable segment is the whole
+// pill, label included, when segments are computed with the popup's
+// measuring DC (as hit testing does), not just its icon.
+func TestBadgeHitArea(t *testing.T) {
+	dc, _, _ := procCreateCompatibleDC.Call(0)
+	if dc == 0 {
+		t.Skip("no device context")
+	}
+	defer procDeleteDC.Call(dc)
+	f := newFonts(1)
+	defer f.destroy()
+	c := &canvas{dc: dc, scale: 1, fonts: f}
+	r := rect{0, 0, popupWidthL, 100}
+
+	b := &Badge{Icon: IconMicOff, Label: "Muted for sounds", Tip: "why"}
+	flow := testFlow()
+	flow.MicPipe = Pipe{State: PipeHeld, Badge: b}
+	flow.YouPipe = Pipe{State: PipeHeld, Badge: &Badge{Icon: IconPause, Label: "Pause key held", Tip: "why"}}
+	rows := flow.Rows()
+
+	iconOnly := c.px(6 + flowBadgeIconL + 6)
+	if seg := rows[1].segments(c, r)[1]; seg.w() <= iconOnly+c.textWidth(b.Label, fontCaption)/2 {
+		t.Errorf("mic badge segment is %d px wide, the label isn't in it", seg.w())
+	}
+	if seg := rows[2].segments(c, r)[1]; seg.w() <= iconOnly+c.px(20) {
+		t.Errorf("you badge segment is %d px wide, the label isn't in it", seg.w())
+	}
+}
