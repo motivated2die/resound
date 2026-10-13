@@ -97,7 +97,7 @@ const persistence = (() => {
             body: body !== undefined ? JSON.stringify(body) : undefined,
         });
         if (response.status === 401) {
-            window.location.href = '/connect.html'; // this device was signed out on the PC
+            window.location.href = '/connect'; // this device was signed out on the PC
             throw new Error('Unauthorized');
         }
         if (!response.ok) throw new Error(`${method} ${url} failed: ${response.status}`);

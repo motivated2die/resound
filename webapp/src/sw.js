@@ -26,12 +26,15 @@ self.addEventListener('fetch', (event) => {
     if (req.method !== 'GET') return;
     const url = new URL(req.url);
     if (url.origin !== self.location.origin) return;
-    // Pages: the cached copy of the requested page (the fragment, e.g. a
-    // pairing link, stays with the browser), index.html for anything else.
+    // Pages are cached under their short names ('/', '/app', '/connect'), as
+    // the build lists them and Cloudflare Pages serves them, so /app.html
+    // finds /app. The fragment (e.g. a pairing link) stays with the browser.
+    // Unknown pages get the landing page.
     if (req.mode === 'navigate') {
+        const page = url.pathname.replace(/\.html$/, '').replace(/^\/index$/, '/');
         event.respondWith(
-            caches.match(url.pathname === '/' ? '/index.html' : url.pathname, { cacheName: CACHE })
-                .then((hit) => hit || caches.match('/index.html', { cacheName: CACHE }))
+            caches.match(page, { cacheName: CACHE })
+                .then((hit) => hit || caches.match('/', { cacheName: CACHE }))
                 .then((hit) => hit || fetch(req))
         );
         return;

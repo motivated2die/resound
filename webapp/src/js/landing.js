@@ -15,7 +15,7 @@
 
     if (location.hash.startsWith('#pair')) return; // rtc.js is on its way
     if (installed) {
-        location.replace(pc ? '/app.html' : '/connect.html');
+        location.replace(pc ? '/app' : '/connect');
         return;
     }
 
@@ -33,7 +33,7 @@
     });
 
     document.addEventListener('DOMContentLoaded', () => {
-        const target = pc ? '/app.html' : '/connect.html';
+        const target = pc ? '/app' : '/connect';
         document.querySelectorAll('[data-open-app]').forEach((a) => { a.href = target; });
         document.querySelectorAll('[data-open-app-label]').forEach((s) => {
             s.textContent = pc ? 'Open soundboard' : 'Connect your phone';

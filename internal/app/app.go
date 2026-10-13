@@ -29,7 +29,7 @@ var Version = "0.6.0-dev"
 // AppURL is the app's address (webapp/, built by cmd/webapp).
 // Set at build time with -ldflags "-X .../internal/app.AppURL=..."; the
 // RESOUND_APP_URL environment variable and config.json's appURL replace it.
-var AppURL = "https://getresound.netlify.app"
+var AppURL = "https://getresound.app"
 
 const appURLEnv = "RESOUND_APP_URL"
 

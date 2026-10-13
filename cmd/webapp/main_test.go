@@ -121,7 +121,7 @@ func TestBuild(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, want := range []string{`"/index.html"`, `"/app.html"`, `"/connect.html"`, `"/js/rtc.js"`, `"/manifest.json"`} {
+	for _, want := range []string{`"/"`, `"/app"`, `"/connect"`, `"/js/rtc.js"`, `"/manifest.json"`} {
 		if !strings.Contains(string(sw), want) {
 			t.Errorf("sw.js does not cache %s", want)
 		}

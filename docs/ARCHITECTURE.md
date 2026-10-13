@@ -39,7 +39,7 @@ internal/ui/icons/ embedded SVG icons (scripts/add-icon.ps1)
 assets/            app icon (exe/tray) and the panel logo (embedded)
 winres/            icon/manifest/version resources (go-winres)
 scripts/           build-release.ps1, add-icon.ps1, icons/ (icon generator)
-webapp/            the phone app (remote), hosted on Netlify
+webapp/            the phone app and website (getresound.app, Cloudflare Pages)
 docs/              BUILDING.md, RELEASING.md, ARCHITECTURE.md
 .github/           CI and release workflows, Dependabot
 ```
@@ -178,7 +178,7 @@ Failures (no network, declined UAC, bad signature) leave the manual "Install man
 
 ## The app and its connection
 
-The phone remote is a web app on an HTTPS host (`webapp/`, built by `cmd/webapp`, hosted on Netlify; nothing of it is in the exe). Being a secure context, it can be installed, keep the screen on and start offline. It connects to the PC with a **WebRTC data channel, without a signaling server**, the technique of libp2p's "WebRTC Direct" (`server/rtc.go`, `webapp/src/js/rtc.js`). The PC runs no web server.
+The phone remote is a web app on an HTTPS host (`webapp/`, built by `cmd/webapp`, hosted at `https://getresound.app` on Cloudflare Pages; nothing of it is in the exe). Being a secure context, it can be installed, keep the screen on and start offline. It connects to the PC with a **WebRTC data channel, without a signaling server**, the technique of libp2p's "WebRTC Direct" (`server/rtc.go`, `webapp/src/js/rtc.js`). The PC runs no web server.
 
 - **Pairing QR code:** `<app>/#pair&v=1&a=<IPs>&p=<port>&f=<certificate fingerprint>&c=<pairing code>&n=<PC name>`. Everything after `#` stays in the browser; the host never sees it.
   - **Addresses.** `LocalAddresses` ranks private addresses of physical adapters first and labels each adapter ("Ethernet", "Wi-Fi", "WSL", "Hyper-V", "VPN", …); virtual adapters and public addresses are marked `Other`. The code carries up to three, `Other` ones only when there is nothing else, and the app tries them all.
@@ -209,8 +209,9 @@ The phone remote is a web app on an HTTPS host (`webapp/`, built by `cmd/webapp`
 
 - **Pages.**
   - `/` (`index.html`): the landing page, a one-pager for visitors: download (GitHub's `releases/latest/download/Resound.exe`), getting started, features, how it works, news. On a phone the soundboard button comes first, on a PC the download; with a paired PC it reads "Open soundboard". External links (GitHub) only navigate; the page loads nothing from other hosts.
-  - `/app.html`: the soundboard (the remote). The manifest's `start_url`, so the installed app starts here; without a paired PC it goes on to the connect page.
-  - `/connect.html`: pairing and the list of paired PCs.
+  - `/app` (`app.html`): the soundboard (the remote). The manifest's `start_url`, so the installed app starts here; without a paired PC it goes on to the connect page.
+  - `/connect` (`connect.html`): pairing and the list of paired PCs.
+  - **Short URLs.** Links, the manifest and the service worker use `/app` and `/connect`: Cloudflare Pages redirects `/app.html` to `/app`, and a page lookup by its `.html` name would miss the cache. `rtc.js` and `sw.js` accept both forms (`page`), and `cmd/webapp -serve` serves the short ones locally.
   - **Forwarding.** `rtc.js` sends a pairing link (`/#pair&…`, as the PC's QR code opens it) to the connect page. `landing.js` sends the installed app (display mode standalone or fullscreen) on to the soundboard or the connect page, so installs from before the landing page existed, which start at `/`, never see it.
 - **Phone persistence (v3).** Device preferences (last tab, fullscreen, keep the screen on, vibration, button position) stay in `localStorage`; everything about sounds and tabs lives on the PC, keyed by ID, with an in-memory mirror for synchronous reads. On first connect after the update, a phone sends its old path-keyed settings to the PC once. Paired PCs and their keys are in `localStorage` (`resound.pcs`); the app asks for persistent storage so the browser doesn't clear them.
 - **Platform features:**
@@ -318,7 +319,7 @@ Ordered by impact on reliability. None blocks normal use. Fixed in 0.6: concurre
 5. **Version info.** `winres.json` and `app.Version` hold development defaults. Release builds must override both; `scripts/build-release.ps1` does (and the release workflow uses it).
 6. **A broken `config.json` resets silently** to defaults and is overwritten on the next save. Fix: back up the broken file and log it.
 7. **Output failure releases holds for both outputs.** `EventOutputFailed` clears all held voices, releasing the mic and PTT even if the other output is still playing.
-8. **The app comes from its host.** Installing it, and updates, need the host (Netlify); an installed app starts from its cache. Phones must be on the PC's network: there is no relay for other networks.
+8. **The app comes from its host.** Installing it, and updates, need the host (Cloudflare Pages); an installed app starts from its cache. Phones must be on the PC's network: there is no relay for other networks.
 9. **Elevation with a different admin account.** When a standard user approves UAC with another account, the helper's log goes to that account's `%LOCALAPPDATA%`.
 10. **Front end** (planned): talk-through button bounces, 250 ms polling instead of live updates.
 11. **No live file watching.** Changes on disk are picked up by the 5 s rescan on phone requests, the panel's "Rescan", and the check on every play. Fix if needed: `ReadDirectoryChangesW`.

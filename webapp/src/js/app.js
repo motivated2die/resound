@@ -170,7 +170,7 @@ async function apiFetch(endpoint, options = {}) {
         }
         if (response.status === 401) {
             console.warn(`API request unauthorized (${endpoint}). Redirecting to login.`);
-            window.location.href = '/connect.html'; // this device was signed out on the PC
+            window.location.href = '/connect'; // this device was signed out on the PC
         }
         const error = new Error(errorMsg);
         error.status = response.status; // the server answered: not a connection problem

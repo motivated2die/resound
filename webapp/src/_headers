@@ -1,5 +1,6 @@
-# Netlify response headers. Nothing loads from another host (WebRTC to the
-# PC is not governed by connect-src).
+# Response headers, read by Cloudflare Pages (and Netlify, same format).
+# Nothing loads from another host (WebRTC to the PC is not governed by
+# connect-src). Pages revalidate by default; the service worker must too.
 /*
   Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self'; font-src 'self'; worker-src 'self'; manifest-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'
   X-Content-Type-Options: nosniff
@@ -7,7 +8,4 @@
   Permissions-Policy: camera=(self), screen-wake-lock=(self), fullscreen=(self), microphone=(), geolocation=()
 
 /sw.js
-  Cache-Control: no-cache
-
-/*.html
   Cache-Control: no-cache

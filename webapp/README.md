@@ -22,7 +22,7 @@ Nothing here is embedded into `Resound.exe`.
 | `js/fullscreen.js` | Fullscreen in a browser tab; the installed app opens fullscreen by itself (`manifest.json`) |
 | `js/device.js` | Vibration on play and stop, "Install the app", persistent storage for the pairing keys |
 | `manifest.json`, `sw.js` | Installation and offline start; the build fills in the service worker's file list |
-| `_headers` | Netlify headers (CSP: nothing from other hosts) |
+| `_headers` | Response headers for Cloudflare Pages (CSP: nothing from other hosts) |
 | `vendor/` | Libraries, each with its license and a README naming the source |
 
 - **Look:** the colours in `css/styles.css` (`:root`) and `css/connect.css` match the desktop panel (`internal/ui/canvas_windows.go`): background `#1c1d22`, accent `#50dea8` with dark text `#102a20` on it, berry red `#f2416f`. Change them together.
@@ -41,13 +41,22 @@ go run ./cmd/devremote -folder D:\Sounds    # the PC side; prints a pairing link
 `localhost` is a secure context, so the app works there in a desktop browser.
 Phones need the HTTPS deployment.
 
-## Deploy (Netlify)
+## Deploy (Cloudflare Pages)
 
-Upload `webapp/dist` after `go run ./cmd/webapp`, or connect the repository:
-`netlify.toml` in the repository root builds and publishes `webapp/dist`.
-The site is currently `https://getresound.netlify.app`, which is the default
-of `app.AppURL` (the address in the PC's QR code). For another deployment,
-set it at build time (`-ldflags "-X github.com/motivated2die/resound/internal/app.AppURL=https://…"`),
+The site is `https://getresound.app`, a Cloudflare Pages project with direct
+uploads (no Git integration):
+
+1. `go run ./cmd/webapp`
+2. Cloudflare dashboard → Workers & Pages → the project → **Create deployment**
+   → Production → drop the `webapp/dist` folder → **Save and Deploy**.
+
+`_headers` sets the security headers there. Pages serves `app.html` at
+`/app` (and redirects `/app.html` there); the app only links the short
+URLs.
+
+`https://getresound.app` is the default of `app.AppURL`, the address in the
+PC's QR code. For another deployment, set it at build time
+(`-ldflags "-X github.com/motivated2die/resound/internal/app.AppURL=https://…"`),
 or on one PC with the `RESOUND_APP_URL` environment variable or `appURL` in
 `config.json`.
 

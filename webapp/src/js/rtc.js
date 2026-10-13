@@ -1,7 +1,7 @@
 // The app's connection to the PC: a WebRTC data channel without a signaling
 // server (see internal/server/rtc.go for the PC's side and the protocol).
 //
-// Loaded first on every page of the hosted app. On the remote (app.html) it
+// Loaded first on every page of the hosted app. On the remote (/app) it
 // replaces fetch() for /api/ paths, so the remote's code speaks the REST API
 // it was written for.
 (() => {
@@ -274,9 +274,14 @@
 
     const notify = (state, detail) => statusListeners.forEach(fn => { try { fn(state, detail); } catch (e) { /* ignore */ } });
 
+    // page is the current page without .html: '/', '/app' or '/connect'.
+    // Hosts differ: Cloudflare Pages redirects /app.html to /app, a plain
+    // file server only knows /app.html; links use the short form.
+    const page = location.pathname.replace(/\.html$/, '').replace(/^\/index$/, '/');
+
     const toConnectPage = (reason) => {
-        const url = '/connect.html' + (reason ? '#' + reason : '');
-        if (location.pathname !== '/connect.html') location.replace(url);
+        const url = '/connect' + (reason ? '#' + reason : '');
+        if (page !== '/connect') location.replace(url);
     };
 
     const ensureConnection = () => {
@@ -363,16 +368,15 @@
         }).catch((e) => console.warn('Service worker:', e));
     }
 
-    const path = location.pathname;
-    if (path === '/' || path === '/index.html' || path === '/app.html') {
+    if (page === '/' || page === '/app') {
         // A pairing link (the PC's QR code opens <app>/#pair&…) goes to the
         // connect page, from the landing page or the remote.
-        if (location.hash.startsWith('#pair')) location.replace('/connect.html' + location.hash);
+        if (location.hash.startsWith('#pair')) location.replace('/connect' + location.hash);
     }
 
     // On the remote: an unpaired app goes to the connect page; otherwise
     // /api/ requests go over the data channel.
-    if (path === '/app.html' && !location.hash.startsWith('#pair')) {
+    if (page === '/app' && !location.hash.startsWith('#pair')) {
         if (!currentPC()) {
             toConnectPage();
         } else {
@@ -384,7 +388,7 @@
                 const pc = currentPC();
                 if (name && pc) name.textContent = pc.name;
                 const button = document.getElementById('app-connection-switch');
-                if (button) button.addEventListener('click', () => { location.href = '/connect.html'; });
+                if (button) button.addEventListener('click', () => { location.href = '/connect'; });
             });
         }
     }

@@ -1,6 +1,7 @@
-// Command webapp builds the Resound app: the static web page hosted on HTTPS
-// (Netlify) that phones install and that connects to the PC over WebRTC. It
-// copies webapp/src and fills in the service worker's version and file list.
+// Command webapp builds the Resound app: the static website on HTTPS
+// (getresound.app, on Cloudflare Pages) that phones install and that connects
+// to the PC over WebRTC. It copies webapp/src and fills in the service
+// worker's version and file list.
 //
 //	go run ./cmd/webapp                  build into webapp/dist
 //	go run ./cmd/webapp -serve :8095     build, then serve it on localhost
@@ -42,7 +43,7 @@ func main() {
 		addr = "localhost" + addr
 	}
 	fmt.Printf("serving %s on http://%s\n", *out, addr)
-	files := http.FileServer(http.Dir(*out))
+	files := shortURLs(*out, http.FileServer(http.Dir(*out)))
 	log.Fatal(http.ListenAndServe(addr, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Cache-Control", "no-cache")
 		files.ServeHTTP(w, r)
@@ -92,7 +93,8 @@ func readFiles(fsys fs.FS) (map[string][]byte, error) {
 }
 
 // precache returns the service worker's version, which changes with any
-// file, and the list of URLs it caches: everything the app can load.
+// file, and the list of URLs it caches: everything the app can load. Pages
+// are listed by their short URLs (/, /app), which every host serves.
 func precache(files map[string][]byte) (version, list string) {
 	var names []string
 	for name := range files {
@@ -104,12 +106,40 @@ func precache(files map[string][]byte) (version, list string) {
 	}
 	slices.Sort(names)
 	sum := sha256.New()
-	urls := []string{"/"}
+	var urls []string
 	for _, name := range names {
 		sum.Write([]byte(name))
 		sum.Write(files[name])
-		urls = append(urls, "/"+name)
+		urls = append(urls, pageURL(name))
 	}
 	data, _ := json.Marshal(urls)
 	return hex.EncodeToString(sum.Sum(nil))[:12], string(data)
+}
+
+// pageURL is a file's URL: pages without .html (index.html is /), as
+// Cloudflare Pages serves them, everything else as is.
+func pageURL(name string) string {
+	switch {
+	case name == "index.html":
+		return "/"
+	case strings.HasSuffix(name, ".html") && !strings.Contains(name, "/"):
+		return "/" + strings.TrimSuffix(name, ".html")
+	}
+	return "/" + name
+}
+
+// shortURLs serves /app from app.html, like the hosts do.
+func shortURLs(dir string, next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		p := r.URL.Path
+		if p != "/" && path.Ext(p) == "" {
+			if _, err := os.Stat(filepath.Join(dir, filepath.FromSlash(p)+".html")); err == nil {
+				r2 := r.Clone(r.Context())
+				r2.URL.Path = p + ".html"
+				next.ServeHTTP(w, r2)
+				return
+			}
+		}
+		next.ServeHTTP(w, r)
+	})
 }

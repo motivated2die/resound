@@ -87,7 +87,7 @@ Commit the SVG, use it as `ui.Icon("<file name>")` (or add a constant in `intern
 The phone remote is a separate web app in `webapp/`, hosted as a static site; nothing of it is in the exe, so changing it needs no rebuild of Resound. See `webapp/README.md`.
 
 ```powershell
-go run ./cmd/webapp                          # builds webapp/dist: upload that folder to Netlify
+go run ./cmd/webapp                          # builds webapp/dist: upload that folder to Cloudflare Pages
 go run ./cmd/webapp -serve :8095             # builds and serves it on http://localhost:8095
 go run ./cmd/devremote -folder <sounds>      # the PC side without audio; prints a pairing link for localhost:8095
 ```
