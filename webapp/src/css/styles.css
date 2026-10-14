@@ -751,6 +751,8 @@ nav#tabs-container::-webkit-scrollbar {
 }
 
 .tab {
+  position: relative;
+  z-index: 1; /* above the indicator */
   flex: 0 0 auto;
   display: inline-flex;
   align-items: center;
@@ -775,18 +777,61 @@ nav#tabs-container::-webkit-scrollbar {
   font-size: 20px;
 }
 
-.tab:hover {
+/* Only where a mouse really hovers: on touch screens :hover sticks to the
+   last tapped tab, which then stayed lit after swiping to another one. */
+@media (hover: hover) {
+  .tab:not(.active):hover {
+    background-color: rgba(255, 255, 255, 0.05);
+    color: var(--text-primary);
+  }
+}
+
+.tab:not(.active):active {
   background-color: rgba(255, 255, 255, 0.05);
-  color: var(--text-primary);
 }
 
 .tab.active {
   color: var(--v-primary-base);
-  border-top-color: var(--v-primary-base);
-  background-color: rgba(var(--accent-rgb), 0.1);
+}
+
+/* The active tab's line and tint: one element that slides to the active tab
+   and takes its width (tabs.js). Under the line, a slight glow fades down,
+   inside the tab. */
+.tab-indicator {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  pointer-events: none;
+  border-top: 3px solid var(--v-primary-base);
+  background: linear-gradient(to bottom,
+      rgba(var(--accent-rgb), 0.17),
+      rgba(var(--accent-rgb), 0.07) 55%,
+      rgba(var(--accent-rgb), 0.05));
+  box-shadow: inset 0 7px 8px -7px rgba(var(--accent-rgb), 0.55);
+  transition: transform 0.28s cubic-bezier(0.3, 0.7, 0.2, 1),
+    width 0.28s cubic-bezier(0.3, 0.7, 0.2, 1),
+    opacity var(--transition-speed) ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tab-indicator {
+    transition: opacity var(--transition-speed) ease;
+  }
 }
 
 .tab.active .icon {
+  color: var(--v-primary-base);
+}
+
+/* While a swipe would land on another tab, the colour goes ahead (tabs.js). */
+#tabs-container[data-swipe-commit] .tab.active,
+#tabs-container[data-swipe-commit] .tab.active .icon {
+  color: var(--text-secondary);
+}
+
+#tabs-container .tab[data-swipe-target],
+#tabs-container .tab[data-swipe-target] .icon {
   color: var(--v-primary-base);
 }
 

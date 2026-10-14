@@ -93,6 +93,7 @@ function initTabSwiping() {
         if (!frame) frame = requestAnimationFrame(() => {
             frame = 0;
             track.style.transform = `translate3d(${pendingX}px, 0, 0)`;
+            if (drag) followSwipe(drag);
         });
     };
 
@@ -125,6 +126,7 @@ function initTabSwiping() {
     // synchronously, so the snap back below shows the same picture.
     function switchTo(tab) {
         tab.click(); // loadSounds also rebuilds the previews for the new neighbours
+        markSwipeTarget(null);
         live.scrollTop = 0;
         resetTrack();
     }
@@ -152,7 +154,9 @@ function initTabSwiping() {
                 isTabSwiping = true;
                 wrapper.classList.add('swipe-active');
                 track.style.transition = 'none';
+                indicator.style.transition = 'none'; // it follows the finger
                 drag.x0 = t.clientX; // start moving from here, without a jump
+                drag.scroll0 = tabsContainer.scrollLeft;
             }
         }
         if (drag.dir !== 'h') return;
@@ -179,21 +183,94 @@ function initTabSwiping() {
         const commit = !cancelled && tabs.length > 1 && (Math.abs(d.dx) > width * SWIPE_COMMIT_RATIO || flick);
         if (!commit) {
             animateTrack(0, resetTrack);
+            markSwipeTarget(null);
+            releaseIndicator(tabs[activeIndex(tabs)]);
             return;
         }
         const dir = d.dx < 0 ? 1 : -1; // swipe left: next tab
         const target = neighbour(tabs, dir);
         animateTrack(dir > 0 ? -width : width, () => switchTo(target));
+        markSwipeTarget(target); // a flick may not have marked it yet
+        releaseIndicator(target);
     };
     wrapper.addEventListener('touchend', () => endDrag(false));
     wrapper.addEventListener('touchcancel', () => endDrag(true));
 
     // --- keep the active tab visible in the (scrollable) tab bar ---
     const scrollActiveTabIntoView = () => {
+        if (drag && drag.dir === 'h') return; // the swipe moves the tab bar itself
         tabsContainer.querySelector('.tab.active')?.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
     };
     new MutationObserver(() => setTimeout(scrollActiveTabIntoView, 50))
         .observe(tabsContainer, { subtree: true, attributes: true, attributeFilter: ['class'], childList: true });
+
+    // --- the active tab's indicator (.tab-indicator in styles.css) ---
+    // It lives in the tab bar, so it scrolls with the tabs, and slides from
+    // tab to tab. A rebuilt tab bar (app.js loadTabs) drops it; it comes back
+    // in place, without sliding in from the left.
+    const indicator = document.createElement('div');
+    indicator.className = 'tab-indicator';
+    indicator.setAttribute('aria-hidden', 'true');
+    const setIndicator = (x, w) => {
+        indicator.style.width = w + 'px';
+        indicator.style.transform = `translateX(${x}px)`;
+    };
+    const placeIndicator = (slide) => {
+        if (drag && drag.dir === 'h') return; // followSwipe places it
+        const active = tabsContainer.querySelector('.tab.active');
+        if (!indicator.isConnected) {
+            tabsContainer.append(indicator);
+            slide = false;
+        }
+        indicator.style.opacity = active ? '1' : '0';
+        if (!active) return;
+        if (!slide) indicator.style.transition = 'none';
+        setIndicator(active.offsetLeft, active.offsetWidth);
+        if (!slide) {
+            void indicator.offsetWidth; // apply before the transition returns
+            indicator.style.transition = '';
+        }
+    };
+
+    // --- the tab bar during a swipe ---
+    // The indicator moves from the active tab towards the one the swipe
+    // heads for, as far as the page has moved, and the tab bar scrolls
+    // along. Past the point where letting go switches tabs, the target takes
+    // the accent colour. On release the indicator finishes its slide at
+    // once, alongside the page, instead of after it.
+    const between = (a, b, p) => a + (b - a) * p;
+    const centred = (tab) => Math.max(0, Math.min(tabsContainer.scrollWidth - tabsContainer.clientWidth,
+        tab.offsetLeft + tab.offsetWidth / 2 - tabsContainer.clientWidth / 2));
+
+    function markSwipeTarget(target) {
+        tabsContainer.toggleAttribute('data-swipe-commit', !!target);
+        tabList().forEach(t => t.toggleAttribute('data-swipe-target', t === target));
+    }
+
+    function followSwipe(d) {
+        const tabs = tabList();
+        const from = tabs[activeIndex(tabs)];
+        const to = neighbour(tabs, d.dx < 0 ? 1 : -1);
+        if (!from || !to || !indicator.isConnected) return;
+        const width = wrapper.clientWidth || window.innerWidth;
+        const p = Math.min(1, Math.abs(d.dx) / width);
+        setIndicator(between(from.offsetLeft, to.offsetLeft, p), between(from.offsetWidth, to.offsetWidth, p));
+        tabsContainer.scrollLeft = between(d.scroll0, centred(to), p);
+        markSwipeTarget(Math.abs(d.dx) > width * SWIPE_COMMIT_RATIO ? to : null);
+    }
+
+    function releaseIndicator(tab) {
+        indicator.style.transition = '';
+        if (!tab) return;
+        setIndicator(tab.offsetLeft, tab.offsetWidth);
+        tabsContainer.scrollTo({ left: centred(tab), behavior: 'smooth' });
+    }
+    new MutationObserver(() => placeIndicator(true))
+        .observe(tabsContainer, { subtree: true, attributes: true, attributeFilter: ['class'], childList: true });
+    // Tab widths change with the font and the screen.
+    window.addEventListener('resize', () => placeIndicator(false));
+    document.fonts?.ready.then(() => placeIndicator(false));
+    placeIndicator(false);
 
     console.log('Tab swiping initialized.');
 }

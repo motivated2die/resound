@@ -976,7 +976,8 @@ async function setActiveTab(tabElement, tabId) {
 
     // Only proceed if the tab is actually changing
     if (currentTabStr === newTabIdStr) {
-         // console.log(`Tab ${newTabIdStr} is already active.`);
+         // A rebuilt tab bar (loadTabs) still marks it.
+         tabElement?.classList.add('active');
          return;
     }
 
@@ -988,6 +989,7 @@ async function setActiveTab(tabElement, tabId) {
         tabElement.classList.add('active');
          // Scroll into view after activation
          setTimeout(() => {
+             if (window.tabManager?.isCurrentlySwiping()) return; // the next swipe moves the tab bar
              tabElement.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
          }, 50);
     }
