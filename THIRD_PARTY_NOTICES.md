@@ -37,6 +37,7 @@ The full license texts are in each module's source (`go mod download`, then the 
 | [emoji-picker-element-data](https://github.com/nolanlawson/emoji-picker-element-data) 1.8.0 (English, Emojibase shortcodes) | Apache-2.0; built from [Emojibase](https://emojibase.dev) data (MIT) with names and keywords from [Unicode CLDR](https://cldr.unicode.org) (Unicode License v3) | `webapp/src/vendor/emoji-picker-element-data/` |
 | [jsQR](https://github.com/cozmo/jsQR) 1.4.0 | Apache-2.0 | `webapp/src/vendor/jsqr/` |
 | [Material Symbols](https://github.com/google/material-design-icons) (Outlined) SVG icons by Google | Apache-2.0 | `webapp/src/assets/icons/` |
+| [Tabler Icons](https://tabler.io/icons) (outline) SVG icons by Paweł Kuna, copies of the panel's | MIT | `webapp/src/assets/panel-icons/` |
 
 Each folder contains the component's license file(s) and a README naming the exact source. The app loads nothing from other hosts.
 

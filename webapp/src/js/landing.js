@@ -55,6 +55,8 @@
             });
         }
 
+        animateDesktopPanel(document.querySelector('[data-desk-panel]'));
+
         document.querySelectorAll('[data-install]').forEach((b) => {
             b.hidden = !installPrompt;
             b.addEventListener('click', async () => {
@@ -66,4 +68,120 @@
             });
         });
     });
+
+    // The picture of the desktop panel plays what the panel shows (internal/
+    // app/flow.go): first someone talks, so the mic's pipe and "Others hear"
+    // follow the voice; then a sound plays, so the mic is muted for it,
+    // push-to-talk is held, and the sound flows to both outputs. Meters jump
+    // up at once and fall smoothly, like the panel's.
+    function animateDesktopPanel(panel) {
+        if (!panel) return;
+        const TALK = 4.2, PLAY = 6.4;         // seconds per phase
+        const FALL = 0.05 / 0.033;            // meter fall per second (flowFall per flowTick)
+        const IDLE = [0x4a, 0x4d, 0x57], ACCENT = [0x50, 0xde, 0xa8];
+
+        const el = (name) => panel.parentElement.querySelector(`[data-dp="${name}"]`);
+        const meters = {};
+        panel.querySelectorAll('[data-meter]').forEach((m) => { meters[m.dataset.meter] = { el: m, shown: 0 }; });
+        const pipes = {};
+        panel.querySelectorAll('[data-pipe]').forEach((p) => { pipes[p.dataset.pipe] = p; });
+        const status = el('status'), progress = el('progress'), muted = el('muted');
+        const held = el('held'), ptt = el('ptt'), legend = el('legend').querySelector('span');
+        const boardIcon = el('board-icon'), boardLabel = el('board-label');
+
+        const setPipe = (name, level, isHeld) => {
+            const p = pipes[name];
+            p.classList.toggle('held', isHeld);
+            if (isHeld) { p.style.color = ''; return; }
+            const f = Math.min(1, level * 1.4);
+            p.style.color = `rgb(${IDLE.map((c, i) => Math.round(c + (ACCENT[i] - c) * f)).join(',')})`;
+        };
+        const setMeter = (name, target, dt) => {
+            const m = meters[name];
+            m.shown = target >= m.shown ? target : Math.max(target, m.shown - FALL * dt);
+            m.el.style.setProperty('--level', m.shown.toFixed(3));
+            return m.shown;
+        };
+        let phase = null;
+        const setPhase = (playing) => {
+            if (phase === playing) return;
+            phase = playing;
+            status.textContent = playing ? 'Playing' : 'Ready';
+            muted.classList.toggle('on', playing);
+            held.classList.toggle('on', playing);
+            ptt.classList.toggle('on', playing);
+            boardIcon.dataset.picon = playing ? 'player-stop' : 'player-play';
+            boardLabel.textContent = playing ? 'Stop' : 'Test sound';
+            legend.textContent = playing
+                ? 'Playing a sound: your mic is muted and push-to-talk is held'
+                : 'Talking: your voice goes into voice chat';
+        };
+
+        // Levels on the panel's 0..1 (decibel) scale. A voice: syllables in
+        // phrases with short breaks. A sound: loud, a little uneven, with a
+        // quick attack and a tail.
+        const voice = (t) => {
+            const phrase = Math.sin(t * 1.9) + Math.sin(t * 0.7 + 1) > -0.6 ? 1 : 0;
+            const syllable = Math.max(0, Math.sin(t * 23) * 0.5 + Math.sin(t * 9.3) * 0.5);
+            return phrase * (0.25 + 0.45 * syllable + Math.random() * 0.08);
+        };
+        const sound = (t, left) => {
+            const env = Math.min(1, t / 0.08) * Math.min(1, left / 0.9);
+            return env * (0.7 + 0.08 * Math.sin(t * 17) + 0.06 * Math.sin(t * 5.1) + Math.random() * 0.07);
+        };
+
+        const frame = (cycle, dt) => {
+            const playing = cycle >= TALK;
+            setPhase(playing);
+            if (!playing) {
+                const mic = setMeter('mic', voice(cycle), dt);
+                setMeter('sounds', 0, dt);
+                setMeter('others', mic * 0.93, dt);
+                setMeter('you', 0, dt);
+                setPipe('mic', mic, false);
+                setPipe('shared', mic, false);
+                setPipe('board', meters.sounds.shown, false);
+                setPipe('you', meters.you.shown, false);
+                progress.style.width = '0';
+            } else {
+                const t = cycle - TALK;
+                const s = setMeter('sounds', sound(t, PLAY - t), dt);
+                setMeter('mic', 0, dt);
+                setMeter('others', s * 0.95, dt);
+                setMeter('you', s * 0.88, dt);
+                setPipe('mic', 0, true);
+                setPipe('shared', s, false);
+                setPipe('board', s, false);
+                setPipe('you', s, false);
+                progress.style.width = `${Math.min(100, (t / PLAY) * 100).toFixed(1)}%`;
+            }
+        };
+
+        // Without motion: one still picture of a sound playing.
+        if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+            frame(TALK + 2.5, 1);
+            ['sounds', 'others', 'you'].forEach((m) => setMeter(m, 0.72, 1));
+            ['board', 'shared', 'you'].forEach((p) => setPipe(p, 0.72, false));
+            return;
+        }
+
+        // Runs only while the panel is on screen.
+        let raf = 0, last = 0, cycle = 0;
+        const tick = (now) => {
+            const dt = last ? Math.min(0.1, (now - last) / 1000) : 0;
+            last = now;
+            cycle = (cycle + dt) % (TALK + PLAY);
+            frame(cycle, dt);
+            raf = requestAnimationFrame(tick);
+        };
+        const run = (on) => {
+            if (on && !raf) { last = 0; raf = requestAnimationFrame(tick); }
+            if (!on && raf) { cancelAnimationFrame(raf); raf = 0; }
+        };
+        if ('IntersectionObserver' in window) {
+            new IntersectionObserver((entries) => run(entries[0].isIntersecting)).observe(panel);
+        } else {
+            run(true);
+        }
+    }
 })();
