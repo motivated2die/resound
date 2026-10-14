@@ -65,6 +65,13 @@ func rowsHeight(c *canvas, rows []Row) (heights []int32, total int32) {
 // row's state (nil: no hover, press or open list).
 func paintRows(c *canvas, rows []Row, heights []int32, left, top int32, states map[int]rowState) {
 	w := c.px(popupWidthL)
+	tops := make([]int32, len(rows))
+	for i, y := 0, top; i < len(rows); i++ {
+		tops[i] = y
+		y += heights[i]
+	}
+	paintGroups(c, len(rows), func(i int) Row { return rows[i] },
+		func(i int) rect { return rect{left, tops[i], left + w, tops[i] + heights[i]} })
 	y := top
 	for i, r := range rows {
 		st, ok := states[i]

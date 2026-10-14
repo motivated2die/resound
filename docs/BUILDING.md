@@ -89,7 +89,7 @@ The phone remote is a separate web app in `webapp/`, hosted as a static site; no
 ```powershell
 go run ./cmd/webapp                          # builds webapp/dist: upload that folder to Cloudflare Pages
 go run ./cmd/webapp -serve :8095             # builds and serves it on http://localhost:8095
-go run ./cmd/devremote -folder <sounds>      # the PC side without audio; prints a pairing link for localhost:8095
+go run ./cmd/devremote -folder <sounds>      # the PC side without audio; prints a pairing link for localhost:8095; Enter = Refresh
 ```
 
 To test a local app with the real Resound, start it with `RESOUND_APP_URL=http://localhost:8095` set: its QR code and "Open the app on this PC" then use the local app (phones need the HTTPS deployment).
@@ -150,6 +150,10 @@ Check, within about 10 s: the home page's header shows `v0.7.0` and a dot with "
 `go test ./internal/input` covers the hotkey matching. The real keyboard hook has a live test that injects F24 (a key no keyboard has) into the desktop, so it only runs on request: `$env:RESOUND_HOOK_TEST="1"; go test -run WatcherLive -v ./internal/input`.
 
 `go test ./internal/update` covers the version comparison, the checksum and the allowed hosts against a fake GitHub.
+
+`go test ./internal/importer` covers finding the sound on a page (a trimmed Myinstants page in `testdata/`), names, the address guard and downloads against a local server. A live test downloads real sounds from Myinstants and Sound Buttons World with the real client and decoder (and checks that their list pages are refused): `$env:RESOUND_LIVE="1"; go test -run Live -v ./internal/importer`.
+
+To try the import in the panel: quit the installed Resound, run the dev build (`go run ./cmd/resound`), open the Sound library page (or the home page's "Import buttons"), click "Myinstants" (or "Sound Buttons World"), and drag a sound's name onto a folder. Check: the folder lights up while dragging; its icon turns green, its count reads "Downloading…", and a lighter band joins it with the card that follows: the card with the name field (the page's name), Discard, Preview and Save, where Enter renames and Esc keeps it; afterwards the folder reads "Added “…”" for 3 seconds. Dropping the same sound again warns that it is already in the library and saves it as "Name (2)". A search page's address gives "No sound file found"; a link dropped outside the folders asks to drop it onto one.
 
 ## Debugging
 

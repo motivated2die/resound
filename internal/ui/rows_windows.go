@@ -16,8 +16,9 @@ type Row interface {
 }
 
 type rowState struct {
-	hover, press int // segment index or -1
-	open         int // segment whose dropdown list is open, or -1
+	hover, press int  // segment index or -1
+	open         int  // segment whose dropdown list is open, or -1
+	drop         bool // something dragged is over this row (a drop field)
 }
 
 // Tone colors informational text.
@@ -391,6 +392,73 @@ func (h headerRow) paint(c *canvas, r rect, st rowState) {
 	paintBack(c, back, st)
 	in := inset(c, r)
 	c.text(h.title, headerTitle(c, r, back.Right+c.px(8), in.Right), fontTitle, colText, dtLeft)
+}
+
+// --- Page header with back button and a tool button -------------------------------
+
+type headerToolRow struct {
+	title   string
+	onBack  func()
+	icon    Icon
+	tipText string
+	onTool  func()
+}
+
+// HeaderTool is a Header with a square icon button at its right end, such
+// as a refresh button. tip is its tooltip; a nil onTool shows it disabled.
+func HeaderTool(title string, onBack func(), icon Icon, tip string, onTool func()) Row {
+	return headerToolRow{title, onBack, icon, tip, onTool}
+}
+
+func (headerToolRow) height() int { return 46 }
+
+func (h headerToolRow) tool(c *canvas, r rect) rect {
+	back := backButton(c, r)
+	in := inset(c, r)
+	return rect{in.Right - back.w(), back.Top, in.Right, back.Bottom}
+}
+
+func (h headerToolRow) segments(c *canvas, r rect) []rect {
+	tool := h.tool(c, r)
+	if h.onTool == nil {
+		tool = rect{}
+	}
+	return []rect{backButton(c, r), tool}
+}
+
+func (h headerToolRow) click(seg int) {
+	switch {
+	case seg == 0 && h.onBack != nil:
+		h.onBack()
+	case seg == 1 && h.onTool != nil:
+		h.onTool()
+	}
+}
+func (headerToolRow) keepsOpen() bool { return true }
+
+func (h headerToolRow) tip(_ *canvas, _ rect, seg int) string {
+	if seg == 1 {
+		return h.tipText
+	}
+	return ""
+}
+
+func (h headerToolRow) paint(c *canvas, r rect, st rowState) {
+	back, tool := backButton(c, r), h.tool(c, r)
+	paintBack(c, back, st)
+	switch {
+	case h.onTool == nil:
+	case st.press == 1:
+		c.roundRect(tool, c.px(8), colRowPress)
+	case st.hover == 1:
+		c.roundRect(tool, c.px(8), colRowHover)
+	}
+	col := colText
+	if h.onTool == nil {
+		col = colMuted
+	}
+	c.icon(h.icon, tool, 18, col)
+	c.text(h.title, headerTitle(c, r, back.Right+c.px(8), tool.Left-c.px(8)), fontTitle, colText, dtLeft)
 }
 
 // backButton is the square back button at the left of a header row; its

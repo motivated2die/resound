@@ -3,6 +3,7 @@ package app
 import (
 	"fmt"
 	"path/filepath"
+	"strings"
 
 	"github.com/skip2/go-qrcode"
 
@@ -125,7 +126,9 @@ func (a *App) homePage() []ui.Row {
 		refresh = a.refreshLibrary
 	}
 	rows = append(rows,
-		ui.Section("Sound library"),
+		ui.SectionLink("Sound library", "Import buttons",
+			"Import sound buttons from websites into your folders, on the Sound library page",
+			func() { a.openPage(pageLibrary) }),
 		ui.NavTool(ui.IconRefresh, "Refresh the library: picks up new, renamed and edited files", refresh,
 			"Folders", libDetail, libTone, func() { a.openPage(pageLibrary) }),
 	)
@@ -418,9 +421,27 @@ func (a *App) indexStatus() library.IndexerStatus {
 }
 
 func (a *App) libraryPage() []ui.Row {
+	var refresh func()
+	if len(a.cfg.Folders) > 0 {
+		refresh = a.refreshLibrary
+	}
 	rows := []ui.Row{
-		ui.Header("Sound library", a.back),
-		ui.Paragraph("Each folder and each of its subfolders becomes a tab on the phone. Refresh after adding or renaming files.", ui.ToneMuted),
+		ui.HeaderTool("Sound library", a.back, ui.IconRefresh,
+			"Refresh the library: picks up new folders, new, renamed and edited files", refresh),
+		ui.Paragraph("Each folder and each subfolder with sounds becomes a tab on the phone. Refresh after changing files or folders in Explorer.", ui.ToneMuted),
+	}
+	if len(a.cfg.Folders) > 0 {
+		rows = append(rows,
+			ui.Section("Import sounds"),
+			ui.ImportGuide("Find a sound on a button site and drag its name onto a folder below. Resound downloads it there. Sound files from Explorer work too.", "drag its name"),
+			ui.Buttons(
+				ui.Action{Label: "Myinstants", OnClick: a.openSite(myinstantsURL)},
+				ui.Action{Label: "Sound Buttons World", OnClick: a.openSite(soundButtonsWorldURL)},
+			),
+		)
+	}
+	if a.imports.warn != "" {
+		rows = append(rows, ui.Paragraph(a.imports.warn, ui.ToneWarning))
 	}
 	if len(a.cfg.Folders) > 0 {
 		rows = append(rows, ui.Section("Folders"))
@@ -437,41 +458,71 @@ func (a *App) libraryPage() []ui.Row {
 	return append(rows, ui.Spacer(4))
 }
 
-// folderRows lists the sound folders, each with a Remove action that asks
-// for confirmation in place.
+// folderRows lists the sound folders and all their subfolders (empty ones
+// too, as the last scan found them) as drop fields: sounds dragged onto one
+// are downloaded or copied into it (see import.go), and the field shows how
+// that goes. Each library folder has a trash button that asks for
+// confirmation in place; clicking a field opens the folder in Explorer.
 func (a *App) folderRows() []ui.Row {
 	tabsByRoot := map[string][2]int{} // folder -> {tabs, sounds}
+	soundsIn := map[string]int{}      // tab folder (lower case) -> sounds
 	for _, t := range a.lib.Tabs() {
 		c := tabsByRoot[t.Root]
 		tabsByRoot[t.Root] = [2]int{c[0] + 1, c[1] + len(t.Sounds)}
+		soundsIn[strings.ToLower(filepath.Clean(t.Path))] = len(t.Sounds)
+	}
+	open := func(dir string) func() {
+		return func() {
+			if err := ui.ShellOpen(dir); err != nil {
+				logx.Printf("opening %s: %v", dir, err)
+			}
+		}
 	}
 	var rows []ui.Row
 	for _, f := range a.cfg.Folders {
 		folder := f
 		c := tabsByRoot[filepath.Clean(f)]
-		detail := fmt.Sprintf("%s · %s · %s", plural(c[1], "sound"), plural(c[0], "tab"), filepath.Dir(f))
+		detail := fmt.Sprintf("%s · %s", plural(c[1], "sound"), plural(c[0], "tab"))
 		if c[0] == 0 {
-			detail = "No sounds found · " + f
+			detail = "No sounds yet"
 		}
-		rows = append(rows, ui.Item(filepath.Base(f), detail, "Remove", func() { a.removing = folder; a.render() }))
+		note, active := a.folderImport(f)
+		rows = append(rows, a.importGroup(active, ui.FolderDrop(ui.FolderSpec{
+			Name: filepath.Base(f), Detail: detail, Tip: f, Note: note, Active: active,
+			ActionIcon: ui.IconTrash, ActionTip: "Remove from the library (the folder and its files stay on disk)",
+			OnAction: func() { a.removing = folder; a.render() },
+			OnClick:  open(f), OnDrop: a.dropOnFolder(f),
+		}), a.importRows(f))...)
 		if a.removing == folder {
 			rows = append(rows,
-				ui.Paragraph("Remove this folder? Favorites, volumes and phone colors are kept for 30 days in case you add it back.", ui.ToneWarning),
+				ui.Paragraph("Remove this folder from the library? Its files stay on disk. Favorites, volumes and phone colors are kept for 30 days in case you add it back.", ui.ToneWarning),
 				ui.Buttons(
 					ui.Action{Label: "Cancel", OnClick: func() { a.removing = ""; a.render() }},
 					ui.Action{Label: "Remove", Style: ui.ButtonDanger, OnClick: func() { a.removeFolder(folder) }},
 				),
 				ui.Separator())
 		}
+		for _, sub := range a.lib.Folders(f) {
+			detail := "Empty"
+			if n := soundsIn[strings.ToLower(sub.Path)]; n > 0 {
+				detail = plural(n, "sound")
+			}
+			note, active := a.folderImport(sub.Path)
+			rows = append(rows, a.importGroup(active, ui.FolderDrop(ui.FolderSpec{
+				Name: filepath.Base(sub.Path), Detail: detail, Tip: sub.Path, Depth: sub.Depth,
+				Note: note, Active: active, OnClick: open(sub.Path), OnDrop: a.dropOnFolder(sub.Path),
+			}), a.importRows(sub.Path))...)
+		}
 	}
 	return rows
 }
 
 // dropRows is the drop field for sound folders, dragged in from Explorer
-// (the panel stays open while another window has the focus).
+// (the panel stays open while another window has the focus), under its own
+// heading so it stands apart from the folders above.
 func (a *App) dropRows() []ui.Row {
 	return []ui.Row{
-		ui.Spacer(4),
+		ui.Section("Add folders"),
 		ui.DropZone("Drop sound folders here", "or click to choose one", a.addFolder),
 	}
 }

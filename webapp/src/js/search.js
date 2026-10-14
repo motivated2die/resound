@@ -207,6 +207,11 @@
         panel.hidden = !on;
     };
 
+    // The PC's library changed (app.js): an open search shows the new list.
+    document.addEventListener('libraryChanged', () => {
+        if (open) loadLibrary().then(() => render({ keepScroll: true }));
+    });
+
     // openSearch shows the search. focus: open the keyboard now (only works
     // in answer to a tap, which the two-finger pull calls later).
     const openSearch = ({ focus = true } = {}) => {

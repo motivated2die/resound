@@ -318,6 +318,13 @@ func (e *Engine) Levels() Levels {
 	return l
 }
 
+// Stop stops one voice on every output; its EventFinished follows.
+func (e *Engine) Stop(id uint64) {
+	for _, o := range e.liveOutputs() {
+		o.Mixer.Stop(id)
+	}
+}
+
 // StopAll stops every voice on every output.
 func (e *Engine) StopAll() {
 	for _, o := range e.liveOutputs() {

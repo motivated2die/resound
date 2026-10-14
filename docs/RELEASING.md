@@ -32,7 +32,7 @@ Resound uses [semantic versioning](https://semver.org): `MAJOR.MINOR.PATCH`, and
 
 - **Pre-releases** add a suffix: `v0.8.0-rc.1`, `v0.8.0-rc.2`, then `v0.8.0`. `rc` means release candidate; `-beta.1` works too. They become GitHub pre-releases, which the "latest release" link and the in-app update skip, so you can hand them to testers safely.
 - **A version is used once.** Once a release with a version is published, never publish different files under that number again; release the next PATCH instead.
-- The version in the source (`app.Version = "0.6.0-dev"` in `internal/app/app.go`, and `winres/winres.json`) is only the default for development builds. Release builds take the version from the tag. You don't edit any file to make a release.
+- The version in the source (`app.Version = "0.13.0-dev"` in `internal/app/app.go`, and `winres/winres.json`) is only the default for development builds. Release builds take the version from the tag. You don't edit any file to make a release.
 
 ## One-time setup on GitHub
 

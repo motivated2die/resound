@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"sync"
 	"testing"
 	"time"
@@ -62,16 +63,27 @@ func TestScanTabsAndInitialIDs(t *testing.T) {
 	touch(t, filepath.Join(root, "new.wav"), now)
 	touch(t, filepath.Join(root, "notes.txt"), now)
 	touch(t, filepath.Join(root, "memes", "bruh.ogg"), now)
-	touch(t, filepath.Join(root, "memes", "deeper", "ignored.mp3"), now)
+	touch(t, filepath.Join(root, "memes", "deeper", "deep.mp3"), now)
 	_ = os.MkdirAll(filepath.Join(root, "empty"), 0o755)
+	touch(t, filepath.Join(root, ".git", "hidden.mp3"), now)
+	touch(t, filepath.Join(root, "memes", "~resound-123.mp3"), now) // a download in progress
 
 	lib := open(t, t.TempDir())
-	if n := lib.Scan([]string{root}); n != 3 {
-		t.Fatalf("scanned %d sounds, want 3", n)
+	if n := lib.Scan([]string{root}); n != 4 {
+		t.Fatalf("scanned %d sounds, want 4", n)
 	}
 	tabs := lib.Tabs()
-	if len(tabs) != 2 || tabs[1].Name != "memes" || tabs[0].ID != ID(root) {
-		t.Fatalf("tabs = %+v, want root + memes", tabs)
+	if len(tabs) != 3 || tabs[0].ID != ID(root) || tabs[1].Name != "memes" || tabs[2].Name != "memes › deeper" {
+		t.Fatalf("tabs = %+v, want root, memes, memes › deeper", tabs)
+	}
+	// Folders lists every subfolder, empty ones too, each before its own.
+	var got []string
+	for _, f := range lib.Folders(root) {
+		rel, _ := filepath.Rel(root, f.Path)
+		got = append(got, fmt.Sprintf("%s:%d", rel, f.Depth))
+	}
+	if want := []string{"empty:1", "memes:1", filepath.Join("memes", "deeper") + ":2"}; !slices.Equal(got, want) {
+		t.Fatalf("folders = %v, want %v", got, want)
 	}
 	if tabs[0].Sounds[0].Name != "new" {
 		t.Fatalf("first sound = %q, want newest first", tabs[0].Sounds[0].Name)
@@ -437,5 +449,71 @@ func TestMapVolumes(t *testing.T) {
 	}
 	if s, _, _ := again.Sound(b); s.LocalVolume != nil || s.RemoteVolume != nil {
 		t.Fatalf("a sound without custom volumes got some: %+v", s)
+	}
+}
+
+func TestScanDepthLimit(t *testing.T) {
+	root := t.TempDir()
+	deep := root
+	for i := 0; i <= MaxDepth; i++ {
+		deep = filepath.Join(deep, fmt.Sprintf("d%d", i))
+	}
+	touch(t, filepath.Join(deep, "too-deep.mp3"), time.Now())
+	touch(t, filepath.Join(filepath.Dir(deep), "deepest.mp3"), time.Now())
+	lib := open(t, t.TempDir())
+	if n := lib.Scan([]string{root}); n != 1 {
+		t.Fatalf("scanned %d sounds, want 1 (the one at MaxDepth)", n)
+	}
+	if fs := lib.Folders(root); len(fs) != MaxDepth || fs[len(fs)-1].Depth != MaxDepth {
+		t.Fatalf("folders = %d, deepest %+v; want %d", len(fs), fs[len(fs)-1], MaxDepth)
+	}
+}
+
+// A file moved into a new nested folder keeps its ID (matched by file ID or
+// content, as for any move).
+func TestScanMoveIntoNewNestedFolder(t *testing.T) {
+	root := t.TempDir()
+	src := filepath.Join(root, "memes", "bruh.mp3")
+	write(t, src, "bruh content", time.Now())
+	lib := open(t, t.TempDir())
+	lib.Scan([]string{root})
+	id := ID(src)
+	lib.Update(id, func(s *SoundSettings) { s.Favorite = true })
+
+	dst := filepath.Join(root, "memes", "classics", "bruh.mp3")
+	if err := os.MkdirAll(filepath.Dir(dst), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Rename(src, dst); err != nil {
+		t.Fatal(err)
+	}
+	lib.Scan([]string{root})
+	s, tab, ok := lib.Sound(id)
+	if !ok || s.Path != dst || !s.Favorite || tab != "memes › classics" {
+		t.Fatalf("after the move: %+v in %q (ok=%v)", s, tab, ok)
+	}
+}
+
+func TestDuplicates(t *testing.T) {
+	root := t.TempDir()
+	write(t, filepath.Join(root, "a", "horn.mp3"), "the same horn", time.Now())
+	write(t, filepath.Join(root, "b", "other.mp3"), "another sound", time.Now())
+	write(t, filepath.Join(root, "b", "same-size.mp3"), "the same hor!", time.Now()) // same size, other content
+	lib := open(t, t.TempDir())
+	lib.Scan([]string{root})
+
+	dropped := filepath.Join(root, "b", "Horn (copy).mp3")
+	write(t, dropped, "the same horn", time.Now())
+	dups, err := lib.Duplicates(dropped)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(dups) != 1 || dups[0].Path != filepath.Join(root, "a", "horn.mp3") {
+		t.Fatalf("duplicates = %+v", dups)
+	}
+	// The file itself is never its own duplicate, also once it is indexed.
+	lib.Scan([]string{root})
+	if dups, _ := lib.Duplicates(filepath.Join(root, "b", "other.mp3")); len(dups) != 0 {
+		t.Fatalf("other.mp3 duplicates = %+v", dups)
 	}
 }

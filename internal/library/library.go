@@ -1,9 +1,11 @@
 // Package library keeps the index of the user's sounds: which files exist,
 // their stable IDs, their content hashes and the user's per-sound settings.
 //
-// Like Soundux, every added folder becomes a tab for its own files plus one
-// tab per direct subfolder that contains sounds; folders are not scanned
-// deeper than that.
+// Every added folder becomes a tab for its own files, plus one tab per
+// subfolder that contains sounds, at any depth (up to MaxDepth levels).
+// Nested tabs are named by their path below the added folder ("Anime ›
+// Naruto"). Empty folders are no tabs, but Folders lists them, so the panel
+// can offer them as places to put sounds.
 //
 // IDs are assigned once, when a file is first seen, and then never change.
 // A file that is renamed, moved to another folder or edited keeps its ID and
@@ -118,6 +120,7 @@ type Library struct {
 	byPath   map[string]uint64 // normalized path -> sound ID (all records)
 	order    []uint64          // present tabs in display order
 	tabSnd   map[uint64][]uint64
+	tree     map[string][]Folder // normalized library folder -> its subfolders
 	scanned  time.Time
 	revision uint64
 	legacy   map[string]legacyEntry // sounds.json, consumed by the first scan
@@ -224,7 +227,32 @@ func (l *Library) tabLocked(id uint64) Tab {
 	return tab
 }
 
-func tabName(t *tabRec) string { return filepath.Base(t.Path) }
+// tabName is a folder's name, or for nested folders their path below the
+// subfolder of the library folder: "Anime › Naruto". Direct subfolders keep
+// their plain name, as before nesting was scanned.
+func tabName(t *tabRec) string {
+	if t.Root != "" {
+		if rel, err := filepath.Rel(t.Root, t.Path); err == nil && rel != "." && !strings.HasPrefix(rel, "..") {
+			return strings.Join(strings.Split(rel, string(filepath.Separator)), " › ")
+		}
+	}
+	return filepath.Base(t.Path)
+}
+
+// Folder is a folder inside a library folder, found by the last scan, with
+// or without sounds. Depth is 1 for a direct subfolder.
+type Folder struct {
+	Path  string
+	Depth int
+}
+
+// Folders returns the subfolders of library folder root found by the last
+// scan, in display order (each followed by its own subfolders).
+func (l *Library) Folders(root string) []Folder {
+	l.mu.RLock()
+	defer l.mu.RUnlock()
+	return slices.Clone(l.tree[normalize(root)])
+}
 
 // Sound returns one present sound and the name of its tab.
 func (l *Library) Sound(id uint64) (Sound, string, bool) {

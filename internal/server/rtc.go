@@ -19,7 +19,9 @@ package server
 // Messages are JSON text. A message longer than rtcChunk is split into frames
 // that start with '+'; the last frame of a message starts with '.'. Requests
 // ({"t":"req"}) are HTTP requests in a message, served by Handler, so the API
-// is the REST API the remote was written for.
+// is the REST API the remote was written for. Events ({"t":"event","e":…})
+// go the other way, unasked, to every signed-in app (broadcast), e.g. when
+// the library changed; apps that don't know an event ignore it.
 
 import (
 	"bytes"
@@ -391,6 +393,28 @@ func (s *rtcSession) receive(frame []byte) {
 	msg := bytes.Clone(s.inbuf.Bytes())
 	s.inbuf.Reset()
 	s.handle(msg)
+}
+
+// broadcast sends a message to every signed-in app connection and returns
+// how many got it. Connections still pairing or saying hello get nothing.
+func (r *RTC) broadcast(v any) int {
+	r.mu.Lock()
+	sessions := make([]*rtcSession, 0, len(r.sessions))
+	for _, s := range r.sessions {
+		sessions = append(sessions, s)
+	}
+	r.mu.Unlock()
+	n := 0
+	for _, s := range sessions {
+		s.mu.Lock()
+		signedIn := s.device != ""
+		s.mu.Unlock()
+		if signedIn {
+			s.send(v)
+			n++
+		}
+	}
+	return n
 }
 
 // send writes one message, split into frames.

@@ -93,6 +93,33 @@ func openDecoder(path string, rate int) (fill fillFunc, expected int64, closer f
 	return fill, expected, closer, nil
 }
 
+// CheckFile reports whether a sound file can be played: it decodes its
+// first half second. Imports use it before keeping a downloaded file.
+func CheckFile(path string) error {
+	const rate = 48000
+	fill, _, closer, err := openDecoder(path, rate)
+	if err != nil {
+		return err
+	}
+	defer closer()
+	buf := make([]float32, 2*chunkFrames)
+	got := 0
+	for got < rate/2 {
+		n, err := fill(buf)
+		got += n / 2
+		if errors.Is(err, io.EOF) {
+			break
+		}
+		if err != nil {
+			return fmt.Errorf("decoding %s: %w: %w", filepath.Base(path), err, ErrUnreadable)
+		}
+	}
+	if got == 0 {
+		return fmt.Errorf("%s has no audio: %w", filepath.Base(path), ErrUnreadable)
+	}
+	return nil
+}
+
 // openFileStreams decodes a sound file once, while it plays, into n sources
 // at rate (one per output running at that rate). length is the known
 // duration in frames (0 = use the decoder's estimate); onEnd receives the

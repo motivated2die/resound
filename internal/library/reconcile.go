@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"encoding/hex"
 	"io"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"slices"
@@ -25,25 +26,50 @@ type foundDir struct {
 	path, norm, root string
 }
 
-// walk lists the tabs and files under folders: each folder plus its direct
-// subfolders. It does I/O only and touches no library state.
-func (l *Library) walk(folders []string) ([]foundDir, []foundFile) {
-	var dirs []foundDir
-	var files []foundFile
+// Scan limits: how deep below a library folder subfolders are scanned, and
+// how many folders one scan visits at most (a library folder like C:\
+// would otherwise walk the whole drive).
+const (
+	MaxDepth   = 8
+	maxFolders = 5000
+)
+
+// walk lists the tabs and files under folders: each folder and all its
+// subfolders, depth first in name order, down to MaxDepth. Hidden-looking
+// folders (".git", "$RECYCLE.BIN") and links (symlinks, junctions) are
+// skipped, so a loop can't make it walk forever. tree gets every subfolder
+// of each library folder, with or without sounds. It does I/O only and
+// touches no library state.
+func (l *Library) walk(folders []string) (dirs []foundDir, files []foundFile, tree map[string][]Folder) {
+	tree = map[string][]Folder{}
 	seen := map[string]bool{}
-	add := func(dir, root string) {
+	visited := 0
+	var visit func(dir, root string, depth int)
+	visit = func(dir, root string, depth int) {
 		norm := normalize(dir)
-		if seen[norm] {
+		if seen[norm] || visited >= maxFolders {
 			return
 		}
 		seen[norm] = true
-		entries, err := os.ReadDir(dir)
+		visited++
+		entries, err := os.ReadDir(dir) // sorted by name
 		if err != nil {
 			return
 		}
+		if depth > 0 {
+			rootNorm := normalize(root)
+			tree[rootNorm] = append(tree[rootNorm], Folder{Path: dir, Depth: depth})
+		}
 		n := 0
+		var subdirs []string
 		for _, e := range entries {
-			if e.IsDir() || !slices.Contains(l.extensions, strings.ToLower(filepath.Ext(e.Name()))) {
+			if e.IsDir() {
+				if plainDir(e) && depth < MaxDepth {
+					subdirs = append(subdirs, filepath.Join(dir, e.Name()))
+				}
+				continue
+			}
+			if !slices.Contains(l.extensions, strings.ToLower(filepath.Ext(e.Name()))) || strings.HasPrefix(e.Name(), "~resound-") {
 				continue
 			}
 			info, err := e.Info()
@@ -57,21 +83,25 @@ func (l *Library) walk(folders []string) ([]foundDir, []foundFile) {
 		if n > 0 {
 			dirs = append(dirs, foundDir{path: dir, norm: norm, root: root})
 		}
+		for _, sub := range subdirs {
+			visit(sub, root, depth+1)
+		}
 	}
 	for _, root := range folders {
 		root = filepath.Clean(root)
-		add(root, root)
-		entries, err := os.ReadDir(root)
-		if err != nil {
-			continue
-		}
-		for _, e := range entries {
-			if e.IsDir() {
-				add(filepath.Join(root, e.Name()), root)
-			}
-		}
+		visit(root, root, 0)
 	}
-	return dirs, files
+	return dirs, files, tree
+}
+
+// plainDir reports a real folder worth scanning: not a link or junction,
+// and not hidden by name.
+func plainDir(e fs.DirEntry) bool {
+	if e.Type()&(fs.ModeSymlink|fs.ModeIrregular) != 0 {
+		return false
+	}
+	name := e.Name()
+	return !strings.HasPrefix(name, ".") && !strings.HasPrefix(name, "$")
 }
 
 // known is what a scan needs to know about an existing record.
@@ -102,7 +132,7 @@ func (l *Library) Scan(folders []string) int {
 	l.scanMu.Lock()
 	defer l.scanMu.Unlock()
 
-	dirs, files := l.walk(folders)
+	dirs, files, tree := l.walk(folders)
 
 	// Snapshot the records; matching does I/O and must not hold the lock.
 	l.mu.RLock()
@@ -182,6 +212,9 @@ func (l *Library) Scan(folders []string) int {
 	}
 
 	changed := l.apply(folders, dirs, matches)
+	l.mu.Lock()
+	l.tree = tree
+	l.mu.Unlock()
 	if changed && l.OnChange != nil {
 		l.OnChange()
 	}
@@ -393,6 +426,54 @@ func (l *Library) inheritTab(sounds []uint64, oldTab map[uint64]uint64, foundDir
 }
 
 func tabKey(id uint64) string { return formatID(id) }
+
+// Duplicates returns the present sounds with the same content as the file
+// at path (by fingerprint, among files of the same size), other than that
+// file itself. Sounds not fingerprinted yet are hashed now, so the answer
+// doesn't wait for the indexer; a few same-size files at most.
+func (l *Library) Duplicates(path string) ([]Sound, error) {
+	info, err := os.Stat(path)
+	if err != nil {
+		return nil, err
+	}
+	self := normalize(path)
+	type cand struct {
+		id       uint64
+		path, fp string
+	}
+	var cands []cand
+	l.mu.RLock()
+	for id, r := range l.sounds {
+		if r.missing() || r.Size != info.Size() || normalize(r.Path) == self {
+			continue
+		}
+		cands = append(cands, cand{id, r.Path, r.Fingerprint})
+	}
+	l.mu.RUnlock()
+	if len(cands) == 0 {
+		return nil, nil
+	}
+	fp, err := Fingerprint(path)
+	if err != nil {
+		return nil, err
+	}
+	var out []Sound
+	for _, c := range cands {
+		if c.fp == "" {
+			if c.fp, err = Fingerprint(c.path); err != nil {
+				continue
+			}
+		}
+		if c.fp != fp {
+			continue
+		}
+		if s, _, ok := l.Sound(c.id); ok {
+			out = append(out, s)
+		}
+	}
+	slices.SortFunc(out, func(a, b Sound) int { return strings.Compare(a.Path, b.Path) })
+	return out, nil
+}
 
 // fingerprintSpan is how much of the start and of the end of a file the
 // fingerprint covers.

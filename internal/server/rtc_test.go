@@ -307,3 +307,42 @@ func TestRTCCertificateKept(t *testing.T) {
 		t.Fatal("device secret unchanged by ResetAll")
 	}
 }
+
+// Signed-in apps hear about library changes; a connection that hasn't
+// paired or said hello yet doesn't.
+func TestRTCLibraryEvent(t *testing.T) {
+	s, _, _ := newTestServer(t)
+	r := startTestRTC(t, s)
+
+	code := s.auth.PairCode()
+	c := dialRTC(t, r, "pabcdefgh12345678", pairPassword(code))
+	if !c.waitOpen(10 * time.Second) {
+		t.Fatal("data channel did not open")
+	}
+	waiting := dialRTC(t, r, "pzyxwvuts87654321", pairPassword(code))
+	if !waiting.waitOpen(10 * time.Second) {
+		t.Fatal("second data channel did not open")
+	}
+	c.send(t, map[string]any{"t": "pair", "code": code, "agent": "test"})
+	if w := c.recv(t); w["t"] != "welcome" {
+		t.Fatalf("welcome = %v", w)
+	}
+
+	if n := r.broadcast(map[string]any{"t": "event", "e": "test"}); n != 1 {
+		t.Fatalf("broadcast reached %d connections, want 1 (the paired one)", n)
+	}
+	if ev := c.recv(t); ev["t"] != "event" || ev["e"] != "test" {
+		t.Fatalf("event = %v", ev)
+	}
+
+	s.LibraryChanged()
+	ev := c.recv(t)
+	if ev["t"] != "event" || ev["e"] != "library" || ev["rev"] != s.libraryETag() {
+		t.Fatalf("library event = %v, want rev %s", ev, s.libraryETag())
+	}
+	select {
+	case m := <-waiting.in:
+		t.Fatalf("the unpaired connection got %v", m)
+	case <-time.After(200 * time.Millisecond):
+	}
+}

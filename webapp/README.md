@@ -16,7 +16,7 @@ Nothing here is embedded into `Resound.exe`.
 |---|---|
 | `index.html`, `js/landing.js`, `css/landing.css` | The landing page at `/`: what Resound is, the download, getting started, features, how it works, news. The installed app skips it |
 | `app.html`, `js/app.js`, `js/*.js`, `css/styles.css` | The remote (the soundboard): tabs, sound cards, layouts, settings. The installed app starts here |
-| `js/rtc.js` | The connection: pairing, reconnecting, and `fetch()` for `/api/` over the data channel. The first script on every page |
+| `js/rtc.js` | The connection: pairing, reconnecting, `fetch()` for `/api/` over the data channel, and events from the PC (`onEvent`, e.g. `library`: `app.js` reloads tabs and sounds). The first script on every page |
 | `connect.html`, `js/connect.js`, `css/connect.css` | Pairing (link, in-app QR scanner, pasted link) and the list of paired PCs |
 | `js/connection-help.js`, `css/connection-help.css` | What to check when the PC doesn't answer, on the remote and the connect page. Keep its steps in line with the panel's Phone remote page (`internal/app/pages.go`) |
 | `js/screen-wake.js` | Keeps the screen on (Screen Wake Lock API), on by default |
@@ -38,7 +38,7 @@ Nothing here is embedded into `Resound.exe`.
 ```powershell
 go run ./cmd/webapp                         # builds webapp/dist (git-ignored)
 go run ./cmd/webapp -serve :8095            # builds and serves it on http://localhost:8095
-go run ./cmd/devremote -folder D:\Sounds    # the PC side; prints a pairing link for localhost:8095
+go run ./cmd/devremote -folder D:\Sounds    # the PC side; prints a pairing link for localhost:8095; Enter refreshes the library
 ```
 
 `localhost` is a secure context, so the app works there in a desktop browser.

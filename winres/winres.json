@@ -33,18 +33,18 @@
     "#1": {
       "0000": {
         "fixed": {
-          "file_version": "0.6.0.0",
-          "product_version": "0.6.0.0"
+          "file_version": "0.13.0.0",
+          "product_version": "0.13.0.0"
         },
         "info": {
           "0409": {
             "CompanyName": "Resound",
             "FileDescription": "Resound soundboard host",
-            "FileVersion": "0.6.0",
+            "FileVersion": "0.13.0",
             "InternalName": "resound",
             "OriginalFilename": "resound.exe",
             "ProductName": "Resound",
-            "ProductVersion": "0.6.0"
+            "ProductVersion": "0.13.0"
           }
         }
       }

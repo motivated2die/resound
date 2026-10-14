@@ -24,7 +24,7 @@ import (
 )
 
 // Version is set at build time with -ldflags "-X .../internal/app.Version=...".
-var Version = "0.6.0-dev"
+var Version = "0.13.0-dev"
 
 // AppURL is the app's address (webapp/, built by cmd/webapp).
 // Set at build time with -ldflags "-X .../internal/app.AppURL=..."; the
@@ -88,9 +88,11 @@ type App struct {
 
 	lib      *library.Library
 	indexer  *library.Indexer
-	removing string // folder awaiting the remove confirmation
-	libNote  string // result of the last refresh, shown until the panel closes
-	keepNote bool   // reopening after a dialog: keep libNote and backupNote
+	removing string       // folder awaiting the remove confirmation
+	libNote  string       // result of the last refresh or add, shown for a moment (setLibNote)
+	libSeq   int          // identifies the current libNote, so an old timer leaves a newer one
+	keepNote bool         // reopening after a dialog: keep libNote and backupNote
+	imports  importsState // sounds dropped onto folders (import.go)
 
 	backupNote       string // result of the last backup action
 	backupFailed     bool
@@ -191,6 +193,7 @@ func Run() int {
 	a.migrateVolumeScale()
 	a.playback.init()
 	a.ptt.init()
+	a.imports.init()
 	defer a.engine.Close()
 
 	a.tray, err = ui.NewTray("Resound")
@@ -203,11 +206,7 @@ func Run() int {
 		logx.Printf("logo: %v", err)
 	}
 	a.tray.Popup().OnShow = a.onPanelOpen
-	a.tray.Popup().OnDrop = func(paths []string) {
-		if a.acceptsDrops() {
-			a.addFolders(paths)
-		}
-	}
+	a.tray.Popup().OnDrop = a.onDropAnywhere // drops on a folder go to its own field
 	a.tray.Popup().OnKey = a.onPanelKey
 	a.tray.Popup().OnEscape = a.onEscape
 	a.tray.OnQuitRequest = func() {
@@ -265,6 +264,7 @@ func (a *App) onPanelOpen() {
 	a.ptt.capturing = false // a capture ends when the panel closes
 	if !a.keepNote {
 		a.libNote, a.backupNote = "", ""
+		a.imports.clearFinished()
 	}
 	a.refreshDevices(false)
 	a.refreshRouting(false)
@@ -310,6 +310,7 @@ func (a *App) save() {
 func (a *App) quit() {
 	a.cancelCableDownload()
 	a.cancelUpdate()
+	a.imports.cancel()
 	if a.srv != nil {
 		a.srv.Close() // before the UI thread stops answering server calls
 	}

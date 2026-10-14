@@ -186,6 +186,12 @@
             if (msg.t === 'res') {
                 const p = this.pending.get(msg.id);
                 if (p) { this.pending.delete(msg.id); p.resolve(msg); }
+                return;
+            }
+            // Events come unasked from the PC, e.g. {"t":"event","e":"library"}
+            // when its sounds or folders changed.
+            if (msg.t === 'event' && typeof msg.e === 'string') {
+                eventListeners.forEach(fn => { try { fn(msg); } catch (e) { console.error('Event listener:', e); } });
             }
         }
 
@@ -286,6 +292,7 @@
     let live = null;     // the open Connection
     let opening = null;  // a connect() in progress
     const statusListeners = new Set();
+    const eventListeners = new Set(); // events from the PC (Connection.receive)
 
     const notify = (state, detail) => statusListeners.forEach(fn => { try { fn(state, detail); } catch (e) { /* ignore */ } });
 
@@ -360,6 +367,8 @@
     window.resoundRTC = {
         parsePairLink, pair, connect, currentPC, forgetPC, loadStore, savePC,
         onStatus: (fn) => { statusListeners.add(fn); return () => statusListeners.delete(fn); },
+        // onEvent gets every event the PC sends ({t: 'event', e: name, …}).
+        onEvent: (fn) => { eventListeners.add(fn); return () => eventListeners.delete(fn); },
         disconnect: () => { if (live) live.close(); },
     };
 

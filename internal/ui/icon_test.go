@@ -31,7 +31,7 @@ func TestIconsRender(t *testing.T) {
 			}
 		}
 	}
-	for _, name := range []Icon{IconAlert, IconChevronLeft, IconClose, IconChevronRight, IconExternalLink, IconFolderPlus, IconInfo, IconKeyboard, IconMic, IconMicOff, IconPause, IconPlay, IconPower, IconRefresh, IconRestore, IconSave, IconSettings, IconStop, IconUnplugged} {
+	for _, name := range []Icon{IconAlert, IconChevronLeft, IconClose, IconChevronRight, IconDownload, IconExternalLink, IconFolder, IconFolderPlus, IconHandGrab, IconTrash, IconInfo, IconKeyboard, IconMic, IconMicOff, IconPause, IconPlay, IconPower, IconRefresh, IconRestore, IconSave, IconSettings, IconStop, IconUnplugged} {
 		if !have[name] {
 			t.Errorf("constant %q has no icons/%s.svg", name, name)
 		}
