@@ -1256,6 +1256,16 @@ body.search-mode .sounds-grid {
   padding-bottom: calc(var(--header-height) + max(env(safe-area-inset-bottom, 0px), var(--keyboard, 0px)) + 10px);
 }
 
+/* Android: the keyboard also covers the gesture bar's strip, which the
+   visual viewport doesn't count (search.js). */
+.keyboard-plus-inset body.search-mode.keyboard-open header {
+  bottom: calc(env(safe-area-inset-bottom, 0px) + var(--keyboard, 0px));
+}
+
+.keyboard-plus-inset body.search-mode.keyboard-open .sounds-grid {
+  padding-bottom: calc(var(--header-height) + env(safe-area-inset-bottom, 0px) + var(--keyboard, 0px) + 10px);
+}
+
 .search-message {
   grid-column: 1 / -1;
 }
