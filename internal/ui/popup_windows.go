@@ -66,12 +66,21 @@ type Popup struct {
 	// not (and no dropdown list is open). It returns true when it handled
 	// the key, e.g. went back a page; otherwise the popup closes.
 	OnEscape func() bool
-	// OnDrop receives the paths of files and folders dropped on the popup
-	// while it accepts drops (see SetAcceptDrops).
-	OnDrop func(paths []string)
+	// OnDrop receives files, folders and web links dropped on the popup
+	// while it accepts drops (see SetAcceptDrops), except on rows that are
+	// drop fields of their own (FolderDrop).
+	OnDrop func(DropData)
 
-	drops bool
+	drops    bool
+	ole      bool       // registered as an OLE drop target (links too)
+	dragData DropData   // what is being dragged over the popup
+	dropRow  int        // the drop field under the dragged item, or -1
+	field    *editField // the native control of a TextField row
 }
+
+// panelPopup is the popup, for callbacks that get no Go context: the OLE
+// drop target and the text field's subclassed control.
+var panelPopup *Popup
 
 // KeyEvent is a key or mouse button press/release seen by the popup. VK is
 // a Windows virtual-key code; Shift/Ctrl/Alt arrive as left/right variants.
@@ -125,16 +134,19 @@ func keyEvent(m uint32, w, l uintptr) (KeyEvent, bool) {
 }
 
 func newPopup() (*Popup, error) {
-	p := &Popup{hoverRow: -1, pressRow: -1, scale: 1}
+	p := &Popup{hoverRow: -1, pressRow: -1, dropRow: -1, scale: 1}
+	panelPopup = p
 	p.measureDC, _, _ = procCreateCompatibleDC.Call(0)
 	if err := registerClass(popupClass, 0, windows.NewCallback(p.wndProc)); err != nil {
 		return nil, err
 	}
-	h, err := createWindow(wsExToolWindow|wsExTopmost, wsPopup, popupClass)
+	// Child windows (a TextField's control) are clipped out of painting.
+	h, err := createWindow(wsExToolWindow|wsExTopmost, wsPopup|wsClipChildren, popupClass)
 	if err != nil {
 		return nil, err
 	}
 	p.hwnd = h
+	p.ole = registerDropTarget(p)
 	if procDwmSetWindowAttribute.Find() == nil { // rounded corners on Windows 11
 		pref := uint32(dwmwcpRound)
 		procDwmSetWindowAttribute.Call(h, dwmwaWindowCornerPreference, uintptr(unsafe.Pointer(&pref)), 4)
@@ -176,6 +188,7 @@ func (p *Popup) Repaint() {
 func (p *Popup) ScrollToTop() {
 	p.closeDropdown()
 	p.scroll = 0
+	p.syncField()
 	procInvalidateRect.Call(p.hwnd, 0, 0)
 }
 
@@ -266,6 +279,7 @@ func (p *Popup) layoutAndPlace() {
 	procSetWindowPos.Call(p.hwnd, hwndTopmost, uintptr(x), uintptr(yPos), uintptr(p.width), uintptr(p.height), swpShowWindow)
 	p.shadow.place(p.hwnd, rect{x, yPos, x + p.width, yPos + p.height}, p.scale)
 	p.tab.place(rect{x, yPos, x + p.width, yPos + p.height}) // between the popup and its shadow
+	p.syncField()
 	procInvalidateRect.Call(p.hwnd, 0, 0)
 }
 
@@ -332,12 +346,19 @@ func (p *Popup) wndProc(hwnd uintptr, m uint32, w, l uintptr) uintptr {
 		// The popup stays open when another window gets the focus: closing
 		// is a deliberate click on its close tab, Esc or the tray icon.
 		return 0
-	case wmDropFiles:
+	case wmDropFiles: // without OLE: files only, anywhere on the popup
 		paths := droppedFiles(w)
 		if len(paths) > 0 && p.OnDrop != nil {
-			p.OnDrop(paths) // may call SetRows
+			p.OnDrop(DropData{Paths: paths}) // may call SetRows
 		}
 		return 0
+	case wmFieldKey:
+		p.fieldKey(w)
+		return 0
+	case wmCtlColorEdit:
+		if p.field != nil && l == p.field.hwnd {
+			return fieldColors(w)
+		}
 	case wmEraseBkgnd:
 		return 1
 	case wmPaint:
@@ -421,6 +442,7 @@ func (p *Popup) wndProc(hwnd uintptr, m uint32, w, l uintptr) uintptr {
 		delta := hiword(w) // multiples of 120 per notch
 		p.scroll = max(0, min(p.scroll-delta*p.canvas(0).px(40)/120, p.maxScroll()))
 		p.hideTip()
+		p.syncField()
 		procInvalidateRect.Call(hwnd, 0, 0)
 		return 0
 	case wmKeyDown:
@@ -479,6 +501,7 @@ func (p *Popup) paint() {
 		if p.dd != nil && p.dd.row == i {
 			st.open = p.dd.seg
 		}
+		st.drop = i == p.dropRow
 		s.row.paint(c, r, st)
 	}
 	// Scroll indicator.
@@ -619,6 +642,9 @@ func (p *Popup) SetAcceptDrops(on bool) {
 		return
 	}
 	p.drops = on
+	if p.ole {
+		return // the drop target asks p.drops on every drag
+	}
 	accept := uintptr(0)
 	if on {
 		accept = 1

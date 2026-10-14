@@ -16,8 +16,9 @@ type Row interface {
 }
 
 type rowState struct {
-	hover, press int // segment index or -1
-	open         int // segment whose dropdown list is open, or -1
+	hover, press int  // segment index or -1
+	open         int  // segment whose dropdown list is open, or -1
+	drop         bool // something dragged is over this row (a drop field)
 }
 
 // Tone colors informational text.

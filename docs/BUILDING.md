@@ -151,6 +151,10 @@ Check, within about 10 s: the home page's header shows `v0.7.0` and a dot with "
 
 `go test ./internal/update` covers the version comparison, the checksum and the allowed hosts against a fake GitHub.
 
+`go test ./internal/importer` covers finding the sound on a page (a trimmed Myinstants page in `testdata/`), names, the address guard and downloads against a local server. A live test downloads real sounds from Myinstants with the real client and decoder: `$env:RESOUND_LIVE="1"; go test -run Live -v ./internal/importer`.
+
+To try the import in the panel: quit the installed Resound, run the dev build (`go run ./cmd/resound`), open the Sound library page (or the home page's "Import from Myinstants"), click "Open Myinstants", and drag a sound's name or link icon onto a folder. Check: the folder lights up while dragging; "Downloading from www.myinstants.com…"; then the name field with the page's name, where Enter renames and Esc keeps it. A search page's address gives "No sound file found"; a link dropped outside the folders asks to drop it onto one.
+
 ## Debugging
 
 - **Log:** `%LOCALAPPDATA%\Resound\debug.log` (panel → Settings → Diagnostics → Open log).
