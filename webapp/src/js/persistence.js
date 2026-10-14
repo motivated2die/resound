@@ -30,7 +30,7 @@ const persistence = (() => {
         haptics: true,
         swapButtonPosition: false,
         // Mirror of the PC's data (also cached here for a fast first paint).
-        soundSettings: {}, // key: sound ID (string) -> { color, emoji, favorite, hasCustomVolume }
+        soundSettings: {}, // key: sound ID (string) -> { color, emoji, favorite, hasCustomVolume, volumeDown }
         tabLayouts: {},    // key: tab ID (string) | 'favorites' -> { currentLayoutMode }
         layoutOrders: {},  // key: `${tabKey}-${layoutMode}` -> [sound IDs as strings]
     });
@@ -133,6 +133,7 @@ const persistence = (() => {
         if ('emoji' in sound) setOrDelete('emoji', sound.emoji);
         if ('isFavorite' in sound) setOrDelete('favorite', sound.isFavorite === true);
         if ('hasCustomVolume' in sound) setOrDelete('hasCustomVolume', sound.hasCustomVolume === true);
+        if ('sliderPosition' in sound) setOrDelete('volumeDown', sound.sliderPosition < 0); // quieter than the default
         if (Object.keys(entry).length) s.soundSettings[id] = entry;
         else delete s.soundSettings[id];
     };
@@ -263,9 +264,12 @@ const persistence = (() => {
 
     const setSoundFavorite = (soundId, isFavorite) => setSoundSetting(soundId, 'favorite', !!isFavorite);
 
-    const setSoundCustomVolume = (soundId, hasCustom) => {
+    // sliderPosition (-50..+50) tells a quieter custom volume from a louder one.
+    const setSoundCustomVolume = (soundId, hasCustom, sliderPosition = 0) => {
         if (hasCustom) setSoundSetting(soundId, 'hasCustomVolume', true);
         else removeSoundSetting(soundId, 'hasCustomVolume');
+        if (hasCustom && sliderPosition < 0) setSoundSetting(soundId, 'volumeDown', true);
+        else removeSoundSetting(soundId, 'volumeDown');
     };
 
     // --- Layouts -------------------------------------------------------------

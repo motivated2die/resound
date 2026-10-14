@@ -48,6 +48,9 @@ type Player interface {
 	// new state: true = paused.
 	TogglePause() bool
 	SetTalkThrough(on bool)
+	// TogglePanel opens the PC's panel, or closes it if it is open, and
+	// returns whether it is open now.
+	TogglePanel() bool
 	// DefaultVolumes returns the default "you hear" / "others hear"
 	// volumes in percent.
 	DefaultVolumes() (local, remote int)
@@ -192,6 +195,7 @@ func (s *Server) routes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/playback/toggle", s.handleToggle)
 	mux.HandleFunc("POST /api/talkthrough/start", func(w http.ResponseWriter, r *http.Request) { s.handleTalk(w, true) })
 	mux.HandleFunc("POST /api/talkthrough/stop", func(w http.ResponseWriter, r *http.Request) { s.handleTalk(w, false) })
+	mux.HandleFunc("POST /api/panel/toggle", s.handlePanelToggle)
 
 	// Resound additions: the whole library in one call, and the phone's
 	// card colors, emoji and layouts stored on the PC (shared by all phones).

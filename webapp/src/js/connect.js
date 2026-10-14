@@ -11,6 +11,13 @@
         const el = $('message');
         el.textContent = text || '';
         el.classList.toggle('error', !!error);
+        show('help', false);
+    };
+
+    // showHelp lists what to check when the PC didn't answer.
+    const showHelp = () => {
+        window.resoundHelp.render($('help'), true);
+        show('help', true);
     };
 
     const standalone = () =>
@@ -52,7 +59,7 @@
             list.append(li);
         }
         show('pcs', entries.length > 0);
-        show('intro', entries.length === 0);
+        show('intro', entries.length === 0 && $('help').hidden);
     };
 
     // --- Pairing -------------------------------------------------------------
@@ -82,7 +89,9 @@
             if (e.denied) {
                 setMessage('This code was already used or has expired. Show a new one on the PC and scan it again.', true);
             } else {
-                setMessage(`Can't reach ${info.name}. Is this device on the same Wi-Fi as the PC, and is Resound running?`, true);
+                // A used or expired code gets no answer either (rtc.go).
+                setMessage(`Can't reach ${info.name}. Check these in order:`, true);
+                showHelp();
             }
             show('pairing', false);
             renderPCs();
@@ -218,6 +227,8 @@
             pairWith(hash);
         } else if (hash === '#removed') {
             setMessage('This device was signed out on the PC. Scan its QR code to pair again.', true);
+        } else if (hash === '#scan') {
+            startScanner(); // "Scan code" on the remote's connection help
         }
     });
 })();

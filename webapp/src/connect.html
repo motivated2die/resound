@@ -12,7 +12,9 @@
     <link rel="apple-touch-icon" href="/assets/resound-192.png">
     <title>Resound · Connect</title>
     <link rel="stylesheet" href="css/connect.css">
+    <link rel="stylesheet" href="css/connection-help.css">
     <script src="js/rtc.js"></script>
+    <script src="js/connection-help.js" defer></script>
     <script src="js/connect.js" defer></script>
 </head>
 <body>
@@ -42,6 +44,8 @@
         </section>
 
         <p id="message" class="message" role="status"></p>
+        <!-- When pairing gets no answer: what to check (connection-help.js) -->
+        <div id="help" hidden></div>
 
         <div class="actions">
             <button id="scan-button" type="button" class="primary">Scan QR code</button>

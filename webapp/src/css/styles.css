@@ -118,6 +118,7 @@ body {
   position: relative;
   flex-grow: 1;
   overflow: hidden;
+  overflow: clip; /* no scroll container: focus or find-in-page can't scroll the previews into view */
 }
 
 /* Swiping: the live page between previews of the previous and next tab
@@ -208,7 +209,8 @@ body {
 }
 
 /* Edit Mode Info Styles - Default right position (before buttons) */
-.edit-mode-info {
+.edit-mode-info,
+.search-mode-info {
   display: none;
   /* Hidden by default */
   align-items: center;
@@ -248,13 +250,18 @@ body {
 .icon[data-icon="edit"] { --icon: url("../assets/icons/edit.svg"); }
 .icon[data-icon="favorite"] { --icon: url("../assets/icons/favorite.svg"); }
 .icon[data-icon="favorite-fill"] { --icon: url("../assets/icons/favorite-fill.svg"); }
+.icon[data-icon="bolt"] { --icon: url("../assets/icons/bolt.svg"); }
 .icon[data-icon="help"] { --icon: url("../assets/icons/help.svg"); }
+.icon[data-icon="install_mobile"] { --icon: url("../assets/icons/install_mobile.svg"); }
 .icon[data-icon="mic"] { --icon: url("../assets/icons/mic.svg"); }
 .icon[data-icon="pause"] { --icon: url("../assets/icons/pause.svg"); }
 .icon[data-icon="play_arrow"] { --icon: url("../assets/icons/play_arrow.svg"); }
+.icon[data-icon="qr_code_scanner"] { --icon: url("../assets/icons/qr_code_scanner.svg"); }
 .icon[data-icon="restart_alt"] { --icon: url("../assets/icons/restart_alt.svg"); }
 .icon[data-icon="school"] { --icon: url("../assets/icons/school.svg"); }
+.icon[data-icon="search"] { --icon: url("../assets/icons/search.svg"); }
 .icon[data-icon="settings"] { --icon: url("../assets/icons/settings.svg"); }
+.icon[data-icon="smartphone"] { --icon: url("../assets/icons/smartphone.svg"); }
 .icon[data-icon="stop_circle"] { --icon: url("../assets/icons/stop_circle.svg"); }
 .icon[data-icon="view_comfy"] { --icon: url("../assets/icons/view_comfy.svg"); }
 .icon[data-icon="view_list"] { --icon: url("../assets/icons/view_list.svg"); }
@@ -266,6 +273,7 @@ body {
   font-size: 16px;
 }
 
+.top-bar.search-mode-active .search-mode-info,
 .top-bar.edit-mode-active .edit-mode-info {
   display: flex;
   /* Show when edit mode is active */
@@ -295,12 +303,68 @@ body {
   /* Default order (right side) */
 }
 
+/* The install pill (install.js), centred on the screen: the space before it
+   and the buttons after it grow alike (flex-basis 0), so it stays in the
+   middle until the buttons need more than half the bar, then moves aside.
+   The buttons never shrink below their own width. */
+.top-bar .top-bar-placeholder,
+.top-bar .action-buttons {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.top-bar .action-buttons {
+  min-width: max-content;
+  justify-content: flex-end;
+}
+
+.top-bar.buttons-left .action-buttons {
+  justify-content: flex-start;
+}
+
+.install-pill {
+  order: 1;
+  flex-shrink: 0;
+  margin: 0 8px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 28px; /* the top bar's round buttons' circles */
+  padding: 0 13px 0 10px;
+  border-radius: 14px;
+  border: 0;
+  background-color: var(--v-secondary-base);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background-color var(--transition-speed) ease;
+}
+
+.install-pill:active {
+  background-color: var(--v-secondary-darken2);
+}
+
+.install-pill .icon {
+  font-size: 17px;
+}
+
+.top-bar.edit-mode-active .install-pill,
+.top-bar.search-mode-active .install-pill,
+.top-bar.search-mode-active #edit-mode-button,
+.top-bar.search-mode-active #layout-mode-button {
+  display: none;
+}
+
 /* --- NEW: Left Alignment Styles --- */
 .top-bar.buttons-left .top-bar-placeholder {
   order: 2;
   /* Placeholder moves to the right */
 }
 
+.top-bar.buttons-left .search-mode-info,
 .top-bar.buttons-left .edit-mode-info {
   order: 1;
   /* Edit info stays before buttons */
@@ -325,9 +389,13 @@ body {
 
 /* --- END Left Alignment Styles --- */
 
+/* 32 px to tap, but the circle is drawn 28 px: the height of the install
+   pill (the background stays inside the padding, so it stays round). */
 .icon-button.top-bar-button {
   width: 32px;
   height: 32px;
+  padding: 2px;
+  background-clip: content-box;
   color: var(--text-secondary);
 }
 
@@ -458,17 +526,19 @@ body {
   box-shadow: none;
 }
 
-.sortable-ghost {
-  opacity: 0.4;
-  background-color: var(--v-secondary-base) !important;
+/* Dragging in edit mode (dragDrop.js): the held button stays in its place,
+   raised; the button it would swap with gets a dashed outline
+   (.sortable-swap-highlight); the copy under the finger is hidden. */
+.sounds-grid .sound-card.sortable-chosen,
+.sounds-grid .sound-card.sortable-ghost {
+  z-index: 5;
+  transform: scale(1.06);
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.5);
+  cursor: grabbing !important;
 }
 
-.sortable-chosen,
-.sortable-drag {
-  opacity: 0.8;
-  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
-  transform: scale(1.05);
-  cursor: grabbing !important;
+.sortable-fallback {
+  opacity: 0 !important;
 }
 
 /* Playing State Highlight Animation */
@@ -750,6 +820,8 @@ nav#tabs-container::-webkit-scrollbar {
 }
 
 .tab {
+  position: relative;
+  z-index: 1; /* above the indicator */
   flex: 0 0 auto;
   display: inline-flex;
   align-items: center;
@@ -774,18 +846,61 @@ nav#tabs-container::-webkit-scrollbar {
   font-size: 20px;
 }
 
-.tab:hover {
+/* Only where a mouse really hovers: on touch screens :hover sticks to the
+   last tapped tab, which then stayed lit after swiping to another one. */
+@media (hover: hover) {
+  .tab:not(.active):hover {
+    background-color: rgba(255, 255, 255, 0.05);
+    color: var(--text-primary);
+  }
+}
+
+.tab:not(.active):active {
   background-color: rgba(255, 255, 255, 0.05);
-  color: var(--text-primary);
 }
 
 .tab.active {
   color: var(--v-primary-base);
-  border-top-color: var(--v-primary-base);
-  background-color: rgba(var(--accent-rgb), 0.1);
+}
+
+/* The active tab's line and tint: one element that slides to the active tab
+   and takes its width (tabs.js). Under the line, a slight glow fades down,
+   inside the tab. */
+.tab-indicator {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  pointer-events: none;
+  border-top: 3px solid var(--v-primary-base);
+  background: linear-gradient(to bottom,
+      rgba(var(--accent-rgb), 0.17),
+      rgba(var(--accent-rgb), 0.07) 55%,
+      rgba(var(--accent-rgb), 0.05));
+  box-shadow: inset 0 7px 8px -7px rgba(var(--accent-rgb), 0.55);
+  transition: transform 0.28s cubic-bezier(0.3, 0.7, 0.2, 1),
+    width 0.28s cubic-bezier(0.3, 0.7, 0.2, 1),
+    opacity var(--transition-speed) ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tab-indicator {
+    transition: opacity var(--transition-speed) ease;
+  }
 }
 
 .tab.active .icon {
+  color: var(--v-primary-base);
+}
+
+/* While a swipe would land on another tab, the colour goes ahead (tabs.js). */
+#tabs-container[data-swipe-commit] .tab.active,
+#tabs-container[data-swipe-commit] .tab.active .icon {
+  color: var(--text-secondary);
+}
+
+#tabs-container .tab[data-swipe-target],
+#tabs-container .tab[data-swipe-target] .icon {
   color: var(--v-primary-base);
 }
 
@@ -859,6 +974,19 @@ header.ptt-active-bg {
   z-index: 1;
   /* Ensure title is above ripples */
   min-width: 0; /* the title shrinks, never the buttons */
+  touch-action: none; /* held: opens the PC's panel (app.js) */
+  cursor: pointer;
+}
+
+/* While the logo is held, it sinks in over the hold time, then springs back. */
+.app-title .logo {
+  transition: transform 0.25s cubic-bezier(0.3, 1.6, 0.5, 1);
+  -webkit-user-drag: none;
+}
+
+.app-title.holding .logo {
+  transform: scale(0.82);
+  transition: transform 0.5s ease-out;
 }
 
 .logo {
@@ -889,7 +1017,7 @@ h1.brand {
   letter-spacing: 0.12em;
   margin: 4px 0 3px;
   position: relative;
-  top: 5px; /* about a third of a line lower; the status line stays put */
+  top: 2px; /* a little lower, with room above the status line, which stays put */
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -959,6 +1087,9 @@ h1.brand {
   padding: 8px;
   border-radius: 30px;
   gap: 8px;
+  /* A darker ring, like the talk button's (.btn-round) */
+  border: 2px solid #b53153; /* --error-color, a quarter darker */
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
 }
 
 .btn-danger:hover {
@@ -1009,7 +1140,7 @@ h1.brand {
   border-radius: 16px 16px 0 0;
   padding: 12px 20px calc(env(safe-area-inset-bottom) + 20px) 20px;
   transform: translateY(110%);
-  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+  transition: transform 0.3s cubic-bezier(0.2, 0.9, 0.25, 1),
     max-height 0.3s ease-out, visibility 0s linear 0.3s;
   max-height: 85vh;
   box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.5);
@@ -1020,8 +1151,272 @@ h1.brand {
 
 #sound-settings-overlay:not(.hidden) #settings-card {
   transform: translateY(0);
-  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+  transition: transform 0.3s cubic-bezier(0.2, 0.9, 0.25, 1),
     max-height 0.3s ease-out;
+}
+
+/* --- Search (search.js) ---
+   The field and the colour chips above the grid, which shows the results;
+   the tabs are tucked away. --keyboard is the virtual keyboard's height (0
+   without one): the bottom bar sits on it, the results scroll above it. */
+.search-panel {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 10px 10px 2px;
+  background-color: var(--v-background-dark);
+}
+
+.search-field {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 46px;
+  padding: 0 4px 0 12px;
+  border-radius: 12px;
+  background-color: var(--v-secondary-darken1);
+  border: 2px solid transparent;
+  transition: border-color var(--transition-speed) ease;
+}
+
+.search-field:focus-within {
+  border-color: var(--v-primary-base);
+}
+
+.search-field > .icon {
+  font-size: 22px;
+  color: var(--text-secondary);
+}
+
+.search-field input {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  border: 0;
+  outline: none;
+  background: none;
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 16px; /* 16 px or more: iOS doesn't zoom in on focus */
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+.search-field input::placeholder {
+  color: var(--text-caption);
+}
+
+.search-field input::-webkit-search-cancel-button {
+  -webkit-appearance: none;
+  display: none; /* the X closes the search instead */
+}
+
+.search-close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  border: 0;
+  border-radius: 50%;
+  background: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.search-close:active {
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
+.search-close .icon {
+  font-size: 22px;
+}
+
+.search-colors {
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  gap: 6px;
+}
+
+.search-colors .search-color {
+  height: 26px;
+  border-radius: 8px;
+}
+
+body.search-mode nav#tabs-container {
+  display: none;
+}
+
+body.search-mode header {
+  bottom: max(env(safe-area-inset-bottom, 0px), var(--keyboard, 0px));
+}
+
+body.search-mode .sounds-grid {
+  padding-bottom: calc(var(--header-height) + max(env(safe-area-inset-bottom, 0px), var(--keyboard, 0px)) + 10px);
+}
+
+.search-message {
+  grid-column: 1 / -1;
+}
+
+/* --- Install sheet (install.js) --- */
+.install-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1250; /* above the settings it can be opened from */
+}
+
+.install-backdrop {
+  position: absolute;
+  inset: 0;
+  background-color: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(2px);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.install-card {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  max-width: 520px;
+  margin: 0 auto;
+  max-height: 90vh;
+  overflow-y: auto;
+  background-color: var(--v-secondary-darken1);
+  border-radius: 16px 16px 0 0;
+  padding: 12px 20px calc(env(safe-area-inset-bottom) + 20px);
+  box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.5);
+  transform: translateY(110%);
+  transition: transform 0.3s cubic-bezier(0.2, 0.9, 0.25, 1);
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.install-overlay.open .install-backdrop { opacity: 1; }
+.install-overlay.open .install-card { transform: translateY(0); }
+
+.install-card .handle-bar { margin-bottom: 0; }
+
+.install-head {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.install-logo {
+  width: 52px;
+  height: 52px;
+  flex-shrink: 0;
+}
+
+.install-head h2 {
+  font-size: 1.25rem;
+  font-weight: 600;
+}
+
+.install-head p,
+.install-benefits div span {
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+}
+
+.install-benefits {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.install-benefits li {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.install-benefit-icon {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  background-color: rgba(var(--accent-rgb), 0.12);
+  color: var(--v-primary-base);
+}
+
+.install-benefit-icon .icon {
+  font-size: 22px;
+}
+
+.install-benefits div {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.3;
+}
+
+.install-steps {
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  padding-top: 16px;
+}
+
+.install-steps h3 {
+  font-size: 1rem;
+  font-weight: 500;
+  margin-bottom: 12px;
+}
+
+.install-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.install-actions .action-button {
+  flex: 1;
+  min-width: 0;
+}
+
+.install-actions .action-button.primary {
+  background-color: var(--v-primary-base);
+  color: var(--on-primary);
+  font-weight: 600;
+}
+
+/* The sound's button, floating above the sheet as a live preview
+   (sound-settings.js). The stage carries the page's grid layout, so the copy
+   looks like the card in the grid; its card is placed by transform. */
+#sound-preview-stage {
+  position: absolute;
+  inset: 0;
+  display: block;
+  padding: env(safe-area-inset-top, 0px) 0 0;
+  overflow: visible;
+  background: none;
+  pointer-events: none;
+}
+
+#sound-preview-stage .sound-card {
+  position: absolute;
+  top: 0;
+  left: 0;
+  min-height: 0;
+  max-height: none;
+  transform-origin: 0 0;
+  pointer-events: auto;
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.55);
+  /* placed by script: no transform transition */
+  transition: background-color var(--transition-speed) ease,
+    background var(--transition-speed) ease;
+}
+
+/* The grid card while its copy floats above the sheet. */
+.sound-card.lifted {
+  opacity: 0;
+  transition: none;
 }
 
 #sound-settings-overlay:not(.hidden) #settings-card {
@@ -1132,29 +1527,26 @@ h1.brand {
   font-weight: 500;
 }
 
-/* Color Selector (Round Buttons) */
+/* Color Selector: two rows of four rounded rectangles */
 .color-selector {
-  display: flex;
-  justify-content: space-between;
-  gap: 5px;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
   padding: 0 2px;
 }
 
 .color-swatch {
-  flex-grow: 1;
-  flex-basis: 0;
-  aspect-ratio: 1 / 1;
-  border-radius: 50%;
+  height: 44px;
+  border-radius: 12px;
   border: 2px solid transparent;
   cursor: pointer;
   transition: border-color var(--transition-speed) ease,
     transform var(--transition-speed) ease;
-  max-width: 36px;
 }
 
 .color-swatch.selected {
   border-color: var(--text-primary);
-  transform: scale(1.1);
+  transform: scale(1.05);
 }
 
 .color-swatch:active {
@@ -1356,6 +1748,32 @@ emoji-picker section#favorites {
 
 #preview-button {
   min-width: 150px;
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+}
+
+/* While previewing ("Stop"), the button fills with the sound's progress,
+   like a playing card: it glides between polls and fades out at the end. */
+#preview-button::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  transform-origin: left center;
+  transform: scaleX(var(--progress, 0));
+  background-color: rgba(255, 255, 255, 0.22);
+  opacity: 0;
+  transition: transform 260ms linear, opacity 0.3s ease;
+  pointer-events: none;
+}
+
+#preview-button[data-state='stop']::before {
+  opacity: 1;
+}
+
+#preview-button.progress-reset::before {
+  transition: none;
 }
 
 /* --- App Settings Modal --- */
@@ -1735,6 +2153,58 @@ emoji-picker section#favorites {
 
 /* Disabled state for toggle switch */
 .toggle-switch.disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+/* --- Can't reach the PC ---
+   Covers the sounds while the PC can't be reached (app.js); the list itself
+   is css/connection-help.css. The tabs and the bottom bar stay. */
+.connection-help {
+  position: absolute;
+  top: max(var(--top-bar-height), env(safe-area-inset-top));
+  left: 0;
+  right: 0;
+  bottom: calc(var(--tabs-height) + var(--header-height));
+  z-index: 50;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 24px max(20px, calc((100% - 420px) / 2));
+  background-color: var(--v-background-dark);
+}
+
+.connection-help h2 {
+  font-size: 1.15rem;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.connection-help-lead {
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  margin-top: -8px;
+}
+
+.connection-help-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+.connection-help-actions .action-button {
+  flex: 1;
+  min-width: 0;
+}
+
+.connection-help-actions .action-button.primary {
+  background-color: var(--v-primary-base);
+  color: var(--on-primary);
+  font-weight: 600;
+}
+
+.connection-help-actions .action-button:disabled {
   opacity: 0.6;
   cursor: default;
 }
@@ -2335,8 +2805,8 @@ emoji-picker section#favorites
   background-color: var(--v-secondary-base);
   /* Default grey */
   color: var(--text-primary);
-  /* --- NEW: Explicitly set touch-action --- */
-  touch-action: manipulation;
+  /* Held, not panned: the touch belongs to push-to-talk (app.js) */
+  touch-action: none;
   /* Prevent text selection on accidental drag */
   user-select: none;
   -webkit-user-select: none;

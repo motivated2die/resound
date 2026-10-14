@@ -17,6 +17,7 @@
     <!-- Driver.js CSS (Local) -->
     <link rel="stylesheet" href="vendor/driverjs/css/driver.css"/>
     <link rel="stylesheet" href="css/styles.css">
+    <link rel="stylesheet" href="css/connection-help.css">
     <!-- SortableJS 1.15.6 (Local, MIT; see vendor/sortablejs/LICENSE) -->
     <script src="vendor/sortablejs/Sortable.min.js"></script>
     <!-- emoji-picker-element 1.29.1 (Local, Apache-2.0; data from vendor/emoji-picker-element-data) -->
@@ -29,9 +30,18 @@
     <div class="top-bar" id="top-bar">
         <!-- Placeholder for left alignment -->
         <div class="top-bar-placeholder"></div>
+        <!-- Centred while installing works (install.js); moves aside for the buttons -->
+        <button id="install-pill" class="install-pill" type="button" hidden>
+            <span class="icon" data-icon="install_mobile" aria-hidden="true"></span>
+            <span>Install app</span>
+        </button>
         <!-- Edit Mode Info (Hidden by default) -->
         <div class="edit-mode-info hidden" id="edit-mode-info">
             <span>EDIT MODE</span>
+        </div>
+        <!-- While searching (search.js) -->
+        <div class="search-mode-info hidden" id="search-mode-info">
+            <span>SEARCH</span>
         </div>
         <!-- Action Buttons -->
         <div class="action-buttons" id="top-bar-action-buttons">
@@ -40,6 +50,9 @@
             </button>
             <button id="layout-mode-button" class="icon-button top-bar-button hidden" aria-label="Change Layout">
                 <span class="icon" data-icon="view_module" aria-hidden="true"></span>
+            </button>
+            <button id="search-button" class="icon-button top-bar-button" aria-label="Search sounds">
+                <span class="icon" data-icon="search" aria-hidden="true"></span>
             </button>
             <button id="edit-mode-button" class="icon-button top-bar-button" aria-label="Toggle Edit Mode">
                 <span class="icon" data-icon="edit" aria-hidden="true"></span>
@@ -54,6 +67,19 @@
     </div>
 
     <div class="container">
+        <!-- Search across all tabs (search.js); the results fill the grid below -->
+        <section id="search-panel" class="search-panel" hidden>
+            <div class="search-field">
+                <span class="icon" data-icon="search" aria-hidden="true"></span>
+                <input id="search-input" type="search" placeholder="Search all sounds" aria-label="Search all sounds"
+                       autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" enterkeyhint="search">
+                <button id="search-close" class="search-close" type="button" aria-label="Close search">
+                    <span class="icon" data-icon="close" aria-hidden="true"></span>
+                </button>
+            </div>
+            <div id="search-colors" class="search-colors" role="radiogroup" aria-label="Filter by colour"></div>
+        </section>
+
         <!-- Wrapper for tab content animation -->
         <div id="tab-content-wrapper">
             <!-- Main sound grid -->
@@ -61,6 +87,20 @@
                 <!-- Sounds will be dynamically added here -->
             </main>
         </div>
+
+        <!-- While the PC can't be reached: what to check (app.js, connection-help.js) -->
+        <section id="connection-help" class="connection-help" aria-live="polite" hidden>
+            <h2>Can't reach <span id="connection-help-name">your PC</span></h2>
+            <p class="connection-help-lead">Resound keeps trying. Check these in order:</p>
+            <div id="connection-help-steps"></div>
+            <div class="connection-help-actions">
+                <button id="connection-help-retry" class="action-button primary" type="button">Try again</button>
+                <button id="connection-help-scan" class="action-button" type="button">
+                    <span class="icon" data-icon="qr_code_scanner" aria-hidden="true"></span>
+                    <span>Scan code</span>
+                </button>
+            </div>
+        </section>
 
         <!-- Tab navigation -->
         <nav class="tabs" id="tabs-container">
@@ -129,7 +169,7 @@
 
             <div class="divider"></div>
 
-            <!-- Color Selector (Round Buttons) -->
+            <!-- Color Selector: two rows of four, the second one reversed -->
             <div class="settings-section">
                  <h3>Button Color</h3>
                  <div id="color-selector" class="color-selector">
@@ -137,10 +177,10 @@
                       <button class="color-swatch red" data-color="red" aria-label="Red color"></button>
                       <button class="color-swatch orange" data-color="orange" aria-label="Orange color"></button>
                       <button class="color-swatch yellow" data-color="yellow" aria-label="Yellow color"></button>
-                      <button class="color-swatch green" data-color="green" aria-label="Green color"></button>
-                      <button class="color-swatch blue" data-color="blue" aria-label="Blue color"></button>
-                      <button class="color-swatch purple" data-color="purple" aria-label="Purple color"></button>
                       <button class="color-swatch pink" data-color="pink" aria-label="Pink color"></button>
+                      <button class="color-swatch purple" data-color="purple" aria-label="Purple color"></button>
+                      <button class="color-swatch blue" data-color="blue" aria-label="Blue color"></button>
+                      <button class="color-swatch green" data-color="green" aria-label="Green color"></button>
                  </div>
             </div>
 
@@ -243,7 +283,7 @@
 
                 <div class="settings-section">
                     <h3>PC</h3>
-                    <p class="modal-info">Connected to <strong id="app-connection-name">your PC</strong> directly over your network.</p>
+                    <p class="modal-info">Connected to <strong id="app-connection-name">your PC</strong> directly over your network. Long-press the logo at the bottom to open or close Resound on the PC.</p>
                     <div class="modal-actions grid">
                         <button id="app-connection-switch" class="action-button">
                             <span>Switch PC</span>
@@ -252,7 +292,7 @@
                             <span class="icon" data-icon="school" aria-hidden="true"></span>
                             <span>Tour</span>
                         </button>
-                        <!-- Shown while the browser offers to install the app (device.js) -->
+                        <!-- Shown where this browser can install the app; opens the install sheet (install.js) -->
                         <button id="install-app-button" class="action-button wide" hidden>
                             <span>Install the app</span>
                         </button>
@@ -262,16 +302,56 @@
         </div>
     </div>
 
+    <!-- Installing the app: why and how (install.js) -->
+    <div id="install-sheet" class="install-overlay" hidden>
+        <div class="install-backdrop"></div>
+        <div class="install-card" role="dialog" aria-modal="true" aria-labelledby="install-title">
+            <div class="handle-bar"></div>
+            <div class="install-head">
+                <img src="assets/resound-192.png" alt="" class="install-logo">
+                <div>
+                    <h2 id="install-title">Install Resound</h2>
+                    <p>Free, no app store, a few seconds.</p>
+                </div>
+            </div>
+            <ul class="install-benefits">
+                <li>
+                    <span class="install-benefit-icon"><span class="icon" data-icon="install_mobile" aria-hidden="true"></span></span>
+                    <div><strong>On your home screen</strong><span>One tap opens your soundboard.</span></div>
+                </li>
+                <li>
+                    <span class="install-benefit-icon"><span class="icon" data-icon="smartphone" aria-hidden="true"></span></span>
+                    <div><strong>The whole screen</strong><span>No browser bars, more room for your buttons.</span></div>
+                </li>
+                <li>
+                    <span class="install-benefit-icon"><span class="icon" data-icon="bolt" aria-hidden="true"></span></span>
+                    <div><strong>Always at hand</strong><span>Never lost among your browser tabs.</span></div>
+                </li>
+            </ul>
+            <div id="install-steps" class="install-steps" hidden>
+                <h3>How to install</h3>
+                <ol id="install-steps-list" class="help-steps"></ol>
+            </div>
+            <div class="install-actions">
+                <button id="install-not-now" class="action-button" type="button">Not now</button>
+                <button id="install-confirm" class="action-button primary" type="button">Install</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Load core modules -->
+    <script src="js/connection-help.js" defer></script>
     <script src="js/persistence.js" defer></script>
     <script src="js/screen-wake.js" defer></script>
     <script src="js/fullscreen.js" defer></script>
     <script src="js/device.js" defer></script>
+    <script src="js/install.js" defer></script>
     <script src="js/editMode.js" defer></script>
     <script src="js/layout.js" defer></script>
     <script src="js/dragDrop.js" defer></script>
     <script src="js/sound-settings.js" defer></script>
     <script src="js/tabs.js" defer></script>
+    <script src="js/search.js" defer></script>
     <script src="js/tutorial.js" defer></script>
     <!-- Load main app logic LAST -->
     <script src="js/app.js" defer></script>

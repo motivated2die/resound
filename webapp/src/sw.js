@@ -1,16 +1,25 @@
 // Service worker of the hosted app: every file is cached at install, so the
 // app starts without the host (only the PC must be reachable). cmd/webapp
 // fills in the version and the file list.
+//
+// One cache per version, served cache-first, so a page never mixes files of
+// two versions. A new version waits after installing until the page asks it
+// to take over (rtc.js, when that doesn't interrupt anyone) or until every
+// window of the app is closed; the next start then gets it directly.
 const VERSION = '__VERSION__';
 const FILES = __FILES__;
 const CACHE = 'resound-app-' + VERSION;
 
 self.addEventListener('install', (event) => {
+    // 'reload' skips the browser's HTTP cache: the new version's files come
+    // from the host, whatever caching headers it sends.
     event.waitUntil(
-        caches.open(CACHE)
-            .then((cache) => cache.addAll(FILES))
-            .then(() => self.skipWaiting())
+        caches.open(CACHE).then((cache) => cache.addAll(FILES.map((f) => new Request(f, { cache: 'reload' }))))
     );
+});
+
+self.addEventListener('message', (event) => {
+    if (event.data === 'skipWaiting') self.skipWaiting();
 });
 
 self.addEventListener('activate', (event) => {

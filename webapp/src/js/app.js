@@ -3,7 +3,11 @@ const state = {
   currentlyPlaying: new Map(), // Map soundId -> playingId
   tabs: [],
   currentTab: null, // Can be tabId (string) or 'favorites' (string)
-  settings: {}, // Loaded by persistence module directly now
+  searching: false, // the search shows its results in the grid (search.js)
+  // Loaded at once: device.js, screen-wake.js and install.js read their
+  // preferences before init() runs (an empty object here made them miss
+  // saved ones, e.g. vibration off). init() loads them again.
+  settings: persistence.load(),
   apiBaseUrl: '', // Determined on init
   longPressTimer: null,
   longPressTarget: null,
@@ -13,6 +17,9 @@ const state = {
   isTalkThroughButtonPressed: false, // Tracks button press state locally
   playbackGloballyPausedByToggle: false, // Tracks C++ state via callback
 };
+// Other scripts read it as window.state (a top-level const is no window
+// property): sound-settings.js marks long presses and checks push-to-talk.
+window.state = state;
 
 // DOM Elements
 const serverStatusEl = document.getElementById('server-status-text');
@@ -90,7 +97,59 @@ function init() {
     state.playbackGloballyPausedByToggle = false; // Init new state
     updatePlayPauseButtonIcon(); // Set initial icon state & visibility
     updateTopBarProgressState(0); // Set initial progress state (inactive)
+    setupPanelLongPress();
     checkServerStatus();
+}
+
+// --- Long press on the logo: the PC's panel ---
+// Holding the logo (with the title next to it) opens Resound's panel on the
+// PC, or closes it if it is open. The browser's own long press (the image
+// menu, Android's long-press vibration, dragging the image) is suppressed.
+const PANEL_HOLD_MS = 500;
+function setupPanelLongPress() {
+    const area = headerEl?.querySelector('.app-title');
+    if (!area) return;
+    area.querySelector('.logo')?.setAttribute('draggable', 'false');
+    let timer = null;
+    let start = null;
+    const cancel = () => {
+        clearTimeout(timer);
+        timer = null;
+        start = null;
+        area.classList.remove('holding');
+    };
+    area.addEventListener('pointerdown', (e) => {
+        if (e.button > 0) return;
+        cancel();
+        start = { x: e.clientX, y: e.clientY };
+        area.classList.add('holding');
+        timer = setTimeout(() => {
+            timer = null;
+            start = null;
+            area.classList.remove('holding');
+            togglePcPanel(e);
+        }, PANEL_HOLD_MS);
+    });
+    area.addEventListener('pointermove', (e) => {
+        if (start && Math.hypot(e.clientX - start.x, e.clientY - start.y) > 10) cancel();
+    });
+    for (const type of ['pointerup', 'pointercancel', 'pointerleave']) area.addEventListener(type, cancel);
+    area.addEventListener('touchstart', (e) => e.preventDefault(), { passive: false }); // no system long press
+    area.addEventListener('contextmenu', (e) => e.preventDefault());
+    area.addEventListener('dragstart', (e) => e.preventDefault());
+}
+
+async function togglePcPanel(event) {
+    if (window.haptics) window.haptics.tap();
+    createRipple(event, headerEl, 'rgba(80, 222, 168, 0.25)');
+    try {
+        const data = await apiFetch('/api/panel/toggle', { method: 'POST' });
+        showToast(data.open ? 'Resound is open on your PC.' : 'Resound closed on your PC.');
+    } catch (error) {
+        if (error.status === 404) showToast('Update Resound on your PC to open it from here.');
+        else if (error.status) showToast("Couldn't open Resound on your PC.");
+        // No answer at all: the connection help shows what to check.
+    }
 }
 
 
@@ -106,6 +165,7 @@ function setConnection(up) {
         clearTimeout(connection.retryTimer);
         connection.retryTimer = null;
         connection.retryDelay = 1000;
+        showConnectionHelp(false);
     }
     if (connection.up !== up) {
         connection.up = up;
@@ -128,8 +188,13 @@ async function reconnect() {
     } catch (_) {
         return; // apiFetch scheduled the next attempt
     }
-    if (!connection.loaded) checkServerStatus(); // the first load never finished
-    else checkForPlayingSounds(); // pick up sounds started meanwhile
+    if (!connection.loaded) {
+        checkServerStatus(); // the first load never finished
+        return;
+    }
+    checkForPlayingSounds(); // pick up sounds started meanwhile
+    // A tab opened while the PC was away shows an error instead of its sounds.
+    if (soundsContainerEl?.querySelector('.error-text')) reloadSoundsForCurrentTab();
 }
 
 // Retry at once when the phone wakes up or gets its network back.
@@ -142,6 +207,42 @@ function retryNow() {
 }
 document.addEventListener('visibilitychange', () => { if (!document.hidden) retryNow(); });
 window.addEventListener('online', retryNow);
+
+// --- Can't reach the PC ---
+// Once a connection attempt has failed, the sounds make way for a list of
+// what to check (connection-help.js). A dropped connection alone doesn't
+// show it: that usually comes straight back (rtc.js reconnects in ~70 ms),
+// and an attempt that gets no answer fails after 8 s.
+const connectionHelpEl = document.getElementById('connection-help');
+const connectionHelpRetry = document.getElementById('connection-help-retry');
+
+function showConnectionHelp(on) {
+    if (!connectionHelpEl || connectionHelpEl.hidden === !on) return;
+    if (on) {
+        const pc = window.resoundRTC?.currentPC();
+        document.getElementById('connection-help-name').textContent = pc ? pc.name : 'your PC';
+        window.resoundHelp?.render(document.getElementById('connection-help-steps'), false);
+    }
+    connectionHelpEl.hidden = !on;
+}
+
+window.resoundRTC?.onStatus((status, detail) => {
+    if (status === 'up') showConnectionHelp(false);
+    else if (status === 'down' && detail) showConnectionHelp(true); // an attempt failed
+    if (connectionHelpRetry) {
+        connectionHelpRetry.disabled = status === 'connecting';
+        connectionHelpRetry.textContent = status === 'connecting' ? 'Connecting…' : 'Try again';
+    }
+});
+connectionHelpRetry?.addEventListener('click', retryNow);
+document.getElementById('connection-help-scan')?.addEventListener('click', () => { location.href = '/connect#scan'; });
+// The device's own network state is part of the list.
+const refreshConnectionHelp = () => {
+    if (connectionHelpEl && !connectionHelpEl.hidden) window.resoundHelp?.render(document.getElementById('connection-help-steps'), false);
+};
+window.addEventListener('online', refreshConnectionHelp);
+window.addEventListener('offline', refreshConnectionHelp);
+navigator.connection?.addEventListener?.('change', refreshConnectionHelp);
 
 // --- API Helper ---
 async function apiFetch(endpoint, options = {}) {
@@ -237,8 +338,11 @@ async function checkServerStatus() {
 
   } catch (error) {
       console.error("Failed initial server status check or subsequent load sequence:", error.message);
-      if (tabsContainerEl) tabsContainerEl.innerHTML = '<p class="error-text">Failed to connect.</p>';
-      if (soundsContainerEl) soundsContainerEl.innerHTML = '<p class="error-text">Failed to connect.</p>';
+      // No answer from the PC: the connection help covers the sounds, and
+      // the first load runs again once the PC is back (reconnect).
+      const text = error.status ? '<p class="error-text">Failed to load.</p>' : '';
+      if (tabsContainerEl) tabsContainerEl.innerHTML = text;
+      if (soundsContainerEl) soundsContainerEl.innerHTML = text;
       updateTopBarProgressState(0);
       state.isAnythingPlayingUnpaused = false; // Ensure state reflects no playback on error
       updatePlayPauseButtonIcon();
@@ -309,9 +413,7 @@ function setupEventListeners() {
     if (talkThroughButton) {
         // --- Use pointerdown for press ---
         talkThroughButton.addEventListener('pointerdown', (e) => {
-            // Don't need stopPropagation unless causing issues elsewhere
-            // Don't use preventDefault here unless absolutely needed for vibration suppression,
-            // as it might break clicks on some platforms. Test without it first.
+            // The browser's own long press is cancelled on touchstart (below).
 
             // --- Aggressively clear sound-card timer ---
             if (typeof soundSettingsManager !== 'undefined' && soundSettingsManager.clearLongPressSoundCardTimer) {
@@ -371,6 +473,15 @@ function setupEventListeners() {
         talkThroughButton.addEventListener('contextmenu', (e) => {
              e.preventDefault();
         });
+
+        // A touch on the button is only push-to-talk. Cancelling touchstart
+        // keeps the browser from treating it as a long press (Android's own
+        // long-press vibration, text selection), a scroll or a click; the
+        // pointer events above still arrive, so the only vibrations are ours
+        // on press and release.
+        talkThroughButton.addEventListener('touchstart', (e) => {
+            if (e.cancelable) e.preventDefault();
+        }, { passive: false });
 
     } else console.error("Talk-Through button not found");
 
@@ -876,6 +987,9 @@ async function loadTabs() {
 
     } catch (error) {
         console.error('Error loading tabs:', error);
+        // No answer from the PC: the caller's first load isn't done, so it
+        // runs again on reconnect.
+        if (!error.status) throw error;
         if (tabsContainerEl) tabsContainerEl.innerHTML = '<p class="error-text">Failed to load tabs.</p>';
         state.currentTab = null; // Reset state on error
         if(soundsContainerEl) soundsContainerEl.innerHTML = '<p class="error-text">Failed to load tabs.</p>';
@@ -928,7 +1042,8 @@ async function setActiveTab(tabElement, tabId) {
 
     // Only proceed if the tab is actually changing
     if (currentTabStr === newTabIdStr) {
-         // console.log(`Tab ${newTabIdStr} is already active.`);
+         // A rebuilt tab bar (loadTabs) still marks it.
+         tabElement?.classList.add('active');
          return;
     }
 
@@ -940,6 +1055,7 @@ async function setActiveTab(tabElement, tabId) {
         tabElement.classList.add('active');
          // Scroll into view after activation
          setTimeout(() => {
+             if (window.tabManager?.isCurrentlySwiping()) return; // the next swipe moves the tab bar
              tabElement.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
          }, 50);
     }
@@ -1001,6 +1117,7 @@ async function loadSounds(tabId) {
         soundsContainerEl.innerHTML = '<p class="no-sounds">Select a tab.</p>';
         return;
     }
+    if (state.searching) return; // the grid shows search results (search.js)
     const id = String(tabId);
     const cached = tabSoundsCache.get(id);
     if (cached) {
@@ -1012,7 +1129,7 @@ async function loadSounds(tabId) {
 
     try {
         const fresh = await fetchTabSounds(id);
-        if (String(state.currentTab) !== id) return; // the user moved on meanwhile
+        if (String(state.currentTab) !== id || state.searching) return; // the user moved on meanwhile
         if (!cached || soundListKey(fresh) !== soundListKey(cached)) {
             displaySounds(orderSounds(id, fresh), !cached);
         } else {
@@ -1128,7 +1245,7 @@ function scheduleProgressReset(card) {
     setTimeout(() => { if (!card.classList.contains('playing')) resetCardProgress(card); }, 400);
 }
 
-function updateSoundCardDisplay(soundId, cardElement = null, tabId = state.currentTab) {
+function updateSoundCardDisplay(soundId, cardElement = null, tabId = state.searching ? 'search' : state.currentTab) {
     const card = cardElement || soundsContainerEl?.querySelector(`.sound-card[data-sound-id="${soundId}"]`);
     if (!card) {
         // console.warn(`Cannot update display: Card element not found for soundId ${soundId}.`);
@@ -1145,6 +1262,9 @@ function updateSoundCardDisplay(soundId, cardElement = null, tabId = state.curre
 
     const contentWrapper = card.querySelector('.sound-content-wrapper');
     const textElement = card.querySelector('.sound-text');
+    // The layout of the grid the card is in: a swipe preview or the sheet's
+    // floating copy may differ from the live page. Not placed yet: the page's.
+    const isList = (card.closest('.sounds-grid') || soundsContainerEl)?.classList.contains('layout-list');
 
     // --- Indicators ---
     let indicators = card.querySelector('.sound-indicators');
@@ -1157,6 +1277,18 @@ function updateSoundCardDisplay(soundId, cardElement = null, tabId = state.curre
     }
     indicators.innerHTML = ''; // Clear existing indicators
 
+    // Indicators, left to right: custom volume, then the favourite in the
+    // corner.
+    // Custom Volume Indicator: quieter or louder than the default
+    const hasCustomVolume = soundSettings.hasCustomVolume === true; // Explicitly check for true
+     card.dataset.customVolume = hasCustomVolume ? 'true' : 'false'; // Set dataset attribute
+    if (hasCustomVolume) {
+        const volIcon = document.createElement('span');
+        volIcon.className = 'indicator-icon icon volume-indicator';
+        volIcon.dataset.icon = soundSettings.volumeDown ? 'volume_down' : 'volume_up';
+        indicators.appendChild(volIcon);
+    }
+
     // Favorite Indicator
     const isFavorite = soundSettings.favorite === true; // Explicitly check for true
     card.dataset.favorite = isFavorite ? 'true' : 'false'; // Set dataset attribute
@@ -1165,16 +1297,6 @@ function updateSoundCardDisplay(soundId, cardElement = null, tabId = state.curre
         favIcon.className = 'indicator-icon icon favorite-indicator';
         favIcon.dataset.icon = 'favorite-fill';
         indicators.appendChild(favIcon);
-    }
-
-    // Custom Volume Indicator
-    const hasCustomVolume = soundSettings.hasCustomVolume === true; // Explicitly check for true
-     card.dataset.customVolume = hasCustomVolume ? 'true' : 'false'; // Set dataset attribute
-    if (hasCustomVolume) {
-        const volIcon = document.createElement('span');
-        volIcon.className = 'indicator-icon icon volume-indicator';
-        volIcon.dataset.icon = 'volume_up';
-        indicators.appendChild(volIcon);
     }
 
     // Remove indicator container if empty
@@ -1205,9 +1327,7 @@ function updateSoundCardDisplay(soundId, cardElement = null, tabId = state.curre
     if (existingEmojiSpan) contentWrapper.removeChild(existingEmojiSpan);
 
     if (soundSettings.emoji && textElement && contentWrapper) {
-        const currentLayoutClass = soundsContainerEl?.classList.contains('layout-list') ? 'layout-list' : 'layout-grid'; // Simplified check
-
-        if (currentLayoutClass === 'layout-list') {
+        if (isList) {
             // Add emoji span before the text in list view
             const emojiSpan = document.createElement('span');
             emojiSpan.className = 'sound-emoji-list';
@@ -1236,7 +1356,7 @@ function updateSoundCardDisplay(soundId, cardElement = null, tabId = state.curre
          const percentage = (playingInstance && playingInstance.lengthInMs > 0)
                            ? (playingInstance.readInMs / playingInstance.lengthInMs) * 100
                            : 0;
-         if (!soundsContainerEl?.classList.contains('layout-list')) { // Only for grid layouts
+         if (!isList) { // Only for grid layouts
               setCardProgress(card, percentage);
          } else {
               card.style.background = ''; // Ensure list items don't have gradient
@@ -1255,26 +1375,7 @@ async function playSound(soundId) {
         const data = await apiFetch(`/api/sounds/${soundId}/play`, { method: 'POST' });
         if (data.success && typeof data.playingId !== 'undefined') {
             console.log(`Sound ${soundId} playback started with playingId ${data.playingId}`);
-            // Store mapping: soundId -> playingId
-            state.currentlyPlaying.set(soundId, data.playingId);
-            const playedCard = soundsContainerEl.querySelector(`.sound-card[data-sound-id="${soundId}"]`);
-            if (playedCard) resetCardProgress(playedCard);
-
-            // Store details for progress tracking
-            const newSoundData = {
-                id: data.playingId, // This is the *instance* ID
-                soundId: soundId,   // This is the *sound definition* ID
-                lengthInMs: data.lengthInMs || 0,
-                readInMs: 0, // Start progress at 0
-                name: data.name || 'Sound', // Get name if available from response
-                paused: false,
-                repeat: false, // Assume repeat is off initially
-            };
-            soundProgress.activeSounds.set(data.playingId, newSoundData);
-
-            updatePlayingStateVisuals(); // Update 'playing' class on cards
-            handleSoundPlayedVisuals(newSoundData); // Update global UI (play icon)
-            startProgressPolling(); // Start or ensure polling is active
+            trackPlaying(soundId, data);
         } else {
             console.error(`Failed to play sound ${soundId}:`, data.error || 'Unknown server error');
             state.currentlyPlaying.delete(soundId); // Ensure cleanup if play failed
@@ -1287,6 +1388,30 @@ async function playSound(soundId) {
         if (error.status) showPlayFailed(soundId, error.message); // the PC answered: this sound failed
     }
 }
+
+// trackPlaying follows a sound the PC started (a play, or a preview from the
+// sound's sheet) with the progress polling: its card shows the fill, and
+// every poll announces 'soundprogress' (the sheet's preview listens).
+function trackPlaying(soundId, data) {
+    state.currentlyPlaying.set(soundId, data.playingId); // soundId -> playingId
+    const playedCard = soundsContainerEl?.querySelector(`.sound-card[data-sound-id="${soundId}"]`);
+    if (playedCard) resetCardProgress(playedCard);
+    const newSoundData = {
+        id: data.playingId, // the instance
+        soundId: soundId,   // the sound
+        lengthInMs: data.lengthInMs || 0,
+        readInMs: 0,
+        name: data.name || 'Sound',
+        paused: false,
+        repeat: false,
+    };
+    soundProgress.activeSounds.set(data.playingId, newSoundData);
+    updatePlayingStateVisuals(); // Update 'playing' class on cards
+    handleSoundPlayedVisuals(newSoundData); // Update global UI (play icon)
+    startProgressPolling(); // Start or ensure polling is active
+}
+
+const announceProgress = () => document.dispatchEvent(new CustomEvent('soundprogress'));
 
 // showPlayFailed flashes the card and says why, e.g. for a damaged file.
 function showPlayFailed(soundId, message) {
@@ -1311,6 +1436,7 @@ async function stopAllSounds() {
         updatePlayingStateVisuals(); // Remove 'playing' class
         stopProgressPolling(); // Stop polling
         handleAllSoundsFinishedVisuals(); // Reset global UI
+        announceProgress();
         console.log("All sounds stopped.");
     } catch (error) {
         console.error('Error stopping sounds:', error);
@@ -1320,6 +1446,7 @@ async function stopAllSounds() {
         updatePlayingStateVisuals();
         stopProgressPolling();
         handleAllSoundsFinishedVisuals();
+        announceProgress();
     }
 }
 
@@ -1480,6 +1607,7 @@ async function fetchSoundProgress() {
              updateTopBarProgressState(0); // Reset progress bar
              stopProgressPolling("No active sounds after update");
         }
+        announceProgress();
 
     } catch (error) {
         console.error('Error fetching sound progress:', error);
@@ -1498,6 +1626,7 @@ async function fetchSoundProgress() {
         state.playbackGloballyPausedByToggle = false;
         updatePlayPauseButtonIcon();
         updateTopBarProgressState(0); // Reset progress bar on error
+        announceProgress();
     }
 }
 
@@ -1590,6 +1719,12 @@ window.app = {
   fetchTabSounds,
   orderSounds,
   createSoundCardElement,
+  // Used by sound-settings.js for the preview and its floating card.
+  trackPlaying,
+  playingSound: (playingId) => soundProgress.activeSounds.get(playingId) || null,
+  setCardProgress,
+  resetCardProgress,
+  stopAllSounds,
   // Reset functions (keep if needed)
   // resetCurrentPageVisuals: resetCurrentPageVisuals,
   // resetCurrentPageLayout: resetCurrentPageLayout,
