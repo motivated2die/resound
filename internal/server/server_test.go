@@ -317,3 +317,20 @@ func TestVolumeAppliesToPlayingSound(t *testing.T) {
 		t.Fatal("reset should return to the defaults")
 	}
 }
+
+// The cards show whether a custom volume is quieter or louder than the
+// default ("You hear", here 50) by the slider position's sign.
+func TestSliderPosition(t *testing.T) {
+	vol := func(v int) *int { return &v }
+	for _, c := range []struct {
+		local *int
+		want  int
+	}{
+		{nil, 0}, {vol(50), 0}, {vol(25), -25}, {vol(0), -50}, {vol(75), 25}, {vol(100), 50}, {vol(200), 50},
+	} {
+		snd := library.Sound{SoundSettings: library.SoundSettings{LocalVolume: c.local}}
+		if got := sliderPosition(snd, 50); got != c.want {
+			t.Errorf("local volume %v: slider %d, want %d", c.local, got, c.want)
+		}
+	}
+}

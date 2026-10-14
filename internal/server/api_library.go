@@ -65,13 +65,14 @@ func (s *Server) handleLibrary(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNotModified)
 		return
 	}
+	defLocal, _ := s.player.DefaultVolumes()
 	tabs := []map[string]any{}
 	sounds := []map[string]any{}
 	for _, t := range s.lib.Tabs() {
 		ids := make([]uint64, 0, len(t.Sounds))
 		for _, snd := range t.Sounds {
 			ids = append(ids, snd.ID)
-			j := soundJSON(snd)
+			j := soundJSON(snd, defLocal)
 			j["tabId"] = snd.TabID
 			sounds = append(sounds, j)
 		}

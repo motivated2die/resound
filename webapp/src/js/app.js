@@ -13,6 +13,9 @@ const state = {
   isTalkThroughButtonPressed: false, // Tracks button press state locally
   playbackGloballyPausedByToggle: false, // Tracks C++ state via callback
 };
+// Other scripts read it as window.state (a top-level const is no window
+// property): sound-settings.js marks long presses and checks push-to-talk.
+window.state = state;
 
 // DOM Elements
 const serverStatusEl = document.getElementById('server-status-text');
@@ -1202,6 +1205,9 @@ function updateSoundCardDisplay(soundId, cardElement = null, tabId = state.curre
 
     const contentWrapper = card.querySelector('.sound-content-wrapper');
     const textElement = card.querySelector('.sound-text');
+    // The layout of the grid the card is in: a swipe preview or the sheet's
+    // floating copy may differ from the live page. Not placed yet: the page's.
+    const isList = (card.closest('.sounds-grid') || soundsContainerEl)?.classList.contains('layout-list');
 
     // --- Indicators ---
     let indicators = card.querySelector('.sound-indicators');
@@ -1214,6 +1220,18 @@ function updateSoundCardDisplay(soundId, cardElement = null, tabId = state.curre
     }
     indicators.innerHTML = ''; // Clear existing indicators
 
+    // Indicators, left to right: custom volume, then the favourite in the
+    // corner.
+    // Custom Volume Indicator: quieter or louder than the default
+    const hasCustomVolume = soundSettings.hasCustomVolume === true; // Explicitly check for true
+     card.dataset.customVolume = hasCustomVolume ? 'true' : 'false'; // Set dataset attribute
+    if (hasCustomVolume) {
+        const volIcon = document.createElement('span');
+        volIcon.className = 'indicator-icon icon volume-indicator';
+        volIcon.dataset.icon = soundSettings.volumeDown ? 'volume_down' : 'volume_up';
+        indicators.appendChild(volIcon);
+    }
+
     // Favorite Indicator
     const isFavorite = soundSettings.favorite === true; // Explicitly check for true
     card.dataset.favorite = isFavorite ? 'true' : 'false'; // Set dataset attribute
@@ -1222,16 +1240,6 @@ function updateSoundCardDisplay(soundId, cardElement = null, tabId = state.curre
         favIcon.className = 'indicator-icon icon favorite-indicator';
         favIcon.dataset.icon = 'favorite-fill';
         indicators.appendChild(favIcon);
-    }
-
-    // Custom Volume Indicator
-    const hasCustomVolume = soundSettings.hasCustomVolume === true; // Explicitly check for true
-     card.dataset.customVolume = hasCustomVolume ? 'true' : 'false'; // Set dataset attribute
-    if (hasCustomVolume) {
-        const volIcon = document.createElement('span');
-        volIcon.className = 'indicator-icon icon volume-indicator';
-        volIcon.dataset.icon = 'volume_up';
-        indicators.appendChild(volIcon);
     }
 
     // Remove indicator container if empty
@@ -1262,9 +1270,7 @@ function updateSoundCardDisplay(soundId, cardElement = null, tabId = state.curre
     if (existingEmojiSpan) contentWrapper.removeChild(existingEmojiSpan);
 
     if (soundSettings.emoji && textElement && contentWrapper) {
-        const currentLayoutClass = soundsContainerEl?.classList.contains('layout-list') ? 'layout-list' : 'layout-grid'; // Simplified check
-
-        if (currentLayoutClass === 'layout-list') {
+        if (isList) {
             // Add emoji span before the text in list view
             const emojiSpan = document.createElement('span');
             emojiSpan.className = 'sound-emoji-list';
@@ -1293,7 +1299,7 @@ function updateSoundCardDisplay(soundId, cardElement = null, tabId = state.curre
          const percentage = (playingInstance && playingInstance.lengthInMs > 0)
                            ? (playingInstance.readInMs / playingInstance.lengthInMs) * 100
                            : 0;
-         if (!soundsContainerEl?.classList.contains('layout-list')) { // Only for grid layouts
+         if (!isList) { // Only for grid layouts
               setCardProgress(card, percentage);
          } else {
               card.style.background = ''; // Ensure list items don't have gradient
@@ -1312,26 +1318,7 @@ async function playSound(soundId) {
         const data = await apiFetch(`/api/sounds/${soundId}/play`, { method: 'POST' });
         if (data.success && typeof data.playingId !== 'undefined') {
             console.log(`Sound ${soundId} playback started with playingId ${data.playingId}`);
-            // Store mapping: soundId -> playingId
-            state.currentlyPlaying.set(soundId, data.playingId);
-            const playedCard = soundsContainerEl.querySelector(`.sound-card[data-sound-id="${soundId}"]`);
-            if (playedCard) resetCardProgress(playedCard);
-
-            // Store details for progress tracking
-            const newSoundData = {
-                id: data.playingId, // This is the *instance* ID
-                soundId: soundId,   // This is the *sound definition* ID
-                lengthInMs: data.lengthInMs || 0,
-                readInMs: 0, // Start progress at 0
-                name: data.name || 'Sound', // Get name if available from response
-                paused: false,
-                repeat: false, // Assume repeat is off initially
-            };
-            soundProgress.activeSounds.set(data.playingId, newSoundData);
-
-            updatePlayingStateVisuals(); // Update 'playing' class on cards
-            handleSoundPlayedVisuals(newSoundData); // Update global UI (play icon)
-            startProgressPolling(); // Start or ensure polling is active
+            trackPlaying(soundId, data);
         } else {
             console.error(`Failed to play sound ${soundId}:`, data.error || 'Unknown server error');
             state.currentlyPlaying.delete(soundId); // Ensure cleanup if play failed
@@ -1344,6 +1331,30 @@ async function playSound(soundId) {
         if (error.status) showPlayFailed(soundId, error.message); // the PC answered: this sound failed
     }
 }
+
+// trackPlaying follows a sound the PC started (a play, or a preview from the
+// sound's sheet) with the progress polling: its card shows the fill, and
+// every poll announces 'soundprogress' (the sheet's preview listens).
+function trackPlaying(soundId, data) {
+    state.currentlyPlaying.set(soundId, data.playingId); // soundId -> playingId
+    const playedCard = soundsContainerEl?.querySelector(`.sound-card[data-sound-id="${soundId}"]`);
+    if (playedCard) resetCardProgress(playedCard);
+    const newSoundData = {
+        id: data.playingId, // the instance
+        soundId: soundId,   // the sound
+        lengthInMs: data.lengthInMs || 0,
+        readInMs: 0,
+        name: data.name || 'Sound',
+        paused: false,
+        repeat: false,
+    };
+    soundProgress.activeSounds.set(data.playingId, newSoundData);
+    updatePlayingStateVisuals(); // Update 'playing' class on cards
+    handleSoundPlayedVisuals(newSoundData); // Update global UI (play icon)
+    startProgressPolling(); // Start or ensure polling is active
+}
+
+const announceProgress = () => document.dispatchEvent(new CustomEvent('soundprogress'));
 
 // showPlayFailed flashes the card and says why, e.g. for a damaged file.
 function showPlayFailed(soundId, message) {
@@ -1368,6 +1379,7 @@ async function stopAllSounds() {
         updatePlayingStateVisuals(); // Remove 'playing' class
         stopProgressPolling(); // Stop polling
         handleAllSoundsFinishedVisuals(); // Reset global UI
+        announceProgress();
         console.log("All sounds stopped.");
     } catch (error) {
         console.error('Error stopping sounds:', error);
@@ -1377,6 +1389,7 @@ async function stopAllSounds() {
         updatePlayingStateVisuals();
         stopProgressPolling();
         handleAllSoundsFinishedVisuals();
+        announceProgress();
     }
 }
 
@@ -1537,6 +1550,7 @@ async function fetchSoundProgress() {
              updateTopBarProgressState(0); // Reset progress bar
              stopProgressPolling("No active sounds after update");
         }
+        announceProgress();
 
     } catch (error) {
         console.error('Error fetching sound progress:', error);
@@ -1555,6 +1569,7 @@ async function fetchSoundProgress() {
         state.playbackGloballyPausedByToggle = false;
         updatePlayPauseButtonIcon();
         updateTopBarProgressState(0); // Reset progress bar on error
+        announceProgress();
     }
 }
 
@@ -1647,6 +1662,12 @@ window.app = {
   fetchTabSounds,
   orderSounds,
   createSoundCardElement,
+  // Used by sound-settings.js for the preview and its floating card.
+  trackPlaying,
+  playingSound: (playingId) => soundProgress.activeSounds.get(playingId) || null,
+  setCardProgress,
+  resetCardProgress,
+  stopAllSounds,
   // Reset functions (keep if needed)
   // resetCurrentPageVisuals: resetCurrentPageVisuals,
   // resetCurrentPageLayout: resetCurrentPageLayout,

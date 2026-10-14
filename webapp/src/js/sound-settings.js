@@ -47,8 +47,10 @@ function initSoundSettings() {
     setupEmojiSelection(); // Now handles modal logic
     setupLongPressDetection();
     setupRightClickBehavior();
+    setupLiftedCard();
 
     settingsBackdrop?.addEventListener('click', closeSettingsMenu);
+    document.addEventListener('soundprogress', syncPreview); // app.js, every poll
 }
 
 // --- MODIFIED: Function to set the selected emoji (called from modal) ---
@@ -63,10 +65,7 @@ function setEmoji(emoji) {
     if (selectEmojiButton) selectEmojiButton.classList.add('hidden'); // Hide select button
     if (clearEmojiButtonSettings) clearEmojiButtonSettings.classList.remove('hidden'); // Show clear button
 
-    // Update the main sound card display
-    if (window.app && typeof window.app.updateSoundCardDisplay === 'function') {
-        window.app.updateSoundCardDisplay(currentSoundId);
-    }
+    refreshCards(currentSoundId);
 
     // Close the modal
     closeEmojiPickerModal();
@@ -83,10 +82,7 @@ function clearEmoji() {
     if (selectEmojiButton) selectEmojiButton.classList.remove('hidden'); // Show select button
     if (clearEmojiButtonSettings) clearEmojiButtonSettings.classList.add('hidden'); // Hide clear button
 
-    // Update the main sound card display
-    if (window.app && typeof window.app.updateSoundCardDisplay === 'function') {
-        window.app.updateSoundCardDisplay(currentSoundId);
-    }
+    refreshCards(currentSoundId);
 
     // DO NOT open the modal automatically
 }
@@ -114,7 +110,7 @@ function setupRightClickBehavior() {
         const soundCard = e.target.closest('.sound-card');
         if (soundCard) {
             e.preventDefault();
-            if (!editMode.isActive()) {
+            if (!editMode.isActive() && !soundCard.closest('#sound-preview-stage')) {
                 const soundId = parseInt(soundCard.dataset.soundId);
                 if (window.soundSettings && typeof window.soundSettings.open === 'function') {
                    openSoundSettings(soundId);
@@ -134,6 +130,7 @@ const longPressDuration = 500;
 let longPressSoundCard = null;
 let longPressStartPosition = null;
 let hasMoved = false;
+let longPressFired = false; // the timer opened the sheet during this touch
 
 // Handle touch start for long press
 function handleTouchStart(e) {
@@ -145,6 +142,7 @@ function handleTouchStart(e) {
     // --- END Check ---
 
     // If we reach here, it's NOT the PTT button, proceed with sound card logic
+    if (e.target.closest('#sound-preview-stage')) return; // the sheet's floating copy plays a preview
     const soundCard = e.target.closest('.sound-card');
     if (!soundCard) {
         // console.log("Ignoring touchstart for long press detection - not on sound card.");
@@ -176,8 +174,9 @@ function handleTouchStart(e) {
             // if (navigator.vibrate) navigator.vibrate(50);
 
             const soundId = parseInt(soundCard.dataset.soundId);
-            // Update last long press time ONLY if it's a valid sound card long press
-            if(window.state) state.lastLongPressTime = Date.now();
+            // The click of this touch's release is not a tap (app.js, below).
+            longPressFired = true;
+            if (window.state) state.lastLongPressTime = Date.now();
             openSoundSettings(soundId);
         } else {
             // console.log("Long press timer fired, but conditions not met (moved or target changed)."); // Optional debug
@@ -188,22 +187,6 @@ function handleTouchStart(e) {
     }, longPressDuration);
 }
 
-
-/* --- Add clarification to handleTouchEnd --- */
-function handleTouchEnd() {
-    // Update last long press time regardless, as the touch ended
-    if(window.state) state.lastLongPressTime = Date.now();
-
-    // --- KEEP: Clear the timer on touch end ---
-    // This is crucial. If the touch ends before the timer fires,
-    // the long press action (including vibration) is cancelled.
-    clearTimeout(longPressTimer);
-    // --- END KEEP ---
-
-    longPressSoundCard = null;
-    longPressStartPosition = null;
-    hasMoved = false;
-}
 
 // Handle touch move for long press
 function handleTouchMove(e) {
@@ -216,9 +199,13 @@ function handleTouchMove(e) {
     }
 }
 
-// Handle touch end for long press
+// Handle touch end for long press. Ending a long press marks the time, so
+// the click that may follow the release doesn't play the card (app.js) or
+// preview the sheet's floating copy, which is under the finger by then. A
+// plain tap leaves it alone.
 function handleTouchEnd() {
-    if(window.state) state.lastLongPressTime = Date.now();
+    if (longPressFired && window.state) state.lastLongPressTime = Date.now();
+    longPressFired = false;
     clearTimeout(longPressTimer);
     longPressSoundCard = null; longPressStartPosition = null; hasMoved = false;
 }
@@ -264,7 +251,7 @@ function onCardTouchMove(e) {
 function onCardTouchEnd() {
     if (!isDragging) return;
     isDragging = false;
-    settingsCard.style.transition = 'transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)';
+    settingsCard.style.transition = `transform 0.3s ${SHEET_EASE}`;
     if (settingsBackdrop) settingsBackdrop.style.transition = 'opacity 0.3s ease';
     const deltaY = currentY - startY;
     if (deltaY > cardHeight * 0.3) { closeSettingsMenu(); }
@@ -288,7 +275,7 @@ function setupButtonActions() {
                     favoriteButton.classList.toggle('active', data.isFavorite === true);
                     persistence.setSoundFavorite(currentSoundId, data.isFavorite === true);
                     if (window.app) {
-                        app.updateSoundCardDisplay(currentSoundId);
+                        refreshCards(currentSoundId);
                         app.tabSoundsCache.delete('favorites'); // the favorites tab changed
                         window.tabManager?.refreshNeighbors();
                     }
@@ -298,29 +285,7 @@ function setupButtonActions() {
     } else { console.error("Favorite button not found."); }
 
     if (previewButton) {
-        previewButton.addEventListener('click', () => {
-            if (!currentSoundId) return;
-            const currentState = previewButton.getAttribute('data-state');
-            if (currentState === 'preview') {
-                if (currentPreviewId) stopPreviewSound(currentPreviewId);
-                fetch(`/api/sounds/${currentSoundId}/preview`, { method: 'POST' })
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success && data.playingId) {
-                        currentPreviewId = data.playingId;
-                        previewButton.setAttribute('data-state', 'stop');
-                        previewButton.querySelector('.icon').dataset.icon = 'stop_circle';
-                        previewButton.querySelector('.button-text').textContent = 'Stop';
-                    }
-                }).catch(err => console.error("Error starting preview:", err));
-            } else {
-                stopPreviewSound(currentPreviewId);
-                currentPreviewId = null;
-                previewButton.setAttribute('data-state', 'preview');
-                previewButton.querySelector('.icon').dataset.icon = 'volume_up';
-                previewButton.querySelector('.button-text').textContent = 'Preview';
-            }
-        });
+        previewButton.addEventListener('click', togglePreview);
     } else { console.error("Preview button not found."); }
 
     if (volumeSlider) {
@@ -361,7 +326,7 @@ function setupColorSelection() {
             persistence.setSoundColor(currentSoundId, color);
             colorSelector.querySelectorAll('.color-swatch').forEach(s => s.classList.remove('selected'));
             swatch.classList.add('selected');
-            if (window.app) app.updateSoundCardDisplay(currentSoundId);
+            refreshCards(currentSoundId);
         }
     });
 }
@@ -426,11 +391,19 @@ function openEmojiPickerModal() {
     if (!emojiPickerModalOverlay) return;
     console.log("Opening emoji picker modal.");
     emojiPickerModalOverlay.classList.remove('hidden');
-    // Optional: Add animation class if needed
-    // requestAnimationFrame(() => emojiPickerModal.classList.add('visible'));
+    clearEmojiSearch();
 
     // Focus the search input after the modal is potentially visible
     focusEmojiSearchInput();
+}
+
+// clearEmojiSearch empties the picker's search, so it opens on all emoji
+// rather than the last search. The picker reacts to its input event.
+function clearEmojiSearch() {
+    const input = emojiPickerInputElement || emojiPickerInstance?.shadowRoot?.querySelector('input[type="search"]');
+    if (!input || !input.value) return;
+    input.value = '';
+    input.dispatchEvent(new Event('input', { bubbles: true }));
 }
 
 // --- NEW: Function to close the emoji picker modal ---
@@ -510,8 +483,8 @@ function updateVolumeWithSlider(sliderPos) {
     .then(response => response.json())
     .then(data => {
         if (!data.success) return;
-        persistence.setSoundCustomVolume(job.soundId, job.pos !== 0);
-        if (window.app) app.updateSoundCardDisplay(job.soundId);
+        persistence.setSoundCustomVolume(job.soundId, job.pos !== 0, job.pos);
+        refreshCards(job.soundId);
         if (job.soundId === currentSoundId && currentSoundData) {
             currentSoundData.hasCustomVolume = (job.pos !== 0);
             currentSoundData.sliderPosition = job.pos;
@@ -578,8 +551,9 @@ function openSoundSettings(soundId) {
         }
         // --- End Modified Emoji Visibility Logic ---
 
-        // Animate in the settings card
+        // The sheet slides up while the button lifts out of the grid above it.
         settingsOverlay.classList.remove('hidden');
+        liftCard(sound);
         requestAnimationFrame(() => {
             if (settingsBackdrop) settingsBackdrop.style.opacity = '1';
             settingsCard.style.transform = 'translateY(0)';
@@ -601,12 +575,7 @@ function resetMenuState() {
     if (!settingsOverlay) return;
 
     // Reset Buttons and Slider
-    if (previewButton) {
-        previewButton.setAttribute('data-state', 'preview');
-        previewButton.querySelector('.icon').dataset.icon = 'volume_up';
-        previewButton.querySelector('.button-text').textContent = 'Preview';
-    }
-    stopPreviewSound(currentPreviewId); currentPreviewId = null;
+    if (currentPreviewId !== null) stopPreview(); else showPreviewStopped();
 
     setSliderPosition(0);
     if (favoriteButton) favoriteButton.classList.remove('active');
@@ -638,8 +607,9 @@ function closeSettingsMenu() {
     if (!settingsOverlay || !settingsCard) return;
     settingsCard.style.transform = 'translateY(100%)';
     if (settingsBackdrop) settingsBackdrop.style.opacity = '0';
+    dropCard();
 
-    stopPreviewSound(currentPreviewId); currentPreviewId = null;
+    if (currentPreviewId !== null) stopPreview();
 
     // Ensure the emoji modal is also closed when the main settings menu closes
     closeEmojiPickerModal();
@@ -656,12 +626,192 @@ function closeSettingsMenu() {
     }, 300); // Match transition duration
 }
 
-// Helper function to stop preview sound
-function stopPreviewSound(playingId) {
-     if (playingId) {
-         fetch('/api/sounds/stop', { method: 'POST' }) // Use general stop endpoint
-             .catch(error => console.error('Error stopping preview sound:', error));
-     }
+// --- Preview ---
+// A preview plays the sound to "You hear" only. The progress polling follows
+// it (app.trackPlaying): while it plays, the preview button reads "Stop" and
+// fills with its progress, like the floating card; when it ends, both return
+// to normal. The PC stops sounds only all at once, so "Stop" stops all.
+
+async function togglePreview() {
+    if (!currentSoundId) return;
+    if (currentPreviewId !== null) {
+        stopPreview();
+        return;
+    }
+    window.haptics?.tap();
+    const soundId = currentSoundId;
+    try {
+        const response = await fetch(`/api/sounds/${soundId}/preview`, { method: 'POST' });
+        const data = await response.json();
+        if (!data.success || data.playingId === undefined || soundId !== currentSoundId) return;
+        currentPreviewId = data.playingId;
+        showPreviewPlaying();
+        app.trackPlaying(soundId, data);
+    } catch (err) {
+        console.error('Error starting preview:', err);
+    }
+}
+
+function stopPreview() {
+    currentPreviewId = null;
+    showPreviewStopped();
+    app.stopAllSounds(); // clears the playing state at once
+}
+
+// syncPreview follows the preview on every progress poll.
+function syncPreview() {
+    if (currentPreviewId === null) return;
+    const playing = app.playingSound(currentPreviewId);
+    if (!playing) { // finished
+        currentPreviewId = null;
+        showPreviewStopped();
+        return;
+    }
+    const p = playing.lengthInMs > 0 ? Math.min(1, playing.readInMs / playing.lengthInMs) : 0;
+    previewButton?.style.setProperty('--progress', String(p));
+    if (lifted) {
+        lifted.card.classList.add('playing');
+        app.setCardProgress(lifted.card, p * 100);
+    }
+}
+
+function showPreviewPlaying() {
+    if (!previewButton) return;
+    resetPreviewFill();
+    previewButton.setAttribute('data-state', 'stop');
+    previewButton.querySelector('.icon').dataset.icon = 'stop_circle';
+    previewButton.querySelector('.button-text').textContent = 'Stop';
+}
+
+function showPreviewStopped() {
+    if (previewButton) {
+        previewButton.setAttribute('data-state', 'preview');
+        previewButton.querySelector('.icon').dataset.icon = 'volume_up';
+        previewButton.querySelector('.button-text').textContent = 'Preview';
+    }
+    if (lifted) {
+        const card = lifted.card;
+        card.classList.remove('playing'); // the fill fades out, then empties
+        setTimeout(() => { if (!card.classList.contains('playing')) app.resetCardProgress(card); }, 400);
+    }
+}
+
+// resetPreviewFill empties the button's fill without animating back.
+function resetPreviewFill() {
+    previewButton.classList.add('progress-reset');
+    previewButton.style.setProperty('--progress', '0');
+    void previewButton.offsetWidth;
+    previewButton.classList.remove('progress-reset');
+}
+
+// --- The button above the sheet ---
+// While the sheet is open, a copy of the sound's button floats above it: it
+// lifts out of the grid as the sheet slides up and settles back into place
+// when it closes. It is built and updated like the grid's cards, so colour,
+// emoji, volume and favourite changes show on it at once, and tapping it
+// previews the sound. In the list layout, which shows no colours, it is a
+// grid card.
+
+const SHEET_EASE = 'cubic-bezier(0.2, 0.9, 0.25, 1)';
+const LIFT_MS = 320;
+let lifted = null; // { card, soundId, w, h, fromList }
+let previewStage = null;
+
+function setupLiftedCard() {
+    previewStage = document.createElement('div');
+    previewStage.id = 'sound-preview-stage';
+    settingsOverlay.append(previewStage); // above the backdrop and the sheet
+    previewStage.addEventListener('click', (e) => {
+        if (!e.target.closest('.sound-card')) return;
+        // The copy rises under the finger that long-pressed the card: the
+        // click of that release is not a tap on it (like app.js's grid).
+        if (Date.now() - (window.state?.lastLongPressTime || 0) < 350) return;
+        togglePreview();
+    });
+}
+
+// gridCard is the sound's card on the live page, if it is there.
+const gridCard = (soundId) =>
+    document.querySelector(`#sounds-container .sound-card[data-sound-id="${soundId}"]`);
+
+// onScreen: a rect that is at least partly visible.
+const onScreen = (r) => r.bottom > 0 && r.top < window.innerHeight && r.width > 0;
+
+function liftCard(sound) {
+    dropCard(true);
+    if (!previewStage || !window.app) return;
+    const container = document.getElementById('sounds-container');
+    const fromList = !container || container.classList.contains('layout-list');
+    const layout = fromList ? 'layout-grid-3'
+        : [...container.classList].find(c => c.startsWith('layout-')) || 'layout-grid-3';
+    previewStage.className = 'sounds-grid ' + layout;
+
+    const source = gridCard(sound.id);
+    const rect = source?.getBoundingClientRect();
+    const w = rect && !fromList ? rect.width : Math.min(160, window.innerWidth * 0.4);
+    const h = rect && !fromList ? rect.height : 85;
+
+    const card = app.createSoundCardElement(sound, { animate: false, tabId: null }); // tabId null: shows the favourite mark
+    card.style.width = w + 'px';
+    card.style.height = h + 'px';
+    card.setAttribute('aria-label', 'Preview ' + (sound.name || 'sound'));
+    previewStage.append(card);
+    app.updateSoundCardDisplay(sound.id, card, null); // again, now in the stage's layout
+    lifted = { card, soundId: sound.id, w, h, fromList };
+
+    // Where it floats: centred in the space above the sheet, larger, never
+    // wider than the screen.
+    const top = parseFloat(getComputedStyle(previewStage).paddingTop) + 16;
+    const bottom = window.innerHeight - settingsCard.offsetHeight - 16;
+    const room = bottom - top;
+    const scale = Math.max(0.5, Math.min(1.6, (window.innerWidth - 48) / w, room / h));
+    const x = (window.innerWidth - w * scale) / 2;
+    const y = top + Math.max(0, (room - h * scale) / 2);
+    const to = `translate(${x}px, ${y}px) scale(${scale})`;
+    card.style.transform = to;
+
+    let from;
+    if (rect && onScreen(rect) && !fromList) {
+        from = { transform: `translate(${rect.left}px, ${rect.top}px) scale(1)`, opacity: 1 };
+        source.classList.add('lifted'); // the copy takes its place
+    } else if (rect && onScreen(rect)) { // a list row: grows out of the row
+        from = { transform: `translate(${rect.left + rect.width / 2 - w * 0.3}px, ${rect.top + rect.height / 2 - h * 0.3}px) scale(0.6)`, opacity: 0 };
+    } else {
+        from = { transform: `translate(${x}px, ${y + 40}px) scale(${scale * 0.9})`, opacity: 0 };
+    }
+    card.animate([from, { transform: to, opacity: 1 }], { duration: LIFT_MS, easing: SHEET_EASE });
+}
+
+// dropCard settles the copy back onto its card in the grid (or fades it
+// out where that card isn't on screen). instant: remove it at once.
+function dropCard(instant) {
+    const l = lifted;
+    lifted = null;
+    if (!l) return;
+    const done = () => {
+        l.card.remove();
+        document.querySelectorAll('#sounds-container .sound-card.lifted').forEach(c => c.classList.remove('lifted'));
+    };
+    if (instant) { done(); return; }
+    const source = gridCard(l.soundId);
+    const rect = source?.getBoundingClientRect();
+    const to = rect && onScreen(rect) && !l.fromList
+        ? { transform: `translate(${rect.left}px, ${rect.top}px) scale(${rect.width / l.w})`, opacity: 1 }
+        : { transform: l.card.style.transform + ' scale(0.85)', opacity: 0 };
+    const anim = l.card.animate([{ transform: l.card.style.transform, opacity: 1 }, to],
+        { duration: 280, easing: SHEET_EASE, fill: 'forwards' });
+    let finished = false;
+    const finish = () => { if (!finished) { finished = true; done(); } };
+    anim.onfinish = finish;
+    setTimeout(finish, 400); // in case the animation never reports back
+}
+
+// refreshCards shows a changed setting on the sound's grid card and on the
+// floating copy.
+function refreshCards(soundId) {
+    if (!window.app) return;
+    app.updateSoundCardDisplay(soundId);
+    if (lifted && String(lifted.soundId) === String(soundId)) app.updateSoundCardDisplay(soundId, lifted.card, null);
 }
 
 // Initialize when DOM content is loaded

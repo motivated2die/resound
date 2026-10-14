@@ -79,7 +79,7 @@ Helper roles run before the single-instance mutex (`Local\Resound.SingleInstance
 | `backup` | Backup zips of `config.json`, `library.json` and `remote.json` with a manifest; validation, clean restore, backup index |
 | `config`, `logx` | `config.json`; log file plus crash output |
 
-Platform-specific files use the `_windows.go` suffix. `mixer.go`, `source.go`, `decode.go`, `probe.go`, `library` and `server` are portable and unit-tested on any OS. `cmd/devremote` serves the phone remote with the real library and indexer but no audio output, for front-end work on any OS (`go run ./cmd/devremote -folder <sounds>`).
+Platform-specific files use the `_windows.go` suffix. `mixer.go`, `source.go`, `decode.go`, `probe.go`, `library` and `server` are portable and unit-tested on any OS. `cmd/devremote` serves the phone remote with the real library and indexer but no audio output (plays are only timed, so progress, previews and their ends show as with the PC), for front-end work on any OS (`go run ./cmd/devremote -folder <sounds>`).
 
 ## Threading model
 

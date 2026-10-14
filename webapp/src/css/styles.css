@@ -1058,7 +1058,7 @@ h1.brand {
   border-radius: 16px 16px 0 0;
   padding: 12px 20px calc(env(safe-area-inset-bottom) + 20px) 20px;
   transform: translateY(110%);
-  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+  transition: transform 0.3s cubic-bezier(0.2, 0.9, 0.25, 1),
     max-height 0.3s ease-out, visibility 0s linear 0.3s;
   max-height: 85vh;
   box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.5);
@@ -1069,8 +1069,41 @@ h1.brand {
 
 #sound-settings-overlay:not(.hidden) #settings-card {
   transform: translateY(0);
-  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+  transition: transform 0.3s cubic-bezier(0.2, 0.9, 0.25, 1),
     max-height 0.3s ease-out;
+}
+
+/* The sound's button, floating above the sheet as a live preview
+   (sound-settings.js). The stage carries the page's grid layout, so the copy
+   looks like the card in the grid; its card is placed by transform. */
+#sound-preview-stage {
+  position: absolute;
+  inset: 0;
+  display: block;
+  padding: env(safe-area-inset-top, 0px) 0 0;
+  overflow: visible;
+  background: none;
+  pointer-events: none;
+}
+
+#sound-preview-stage .sound-card {
+  position: absolute;
+  top: 0;
+  left: 0;
+  min-height: 0;
+  max-height: none;
+  transform-origin: 0 0;
+  pointer-events: auto;
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.55);
+  /* placed by script: no transform transition */
+  transition: background-color var(--transition-speed) ease,
+    background var(--transition-speed) ease;
+}
+
+/* The grid card while its copy floats above the sheet. */
+.sound-card.lifted {
+  opacity: 0;
+  transition: none;
 }
 
 #sound-settings-overlay:not(.hidden) #settings-card {
@@ -1181,29 +1214,26 @@ h1.brand {
   font-weight: 500;
 }
 
-/* Color Selector (Round Buttons) */
+/* Color Selector: two rows of four rounded rectangles */
 .color-selector {
-  display: flex;
-  justify-content: space-between;
-  gap: 5px;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
   padding: 0 2px;
 }
 
 .color-swatch {
-  flex-grow: 1;
-  flex-basis: 0;
-  aspect-ratio: 1 / 1;
-  border-radius: 50%;
+  height: 44px;
+  border-radius: 12px;
   border: 2px solid transparent;
   cursor: pointer;
   transition: border-color var(--transition-speed) ease,
     transform var(--transition-speed) ease;
-  max-width: 36px;
 }
 
 .color-swatch.selected {
   border-color: var(--text-primary);
-  transform: scale(1.1);
+  transform: scale(1.05);
 }
 
 .color-swatch:active {
@@ -1405,6 +1435,32 @@ emoji-picker section#favorites {
 
 #preview-button {
   min-width: 150px;
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+}
+
+/* While previewing ("Stop"), the button fills with the sound's progress,
+   like a playing card: it glides between polls and fades out at the end. */
+#preview-button::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  transform-origin: left center;
+  transform: scaleX(var(--progress, 0));
+  background-color: rgba(255, 255, 255, 0.22);
+  opacity: 0;
+  transition: transform 260ms linear, opacity 0.3s ease;
+  pointer-events: none;
+}
+
+#preview-button[data-state='stop']::before {
+  opacity: 1;
+}
+
+#preview-button.progress-reset::before {
+  transition: none;
 }
 
 /* --- App Settings Modal --- */

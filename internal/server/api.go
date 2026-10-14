@@ -47,10 +47,13 @@ func decodeBody(r *http.Request, v any) error {
 
 // soundJSON is the list shape the front end reads: the Soundux Remote fields
 // (id, name, path, isFavorite) plus the settings the phone shows on cards.
-func soundJSON(s library.Sound) map[string]any {
+// sliderPosition tells the card whether a custom volume is quieter (< 0) or
+// louder than the default; defLocal is the default "You hear" volume.
+func soundJSON(s library.Sound, defLocal int) map[string]any {
 	return map[string]any{
 		"id": s.ID, "name": s.Name, "path": s.Path, "isFavorite": s.Favorite,
 		"hasCustomVolume": s.LocalVolume != nil || s.RemoteVolume != nil,
+		"sliderPosition":  sliderPosition(s, defLocal),
 		"color":           s.Color,
 		"emoji":           s.Emoji,
 		"durationMs":      s.Duration.Milliseconds(),
@@ -60,24 +63,6 @@ func soundJSON(s library.Sound) map[string]any {
 // volumeInfo reproduces the Soundux Remote's per-sound volume model: one
 // slider from -50 to +50 scales both defaults by 0x..2x.
 func volumeInfo(s library.Sound, defLocal, defRemote int) map[string]any {
-	ratio := 1.0
-	if s.LocalVolume != nil {
-		switch {
-		case defLocal > 0:
-			ratio = float64(*s.LocalVolume) / float64(defLocal)
-		case *s.LocalVolume > 0:
-			ratio = 2
-		}
-	}
-	slider := 0
-	switch {
-	case ratio > 2:
-		slider = 50
-	case ratio < 0:
-		slider = -50
-	default:
-		slider = int(math.Round((ratio - 1) * 50))
-	}
 	orNil := func(p *int) any {
 		if p == nil {
 			return nil
@@ -98,9 +83,36 @@ func volumeInfo(s library.Sound, defLocal, defRemote int) map[string]any {
 		"customRemoteVolume":  orNil(s.RemoteVolume),
 		"defaultLocalVolume":  defLocal,
 		"defaultRemoteVolume": defRemote,
-		"sliderPosition":      slider,
-		"volumeRatio":         ratio,
+		"sliderPosition":      sliderPosition(s, defLocal),
+		"volumeRatio":         volumeRatio(s, defLocal),
 	}
+}
+
+// volumeRatio is a sound's "You hear" volume relative to the default.
+func volumeRatio(s library.Sound, defLocal int) float64 {
+	ratio := 1.0
+	if s.LocalVolume != nil {
+		switch {
+		case defLocal > 0:
+			ratio = float64(*s.LocalVolume) / float64(defLocal)
+		case *s.LocalVolume > 0:
+			ratio = 2
+		}
+	}
+	return ratio
+}
+
+// sliderPosition is volumeRatio on the slider's scale, -50..+50 (0: the
+// default).
+func sliderPosition(s library.Sound, defLocal int) int {
+	ratio := volumeRatio(s, defLocal)
+	switch {
+	case ratio > 2:
+		return 50
+	case ratio < 0:
+		return -50
+	}
+	return int(math.Round((ratio - 1) * 50))
 }
 
 // --- auth ------------------------------------------------------------------
@@ -132,17 +144,19 @@ func (s *Server) handleTabSounds(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusNotFound, "Tab not found")
 		return
 	}
+	defLocal, _ := s.player.DefaultVolumes()
 	sounds := []map[string]any{}
 	for _, snd := range tab.Sounds {
-		sounds = append(sounds, soundJSON(snd))
+		sounds = append(sounds, soundJSON(snd, defLocal))
 	}
 	writeJSON(w, http.StatusOK, sounds)
 }
 
 func (s *Server) handleFavorites(w http.ResponseWriter, r *http.Request) {
+	defLocal, _ := s.player.DefaultVolumes()
 	sounds := []map[string]any{}
 	for _, snd := range s.lib.Favorites() {
-		sounds = append(sounds, soundJSON(snd))
+		sounds = append(sounds, soundJSON(snd, defLocal))
 	}
 	writeJSON(w, http.StatusOK, sounds)
 }
@@ -159,7 +173,7 @@ func (s *Server) handleSound(w http.ResponseWriter, r *http.Request) {
 	}
 	defLocal, defRemote := s.player.DefaultVolumes()
 	resp := volumeInfo(snd, defLocal, defRemote)
-	for k, v := range soundJSON(snd) {
+	for k, v := range soundJSON(snd, defLocal) {
 		resp[k] = v
 	}
 	resp["tabName"] = tabName
