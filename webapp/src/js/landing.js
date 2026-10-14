@@ -10,7 +10,7 @@
     const rtc = window.resoundRTC;
     const pc = rtc ? rtc.currentPC() : null;
     const installed = window.matchMedia('(display-mode: standalone)').matches ||
-        window.matchMedia('(display-mode: fullscreen)').matches ||
+        (window.matchMedia('(display-mode: fullscreen)').matches && !document.fullscreenElement) || // not a fullscreened tab
         navigator.standalone === true;
 
     if (location.hash.startsWith('#pair')) return; // rtc.js is on its way
