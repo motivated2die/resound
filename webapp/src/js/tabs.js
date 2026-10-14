@@ -34,8 +34,17 @@ function initTabSwiping() {
     const nextPage = document.createElement('div');
     prevPage.id = 'page-prev';
     nextPage.id = 'page-next';
+    // Previews are only looked at while swiping: never focused (a preview
+    // with more cards than fit is a scroller, which Chromium lets Tab focus;
+    // the browser then scrolled the wrapper to show it, and the live page
+    // stayed out of view), searched with find-in-page or read out.
+    prevPage.inert = true;
+    nextPage.inert = true;
     wrapper.insertBefore(track, live);
     track.append(prevPage, live, nextPage);
+    // Only the track moves the pages. Should anything scroll the wrapper
+    // itself (where overflow: clip is missing), undo it at once.
+    wrapper.addEventListener('scroll', () => { wrapper.scrollLeft = 0; wrapper.scrollTop = 0; });
 
     const tabList = () => Array.from(tabsContainer.querySelectorAll('.tab'));
     const activeIndex = (tabs) => Math.max(0, tabs.findIndex(t => t.classList.contains('active')));
@@ -136,6 +145,7 @@ function initTabSwiping() {
 
     wrapper.addEventListener('touchstart', (e) => {
         if (typeof editMode !== 'undefined' && editMode.isActive()) return;
+        if (window.state?.searching) return; // search results: no tabs to swipe to
         if (e.touches.length > 1) { drag = null; return; }
         if (settle) settle.done(); // finish the previous swipe now: quick successive swipes
         const t = e.touches[0];

@@ -143,6 +143,7 @@ function handleTouchStart(e) {
 
     // If we reach here, it's NOT the PTT button, proceed with sound card logic
     if (e.target.closest('#sound-preview-stage')) return; // the sheet's floating copy plays a preview
+    if (e.touches.length > 1) { clearTimeout(longPressTimer); longPressSoundCard = null; return; } // two fingers: the search pull
     const soundCard = e.target.closest('.sound-card');
     if (!soundCard) {
         // console.log("Ignoring touchstart for long press detection - not on sound card.");

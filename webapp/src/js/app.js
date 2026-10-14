@@ -3,6 +3,7 @@ const state = {
   currentlyPlaying: new Map(), // Map soundId -> playingId
   tabs: [],
   currentTab: null, // Can be tabId (string) or 'favorites' (string)
+  searching: false, // the search shows its results in the grid (search.js)
   // Loaded at once: device.js, screen-wake.js and install.js read their
   // preferences before init() runs (an empty object here made them miss
   // saved ones, e.g. vibration off). init() loads them again.
@@ -1064,6 +1065,7 @@ async function loadSounds(tabId) {
         soundsContainerEl.innerHTML = '<p class="no-sounds">Select a tab.</p>';
         return;
     }
+    if (state.searching) return; // the grid shows search results (search.js)
     const id = String(tabId);
     const cached = tabSoundsCache.get(id);
     if (cached) {
@@ -1075,7 +1077,7 @@ async function loadSounds(tabId) {
 
     try {
         const fresh = await fetchTabSounds(id);
-        if (String(state.currentTab) !== id) return; // the user moved on meanwhile
+        if (String(state.currentTab) !== id || state.searching) return; // the user moved on meanwhile
         if (!cached || soundListKey(fresh) !== soundListKey(cached)) {
             displaySounds(orderSounds(id, fresh), !cached);
         } else {
@@ -1191,7 +1193,7 @@ function scheduleProgressReset(card) {
     setTimeout(() => { if (!card.classList.contains('playing')) resetCardProgress(card); }, 400);
 }
 
-function updateSoundCardDisplay(soundId, cardElement = null, tabId = state.currentTab) {
+function updateSoundCardDisplay(soundId, cardElement = null, tabId = state.searching ? 'search' : state.currentTab) {
     const card = cardElement || soundsContainerEl?.querySelector(`.sound-card[data-sound-id="${soundId}"]`);
     if (!card) {
         // console.warn(`Cannot update display: Card element not found for soundId ${soundId}.`);

@@ -22,6 +22,7 @@ Nothing here is embedded into `Resound.exe`.
 | `js/screen-wake.js` | Keeps the screen on (Screen Wake Lock API), on by default |
 | `js/fullscreen.js` | Fullscreen in a browser tab; the installed app opens fullscreen by itself (`manifest.json`) |
 | `js/device.js` | Vibration on play and stop, persistent storage for the pairing keys |
+| `js/search.js` | Search across all tabs: fuzzy by name, a colour filter; opened from the top bar or by pulling down with two fingers. Results fill the usual grid; the bottom bar stays above the virtual keyboard |
 | `js/install.js` | The "Install app" pill in the top bar and its sheet: why, and how in this browser (one tap where Chromium offers it, steps elsewhere) |
 | `manifest.json`, `sw.js` | Installation and offline start; the build fills in the service worker's file list |
 | `_headers` | Response headers for Cloudflare Pages (CSP: nothing from other hosts) |
