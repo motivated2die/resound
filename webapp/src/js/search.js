@@ -10,7 +10,10 @@
 //
 // With a virtual keyboard open, the bottom bar sits on top of it (the
 // visual viewport shrinks by the keyboard's height: --keyboard in
-// styles.css), so sounds can be stopped while typing. Tapping a result keeps
+// styles.css), so sounds can be stopped while typing. On Android that shrink
+// leaves out the gesture bar's strip, which the keyboard covers too: there
+// the bottom safe-area inset is added (.keyboard-plus-inset); on iPhone and
+// iPad the shrink includes the home indicator's area already. Tapping a result keeps
 // the keyboard open; scrolling the results or Enter closes it.
 (() => {
     'use strict';
@@ -178,6 +181,8 @@
     // --keyboard is how much of the layout the visual viewport doesn't show
     // at the bottom: the keyboard (0 on desktops and while it is closed).
 
+    const isIOS = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+    document.documentElement.classList.toggle('keyboard-plus-inset', !isIOS);
     const vv = window.visualViewport;
     const updateKeyboard = () => {
         let kb = vv ? Math.round(window.innerHeight - vv.height - vv.offsetTop) : 0;
@@ -227,12 +232,18 @@
         updateKeyboard();
         if (pushedHistory && !fromHistory) history.back();
         pushedHistory = false;
+        wrapper.style.transform = ''; // never leave the page pulled down
         grid.innerHTML = '';
         grid.scrollTop = 0;
         app.reloadSoundsForCurrentTab(); // from the cache: at once
     };
 
     // --- Two-finger pull ------------------------------------------------------------
+    // Pulling arms the search (with a tap of vibration); lifting the fingers
+    // opens it and focuses the field. Opening on the lift matters twice:
+    // opening empties the grid, and a removed card under the fingers would
+    // take the touch's end with it (the reset of the pull and the focus were
+    // lost); and the lift is what lets a page open the keyboard.
 
     const setupPull = () => {
         let pull = null; // { y0, x0, armed }
@@ -253,18 +264,16 @@
             const dx = Math.abs(avg(e.touches, 'clientX') - pull.x0);
             if (dy <= 0 || dx > dy) { wrapper.style.transform = ''; return; }
             wrapper.style.transform = `translateY(${Math.min(dy, 160) * 0.45}px)`; // follows, with resistance
-            if (!pull.armed && dy > PULL_OPEN_PX) {
-                pull.armed = true;
-                window.haptics?.tap();
-                openSearch({ focus: false });
-            }
+            const armed = dy > PULL_OPEN_PX;
+            if (armed && !pull.armed) window.haptics?.tap();
+            pull.armed = armed; // pulled back up: not any more
         }, { passive: false });
         const end = () => {
             if (!pull) return;
             const armed = pull.armed;
             pull = null;
             reset();
-            if (armed) input.focus({ preventScroll: true }); // touchend may open the keyboard
+            if (armed) openSearch(); // focuses the field: the lift may open the keyboard
         };
         wrapper.addEventListener('touchend', end);
         wrapper.addEventListener('touchcancel', end);
