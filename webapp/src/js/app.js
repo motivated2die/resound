@@ -97,7 +97,59 @@ function init() {
     state.playbackGloballyPausedByToggle = false; // Init new state
     updatePlayPauseButtonIcon(); // Set initial icon state & visibility
     updateTopBarProgressState(0); // Set initial progress state (inactive)
+    setupPanelLongPress();
     checkServerStatus();
+}
+
+// --- Long press on the logo: the PC's panel ---
+// Holding the logo (with the title next to it) opens Resound's panel on the
+// PC, or closes it if it is open. The browser's own long press (the image
+// menu, Android's long-press vibration, dragging the image) is suppressed.
+const PANEL_HOLD_MS = 500;
+function setupPanelLongPress() {
+    const area = headerEl?.querySelector('.app-title');
+    if (!area) return;
+    area.querySelector('.logo')?.setAttribute('draggable', 'false');
+    let timer = null;
+    let start = null;
+    const cancel = () => {
+        clearTimeout(timer);
+        timer = null;
+        start = null;
+        area.classList.remove('holding');
+    };
+    area.addEventListener('pointerdown', (e) => {
+        if (e.button > 0) return;
+        cancel();
+        start = { x: e.clientX, y: e.clientY };
+        area.classList.add('holding');
+        timer = setTimeout(() => {
+            timer = null;
+            start = null;
+            area.classList.remove('holding');
+            togglePcPanel(e);
+        }, PANEL_HOLD_MS);
+    });
+    area.addEventListener('pointermove', (e) => {
+        if (start && Math.hypot(e.clientX - start.x, e.clientY - start.y) > 10) cancel();
+    });
+    for (const type of ['pointerup', 'pointercancel', 'pointerleave']) area.addEventListener(type, cancel);
+    area.addEventListener('touchstart', (e) => e.preventDefault(), { passive: false }); // no system long press
+    area.addEventListener('contextmenu', (e) => e.preventDefault());
+    area.addEventListener('dragstart', (e) => e.preventDefault());
+}
+
+async function togglePcPanel(event) {
+    if (window.haptics) window.haptics.tap();
+    createRipple(event, headerEl, 'rgba(80, 222, 168, 0.25)');
+    try {
+        const data = await apiFetch('/api/panel/toggle', { method: 'POST' });
+        showToast(data.open ? 'Resound is open on your PC.' : 'Resound closed on your PC.');
+    } catch (error) {
+        if (error.status === 404) showToast('Update Resound on your PC to open it from here.');
+        else if (error.status) showToast("Couldn't open Resound on your PC.");
+        // No answer at all: the connection help shows what to check.
+    }
 }
 
 

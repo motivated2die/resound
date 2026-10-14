@@ -246,6 +246,20 @@ func (t *Tray) ShowPanel() {
 	t.popup.ShowAt(point{work.Right - 1, work.Bottom - 1})
 }
 
+// TogglePanel opens the panel like ShowPanel, or closes it if it is open,
+// and reports whether it is open now. For the phone's long press on the
+// logo. The panel is topmost, so it shows even when Windows keeps the focus
+// with the app in front (it only hands the focus over after the user's own
+// input).
+func (t *Tray) TogglePanel() bool {
+	if t.popup.Visible() {
+		t.popup.Hide()
+		return false
+	}
+	t.ShowPanel()
+	return t.popup.Visible()
+}
+
 // SignalQuitRunningInstance asks a running instance to exit and waits up to
 // timeout for it to close its window. It returns false if one is still
 // running afterwards; true also when none was running.

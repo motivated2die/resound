@@ -38,6 +38,7 @@ type logPlayer struct {
 	nextID  uint64
 	playing []*fakeVoice
 	paused  time.Time // when everything was paused; zero while playing
+	panel   bool      // the pretend panel is open
 }
 
 type fakeVoice struct {
@@ -108,7 +109,14 @@ func (p *logPlayer) TogglePause() bool {
 	return false
 }
 
-func (*logPlayer) SetTalkThrough(bool)                 {}
+func (*logPlayer) SetTalkThrough(bool) {}
+func (p *logPlayer) TogglePanel() bool {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.panel = !p.panel
+	log.Printf("panel %s (pretend)", map[bool]string{true: "opened", false: "closed"}[p.panel])
+	return p.panel
+}
 func (*logPlayer) DefaultVolumes() (local, remote int) { return 50, 100 }
 func (*logPlayer) SetSoundVolume(id uint64, local, remote *int) {
 	log.Printf("volume of %d now %v / %v", id, deref(local), deref(remote))

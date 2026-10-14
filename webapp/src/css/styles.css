@@ -974,6 +974,19 @@ header.ptt-active-bg {
   z-index: 1;
   /* Ensure title is above ripples */
   min-width: 0; /* the title shrinks, never the buttons */
+  touch-action: none; /* held: opens the PC's panel (app.js) */
+  cursor: pointer;
+}
+
+/* While the logo is held, it sinks in over the hold time, then springs back. */
+.app-title .logo {
+  transition: transform 0.25s cubic-bezier(0.3, 1.6, 0.5, 1);
+  -webkit-user-drag: none;
+}
+
+.app-title.holding .logo {
+  transform: scale(0.82);
+  transition: transform 0.5s ease-out;
 }
 
 .logo {

@@ -263,6 +263,14 @@ func (s *Server) handleToggle(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"success": true, "newState": state})
 }
 
+// handlePanelToggle opens or closes the panel on the PC (a long press on the
+// phone's logo).
+func (s *Server) handlePanelToggle(w http.ResponseWriter, r *http.Request) {
+	open := s.player.TogglePanel()
+	s.logf("remote: panel %s from %s", map[bool]string{true: "opened", false: "closed"}[open], rtcDevice(r))
+	writeJSON(w, http.StatusOK, map[string]any{"success": true, "open": open})
+}
+
 func (s *Server) handleTalk(w http.ResponseWriter, on bool) {
 	s.player.SetTalkThrough(on)
 	writeJSON(w, http.StatusOK, map[string]any{"success": true})

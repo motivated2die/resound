@@ -18,10 +18,11 @@ import (
 )
 
 type fakePlayer struct {
-	played []uint64
-	lib    *library.Library
-	err    error  // returned by Play when set
-	volume []*int // last SetSoundVolume call: local, remote
+	played    []uint64
+	lib       *library.Library
+	err       error  // returned by Play when set
+	volume    []*int // last SetSoundVolume call: local, remote
+	panelOpen bool
 }
 
 func (f *fakePlayer) Play(id uint64, preview bool) (Started, error) {
@@ -34,10 +35,14 @@ func (f *fakePlayer) Play(id uint64, preview bool) (Started, error) {
 	f.played = append(f.played, id)
 	return Started{PlayingID: 7, Length: 1500 * time.Millisecond}, nil
 }
-func (f *fakePlayer) StopAll()                   {}
-func (f *fakePlayer) Progress() []Progress       { return nil }
-func (f *fakePlayer) TogglePause() bool          { return true }
-func (f *fakePlayer) SetTalkThrough(bool)        {}
+func (f *fakePlayer) StopAll()             {}
+func (f *fakePlayer) Progress() []Progress { return nil }
+func (f *fakePlayer) TogglePause() bool    { return true }
+func (f *fakePlayer) SetTalkThrough(bool)  {}
+func (f *fakePlayer) TogglePanel() bool {
+	f.panelOpen = !f.panelOpen
+	return f.panelOpen
+}
 func (f *fakePlayer) DefaultVolumes() (int, int) { return 50, 100 }
 func (f *fakePlayer) SetSoundVolume(_ uint64, local, remote *int) {
 	f.volume = []*int{local, remote}
@@ -139,6 +144,13 @@ func TestAPI(t *testing.T) {
 	rec = do(t, h, "GET", "/api/favorites", "", c)
 	if !strings.Contains(rec.Body.String(), "boom") {
 		t.Fatalf("favorites: %s", rec.Body)
+	}
+
+	// The phone's long press on the logo opens the panel, the next closes it.
+	for _, want := range []string{`"open":true`, `"open":false`} {
+		if rec := do(t, h, "POST", "/api/panel/toggle", "", c); rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), want) {
+			t.Fatalf("panel toggle: %d %s, want %s", rec.Code, rec.Body, want)
+		}
 	}
 
 	do(t, h, "POST", "/api/auth/logout", "", c)

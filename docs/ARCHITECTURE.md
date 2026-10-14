@@ -208,6 +208,7 @@ The phone remote is a web app on an HTTPS host (`webapp/`, built by `cmd/webapp`
   - `POST /api/sounds/{id}/appearance` `{color, emoji}`, `POST /api/layouts/{tabId|favorites}` `{mode, orders}`: phone card looks and layouts, stored on the PC and shared by all phones. Colors and emoji are validated because the phone puts them into class names and CSS strings.
   - `POST /api/library/import` `{overwrite, sounds, layouts}` accepts sound IDs or file paths, so settings from earlier phone versions (path-keyed) and exported files can be adopted. Without `overwrite`, only empty values are filled.
   - `POST /api/library/reset-appearance` clears all colors, emoji and layouts.
+  - `POST /api/panel/toggle` opens the panel on the PC, or closes it if it is open (`{open}`): a long press on the logo in the phone's bottom bar. The panel is topmost, so it shows above other windows even when Windows keeps the focus with the app in front (it hands the focus over only after the user's own input on the PC). Phones meeting an older PC get 404 and say to update it.
 - **Response shapes** match the C++ server, including the volume slider model (−50…+50 scales both default volumes from 0× to 2×).
 
 ### The app (`webapp/src`)

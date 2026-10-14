@@ -152,6 +152,12 @@ func (r remotePlayer) SetTalkThrough(on bool) {
 	r.a.onUI(func() { r.a.setTalkThrough(on); r.a.render() })
 }
 
+func (r remotePlayer) TogglePanel() bool {
+	var open bool
+	r.a.onUI(func() { open = r.a.tray.TogglePanel() })
+	return open
+}
+
 func (r remotePlayer) DefaultVolumes() (local, remote int) {
 	r.a.onUI(func() { local, remote = r.a.cfg.MonitorVolume, r.a.cfg.CableVolume })
 	return
