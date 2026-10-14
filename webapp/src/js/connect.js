@@ -22,7 +22,7 @@
 
     const standalone = () =>
         window.matchMedia('(display-mode: standalone)').matches ||
-        window.matchMedia('(display-mode: fullscreen)').matches ||
+        (window.matchMedia('(display-mode: fullscreen)').matches && !document.fullscreenElement) || // not a fullscreened tab
         navigator.standalone === true;
     const isIOS = () => /iPhone|iPad|iPod/.test(navigator.userAgent) ||
         (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);

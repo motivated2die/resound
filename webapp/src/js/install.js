@@ -31,8 +31,13 @@
         return m ? Number(m[1]) : 0;
     })();
 
+    // standalone: the installed app. A browser tab the page put into
+    // fullscreen (the Fullscreen setting, fullscreen.js) also matches
+    // display-mode: fullscreen in Chromium, but has a fullscreenElement; the
+    // installed app's fullscreen (manifest) has none.
     const standalone = () =>
-        ['standalone', 'fullscreen', 'minimal-ui'].some(m => window.matchMedia(`(display-mode: ${m})`).matches) ||
+        ['standalone', 'minimal-ui'].some(m => window.matchMedia(`(display-mode: ${m})`).matches) ||
+        (window.matchMedia('(display-mode: fullscreen)').matches && !document.fullscreenElement && !document.webkitFullscreenElement) ||
         navigator.standalone === true;
 
     let installPrompt = null; // Chromium's beforeinstallprompt event
