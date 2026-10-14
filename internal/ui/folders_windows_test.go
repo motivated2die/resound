@@ -10,25 +10,26 @@ import "testing"
 func TestLibraryRowsRender(t *testing.T) {
 	dropped := false
 	rows := []Row{
-		SectionLink("Sound library", "Import from Myinstants", func() {}),
+		SectionLink("Sound library", "Import buttons", "Download sounds", func() {}),
 		Section("Import sounds"),
 		ImportGuide("Find a sound on Myinstants, then drag its name onto a folder below. Resound downloads it there."),
 		Section("Folders"),
 		FolderDrop(FolderSpec{Name: "Memes", Detail: "42 sounds · 3 tabs", ActionIcon: IconTrash, ActionTip: "Remove", OnAction: func() {}, OnClick: func() {}, OnDrop: func(DropData) { dropped = true }}),
 		FolderDrop(FolderSpec{Name: "Anime", Detail: "12 sounds", Depth: 1, OnDrop: func(DropData) {}}),
 		FolderDrop(FolderSpec{Name: "Naruto", Detail: "Empty", Depth: 2, OnDrop: func(DropData) {}}),
-		FolderDrop(FolderSpec{Name: "Reactions", Detail: "4 sounds", Depth: 1, Active: true, OnDrop: func(DropData) {}}),
-		Text("Added to “Reactions”. Name it:", "", ToneGood),
+		GroupStart(),
+		FolderDrop(FolderSpec{Name: "Reactions", Note: "Name the new sound", Depth: 1, Active: true, OnDrop: func(DropData) {}}),
 		Paragraph("Already in your library: “Vine boom” in Memes.", ToneWarning),
 		TextField("f", "FAHHHHHHHHHHHHHH", 80, nil, nil),
 		Buttons(Action{Label: "Discard", Icon: IconTrash, Style: ButtonDanger}, Action{Label: "Preview", Icon: IconPlay}, Action{Label: "Save", Style: ButtonPrimary}),
+		GroupEnd(),
 		FolderDrop(FolderSpec{Name: "Games", Detail: "7 sounds", Note: "Added “Mario jump”", Depth: 1, OnDrop: func(DropData) {}}),
 		FolderDrop(FolderSpec{Name: "Classics", Detail: "Empty", Depth: 1, OnDrop: func(DropData) {}}),
 	}
 	states := map[int]rowState{
 		0:  {hover: 0, press: -1, open: -1},
 		4:  {hover: 1, press: -1, open: -1},
-		13: {hover: -1, press: -1, open: -1, drop: true},
+		14: {hover: -1, press: -1, open: -1, drop: true},
 	}
 	for _, scale := range []float64{1, 1.5} {
 		img := renderRows(t, rows, scale, states)

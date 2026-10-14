@@ -364,8 +364,32 @@ func (a *App) addFolders(paths []string) {
 		}
 		note = append(note, fmt.Sprintf("Skipped %s that %s neither a folder nor a sound file.", plural(skipped, "item"), verb))
 	}
-	a.libNote = strings.Join(note, " ")
+	a.setLibNote(strings.Join(note, " "), true)
 	a.render()
+}
+
+// libNoteFor is how long a note about the library (a refresh, added
+// folders, copied sounds) stays on the library and home pages.
+const libNoteFor = 5 * time.Second
+
+// setLibNote shows a note about the library. With expire, it disappears
+// after libNoteFor unless a newer note replaced it; without (progress such
+// as "Copying…"), it stays until the next note.
+func (a *App) setLibNote(text string, expire bool) {
+	a.libSeq++
+	a.libNote = text
+	if !expire || text == "" {
+		return
+	}
+	seq := a.libSeq
+	time.AfterFunc(libNoteFor, func() {
+		a.tray.Post(func() {
+			if a.libSeq == seq && a.libNote != "" {
+				a.libNote = ""
+				a.render()
+			}
+		})
+	})
 }
 
 // folderCovering reports whether p is a library folder already, or inside
@@ -417,7 +441,7 @@ func (a *App) refreshLibrary() {
 	if len(gone) > 0 {
 		note = append(note, "Their sounds' settings are kept for 30 days in case they come back.")
 	}
-	a.libNote = strings.Join(note, " ")
+	a.setLibNote(strings.Join(note, " "), true)
 	a.render()
 }
 

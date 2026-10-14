@@ -189,11 +189,12 @@ func paintGuide(c *canvas, box rect) {
 	}
 	c.roundRect(box, c.px(10), colList) // one little scene
 
-	// A Myinstants button: a red dome on its darker base.
+	// A Myinstants-style button in the panel's berry red: a dome on its
+	// darker base, with a highlight.
 	bx, by := at(26, 21)
-	c.circle(bx, by+c.px(3), c.px(14), rgb(0x8E, 0x16, 0x1B))
-	c.circle(bx, by, c.px(13), rgb(0xE5, 0x39, 0x35))
-	c.circle(bx-c.px(4), by-c.px(4), c.px(3), rgb(0xEE, 0x6A, 0x66))
+	c.circle(bx, by+c.px(3), c.px(14), shade(colDanger, -90))
+	c.circle(bx, by, c.px(13), colDanger)
+	c.circle(bx-c.px(4), by-c.px(4), c.px(3), shade(colDanger, 45))
 
 	// Its name below, underlined like the link it is.
 	const label = "Bruh"
@@ -221,7 +222,7 @@ func paintGuide(c *canvas, box rect) {
 	field := rect{fl, ft, fr, fb}
 	c.roundRect(field, c.px(7), mix(colList, colAccent, 0.18))
 	c.dashedFrame(field, c.px(7), colAccent)
-	c.icon(IconDownload, rect{field.Left + c.px(4), field.Top, field.Left + c.px(18), field.Bottom}, 12, colAccent)
+	c.icon(IconFolder, rect{field.Left + c.px(4), field.Top, field.Left + c.px(18), field.Bottom}, 12, colAccent)
 	bar := field.Top + field.h()/2
 	c.fill(rect{field.Left + c.px(21), bar - c.px(1), field.Right - c.px(6), bar - c.px(1) + max(2, c.px(2))}, mix(colList, colAccent, 0.5))
 
@@ -244,13 +245,23 @@ func paintGuide(c *canvas, box rect) {
 // --- Section caption with a link ------------------------------------------------------
 
 type sectionLinkRow struct {
-	text, link string
-	onClick    func()
+	text, link, tipText string
+	onClick             func()
 }
 
 // SectionLink is a Section caption with a small accent link at its right
-// end, e.g. a shortcut to the page where something is done.
-func SectionLink(text, link string, onClick func()) Row { return sectionLinkRow{text, link, onClick} }
+// end, e.g. a shortcut to the page where something is done. tip is the
+// link's tooltip.
+func SectionLink(text, link, tip string, onClick func()) Row {
+	return sectionLinkRow{text, link, tip, onClick}
+}
+
+func (s sectionLinkRow) tip(_ *canvas, _ rect, seg int) string {
+	if seg == 0 {
+		return s.tipText
+	}
+	return ""
+}
 
 func (sectionLinkRow) height() int { return 28 }
 
@@ -291,5 +302,44 @@ func (s sectionLinkRow) paint(c *canvas, r rect, st rowState) {
 		w := c.textWidth(s.link, fontCaption)
 		y := link.Top + link.h()/2 + c.px(7)
 		c.fill(rect{link.Right - w, y, link.Right, y + max(1, c.px(1))}, col)
+	}
+}
+
+// --- Groups ---------------------------------------------------------------------------
+
+// colGroup is the band behind a group of rows: a little lighter than the
+// panel, darker than a hovered row.
+var colGroup = rgb(0x26, 0x28, 0x2F)
+
+type groupMarkRow struct{ start bool }
+
+// GroupStart and GroupEnd enclose rows that belong together, such as a
+// folder and the import into it: the panel draws one rounded band behind
+// them. The markers are a few pixels of padding themselves.
+func GroupStart() Row { return groupMarkRow{true} }
+func GroupEnd() Row   { return groupMarkRow{false} }
+
+func (groupMarkRow) height() int                   { return 4 }
+func (groupMarkRow) segments(*canvas, rect) []rect { return nil }
+func (groupMarkRow) click(int)                     {}
+func (groupMarkRow) keepsOpen() bool               { return true }
+func (groupMarkRow) paint(*canvas, rect, rowState) {}
+
+// paintGroups draws the bands of the groups among n rows; row(i) and
+// rowRect(i) give each row and where it is. Called before the rows paint.
+func paintGroups(c *canvas, n int, row func(int) Row, rowRect func(int) rect) {
+	start := -1
+	for i := 0; i < n; i++ {
+		g, ok := row(i).(groupMarkRow)
+		switch {
+		case !ok:
+		case g.start:
+			start = i
+		case start >= 0:
+			top, bottom := rowRect(start), rowRect(i)
+			band := rect{top.Left + c.px(6), top.Top, top.Right - c.px(6), bottom.Bottom}
+			c.roundRect(band, c.px(14), colGroup)
+			start = -1
+		}
 	}
 }

@@ -89,7 +89,8 @@ type App struct {
 	lib      *library.Library
 	indexer  *library.Indexer
 	removing string       // folder awaiting the remove confirmation
-	libNote  string       // result of the last refresh, shown until the panel closes
+	libNote  string       // result of the last refresh or add, shown for a moment (setLibNote)
+	libSeq   int          // identifies the current libNote, so an old timer leaves a newer one
 	keepNote bool         // reopening after a dialog: keep libNote and backupNote
 	imports  importsState // sounds dropped onto folders (import.go)
 

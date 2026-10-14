@@ -362,7 +362,7 @@ func retry(fn func() error) error {
 // copySounds copies sound files dropped on a folder field into it (they
 // are not moved: the originals stay where they were).
 func (a *App) copySounds(dir string, files []string, skipped int) {
-	a.libNote = "Copying " + plural(len(files), "sound") + "…"
+	a.setLibNote("Copying "+plural(len(files), "sound")+"…", false)
 	go func() {
 		copied, failed, known := 0, 0, 0
 		for _, f := range files {
@@ -394,7 +394,7 @@ func (a *App) copySounds(dir string, files []string, skipped int) {
 			if skipped > 0 {
 				parts = append(parts, plural(skipped, "file")+" skipped: not MP3, WAV, FLAC or OGG.")
 			}
-			a.libNote = strings.Join(parts, " ")
+			a.setLibNote(strings.Join(parts, " "), true)
 			a.rescan()
 			a.render()
 		})
@@ -436,7 +436,6 @@ func (a *App) importRows(dir string) []ui.Row {
 		case importNaming:
 			j := job
 			fieldID := fmt.Sprintf("import-name-%d", j.id)
-			rows = append(rows, ui.Text("Added to “"+filepath.Base(j.dir)+"”. Name it:", "", ui.ToneGood))
 			if j.dup != "" {
 				rows = append(rows, ui.Paragraph(j.dup, ui.ToneWarning))
 			}
@@ -458,6 +457,21 @@ func (a *App) importRows(dir string) []ui.Row {
 		}
 	}
 	return rows
+}
+
+// importGroup puts a folder's field and the rows of the import into it
+// (its card, or why it failed) together. While an import into the folder
+// runs, they share a lighter band, so the card visibly belongs to it.
+func (a *App) importGroup(active bool, field ui.Row, rows []ui.Row) []ui.Row {
+	out := []ui.Row{field}
+	if active {
+		out = []ui.Row{ui.GroupStart(), field}
+	}
+	out = append(out, rows...)
+	if active {
+		out = append(out, ui.GroupEnd())
+	}
+	return out
 }
 
 // openMyinstants opens Myinstants in the browser. The panel stays open, so

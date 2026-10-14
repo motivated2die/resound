@@ -126,7 +126,8 @@ func (a *App) homePage() []ui.Row {
 		refresh = a.refreshLibrary
 	}
 	rows = append(rows,
-		ui.SectionLink("Sound library", "Import from Myinstants", func() { a.openPage(pageLibrary) }),
+		ui.SectionLink("Sound library", "Import buttons",
+			"Download sound buttons from Myinstants into your folders", func() { a.openPage(pageLibrary) }),
 		ui.NavTool(ui.IconRefresh, "Refresh the library: picks up new, renamed and edited files", refresh,
 			"Folders", libDetail, libTone, func() { a.openPage(pageLibrary) }),
 	)
@@ -477,13 +478,12 @@ func (a *App) folderRows() []ui.Row {
 			detail = "No sounds yet"
 		}
 		note, active := a.folderImport(f)
-		rows = append(rows, ui.FolderDrop(ui.FolderSpec{
+		rows = append(rows, a.importGroup(active, ui.FolderDrop(ui.FolderSpec{
 			Name: filepath.Base(f), Detail: detail, Tip: f, Note: note, Active: active,
 			ActionIcon: ui.IconTrash, ActionTip: "Remove from the library (the folder and its files stay on disk)",
 			OnAction: func() { a.removing = folder; a.render() },
 			OnClick:  open(f), OnDrop: a.dropOnFolder(f),
-		}))
-		rows = append(rows, a.importRows(f)...)
+		}), a.importRows(f))...)
 		if a.removing == folder {
 			rows = append(rows,
 				ui.Paragraph("Remove this folder from the library? Its files stay on disk. Favorites, volumes and phone colors are kept for 30 days in case you add it back.", ui.ToneWarning),
@@ -499,21 +499,21 @@ func (a *App) folderRows() []ui.Row {
 				detail = plural(n, "sound")
 			}
 			note, active := a.folderImport(sub.Path)
-			rows = append(rows, ui.FolderDrop(ui.FolderSpec{
+			rows = append(rows, a.importGroup(active, ui.FolderDrop(ui.FolderSpec{
 				Name: filepath.Base(sub.Path), Detail: detail, Tip: sub.Path, Depth: sub.Depth,
 				Note: note, Active: active, OnClick: open(sub.Path), OnDrop: a.dropOnFolder(sub.Path),
-			}))
-			rows = append(rows, a.importRows(sub.Path)...)
+			}), a.importRows(sub.Path))...)
 		}
 	}
 	return rows
 }
 
 // dropRows is the drop field for sound folders, dragged in from Explorer
-// (the panel stays open while another window has the focus).
+// (the panel stays open while another window has the focus), under its own
+// heading so it stands apart from the folders above.
 func (a *App) dropRows() []ui.Row {
 	return []ui.Row{
-		ui.Spacer(4),
+		ui.Section("Add folders"),
 		ui.DropZone("Drop sound folders here", "or click to choose one", a.addFolder),
 	}
 }
