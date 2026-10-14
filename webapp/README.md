@@ -18,6 +18,7 @@ Nothing here is embedded into `Resound.exe`.
 | `app.html`, `js/app.js`, `js/*.js`, `css/styles.css` | The remote (the soundboard): tabs, sound cards, layouts, settings. The installed app starts here |
 | `js/rtc.js` | The connection: pairing, reconnecting, and `fetch()` for `/api/` over the data channel. The first script on every page |
 | `connect.html`, `js/connect.js`, `css/connect.css` | Pairing (link, in-app QR scanner, pasted link) and the list of paired PCs |
+| `js/connection-help.js`, `css/connection-help.css` | What to check when the PC doesn't answer, on the remote and the connect page. Keep its steps in line with the panel's Phone remote page (`internal/app/pages.go`) |
 | `js/screen-wake.js` | Keeps the screen on (Screen Wake Lock API), on by default |
 | `js/fullscreen.js` | Fullscreen in a browser tab; the installed app opens fullscreen by itself (`manifest.json`) |
 | `js/device.js` | Vibration on play and stop, "Install the app", persistent storage for the pairing keys |
@@ -61,4 +62,6 @@ or on one PC with the `RESOUND_APP_URL` environment variable or `appURL` in
 `config.json`.
 
 Installed apps pick up a new deployment the next time they come to the
-foreground: the service worker fetches it and the page reloads.
+foreground (or within the hour while on screen): the service worker fetches
+it, and the page reloads into it as soon as that interrupts nobody, at the
+latest when the app goes to the background.

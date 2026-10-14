@@ -252,6 +252,7 @@ body {
 .icon[data-icon="mic"] { --icon: url("../assets/icons/mic.svg"); }
 .icon[data-icon="pause"] { --icon: url("../assets/icons/pause.svg"); }
 .icon[data-icon="play_arrow"] { --icon: url("../assets/icons/play_arrow.svg"); }
+.icon[data-icon="qr_code_scanner"] { --icon: url("../assets/icons/qr_code_scanner.svg"); }
 .icon[data-icon="restart_alt"] { --icon: url("../assets/icons/restart_alt.svg"); }
 .icon[data-icon="school"] { --icon: url("../assets/icons/school.svg"); }
 .icon[data-icon="settings"] { --icon: url("../assets/icons/settings.svg"); }
@@ -1735,6 +1736,58 @@ emoji-picker section#favorites {
 
 /* Disabled state for toggle switch */
 .toggle-switch.disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+/* --- Can't reach the PC ---
+   Covers the sounds while the PC can't be reached (app.js); the list itself
+   is css/connection-help.css. The tabs and the bottom bar stay. */
+.connection-help {
+  position: absolute;
+  top: max(var(--top-bar-height), env(safe-area-inset-top));
+  left: 0;
+  right: 0;
+  bottom: calc(var(--tabs-height) + var(--header-height));
+  z-index: 50;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 24px max(20px, calc((100% - 420px) / 2));
+  background-color: var(--v-background-dark);
+}
+
+.connection-help h2 {
+  font-size: 1.15rem;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.connection-help-lead {
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  margin-top: -8px;
+}
+
+.connection-help-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+.connection-help-actions .action-button {
+  flex: 1;
+  min-width: 0;
+}
+
+.connection-help-actions .action-button.primary {
+  background-color: var(--v-primary-base);
+  color: var(--on-primary);
+  font-weight: 600;
+}
+
+.connection-help-actions .action-button:disabled {
   opacity: 0.6;
   cursor: default;
 }

@@ -17,6 +17,7 @@
     <!-- Driver.js CSS (Local) -->
     <link rel="stylesheet" href="vendor/driverjs/css/driver.css"/>
     <link rel="stylesheet" href="css/styles.css">
+    <link rel="stylesheet" href="css/connection-help.css">
     <!-- SortableJS 1.15.6 (Local, MIT; see vendor/sortablejs/LICENSE) -->
     <script src="vendor/sortablejs/Sortable.min.js"></script>
     <!-- emoji-picker-element 1.29.1 (Local, Apache-2.0; data from vendor/emoji-picker-element-data) -->
@@ -61,6 +62,20 @@
                 <!-- Sounds will be dynamically added here -->
             </main>
         </div>
+
+        <!-- While the PC can't be reached: what to check (app.js, connection-help.js) -->
+        <section id="connection-help" class="connection-help" aria-live="polite" hidden>
+            <h2>Can't reach <span id="connection-help-name">your PC</span></h2>
+            <p class="connection-help-lead">Resound keeps trying. Check these in order:</p>
+            <div id="connection-help-steps"></div>
+            <div class="connection-help-actions">
+                <button id="connection-help-retry" class="action-button primary" type="button">Try again</button>
+                <button id="connection-help-scan" class="action-button" type="button">
+                    <span class="icon" data-icon="qr_code_scanner" aria-hidden="true"></span>
+                    <span>Scan code</span>
+                </button>
+            </div>
+        </section>
 
         <!-- Tab navigation -->
         <nav class="tabs" id="tabs-container">
@@ -263,6 +278,7 @@
     </div>
 
     <!-- Load core modules -->
+    <script src="js/connection-help.js" defer></script>
     <script src="js/persistence.js" defer></script>
     <script src="js/screen-wake.js" defer></script>
     <script src="js/fullscreen.js" defer></script>

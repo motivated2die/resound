@@ -1,0 +1,51 @@
+/* The "what to check" list (js/connection-help.js), on the remote and the
+   connect page. Colours are the shared palette (css/styles.css). */
+.help-note {
+    color: #f2c14e;
+    font-size: 14px;
+    margin-bottom: 10px;
+}
+
+.help-steps {
+    list-style: none;
+    counter-reset: help;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    text-align: left;
+}
+
+.help-steps li {
+    counter-increment: help;
+    display: grid;
+    grid-template-columns: 26px 1fr;
+    column-gap: 10px;
+    font-size: 14px;
+    line-height: 1.4;
+    color: #9a9ca6;
+}
+
+.help-steps li::before {
+    content: counter(help);
+    grid-row: span 2;
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    background: #3a3d46;
+    color: #ececf0;
+    font-size: 13px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.help-steps li.flagged::before {
+    background: #f2c14e;
+    color: #1c1d22;
+}
+
+.help-steps strong {
+    color: #ececf0;
+    font-weight: 600;
+}

@@ -106,6 +106,7 @@ function setConnection(up) {
         clearTimeout(connection.retryTimer);
         connection.retryTimer = null;
         connection.retryDelay = 1000;
+        showConnectionHelp(false);
     }
     if (connection.up !== up) {
         connection.up = up;
@@ -128,8 +129,13 @@ async function reconnect() {
     } catch (_) {
         return; // apiFetch scheduled the next attempt
     }
-    if (!connection.loaded) checkServerStatus(); // the first load never finished
-    else checkForPlayingSounds(); // pick up sounds started meanwhile
+    if (!connection.loaded) {
+        checkServerStatus(); // the first load never finished
+        return;
+    }
+    checkForPlayingSounds(); // pick up sounds started meanwhile
+    // A tab opened while the PC was away shows an error instead of its sounds.
+    if (soundsContainerEl?.querySelector('.error-text')) reloadSoundsForCurrentTab();
 }
 
 // Retry at once when the phone wakes up or gets its network back.
@@ -142,6 +148,42 @@ function retryNow() {
 }
 document.addEventListener('visibilitychange', () => { if (!document.hidden) retryNow(); });
 window.addEventListener('online', retryNow);
+
+// --- Can't reach the PC ---
+// Once a connection attempt has failed, the sounds make way for a list of
+// what to check (connection-help.js). A dropped connection alone doesn't
+// show it: that usually comes straight back (rtc.js reconnects in ~70 ms),
+// and an attempt that gets no answer fails after 8 s.
+const connectionHelpEl = document.getElementById('connection-help');
+const connectionHelpRetry = document.getElementById('connection-help-retry');
+
+function showConnectionHelp(on) {
+    if (!connectionHelpEl || connectionHelpEl.hidden === !on) return;
+    if (on) {
+        const pc = window.resoundRTC?.currentPC();
+        document.getElementById('connection-help-name').textContent = pc ? pc.name : 'your PC';
+        window.resoundHelp?.render(document.getElementById('connection-help-steps'), false);
+    }
+    connectionHelpEl.hidden = !on;
+}
+
+window.resoundRTC?.onStatus((status, detail) => {
+    if (status === 'up') showConnectionHelp(false);
+    else if (status === 'down' && detail) showConnectionHelp(true); // an attempt failed
+    if (connectionHelpRetry) {
+        connectionHelpRetry.disabled = status === 'connecting';
+        connectionHelpRetry.textContent = status === 'connecting' ? 'Connecting…' : 'Try again';
+    }
+});
+connectionHelpRetry?.addEventListener('click', retryNow);
+document.getElementById('connection-help-scan')?.addEventListener('click', () => { location.href = '/connect#scan'; });
+// The device's own network state is part of the list.
+const refreshConnectionHelp = () => {
+    if (connectionHelpEl && !connectionHelpEl.hidden) window.resoundHelp?.render(document.getElementById('connection-help-steps'), false);
+};
+window.addEventListener('online', refreshConnectionHelp);
+window.addEventListener('offline', refreshConnectionHelp);
+navigator.connection?.addEventListener?.('change', refreshConnectionHelp);
 
 // --- API Helper ---
 async function apiFetch(endpoint, options = {}) {
@@ -237,8 +279,11 @@ async function checkServerStatus() {
 
   } catch (error) {
       console.error("Failed initial server status check or subsequent load sequence:", error.message);
-      if (tabsContainerEl) tabsContainerEl.innerHTML = '<p class="error-text">Failed to connect.</p>';
-      if (soundsContainerEl) soundsContainerEl.innerHTML = '<p class="error-text">Failed to connect.</p>';
+      // No answer from the PC: the connection help covers the sounds, and
+      // the first load runs again once the PC is back (reconnect).
+      const text = error.status ? '<p class="error-text">Failed to load.</p>' : '';
+      if (tabsContainerEl) tabsContainerEl.innerHTML = text;
+      if (soundsContainerEl) soundsContainerEl.innerHTML = text;
       updateTopBarProgressState(0);
       state.isAnythingPlayingUnpaused = false; // Ensure state reflects no playback on error
       updatePlayPauseButtonIcon();
@@ -876,6 +921,9 @@ async function loadTabs() {
 
     } catch (error) {
         console.error('Error loading tabs:', error);
+        // No answer from the PC: the caller's first load isn't done, so it
+        // runs again on reconnect.
+        if (!error.status) throw error;
         if (tabsContainerEl) tabsContainerEl.innerHTML = '<p class="error-text">Failed to load tabs.</p>';
         state.currentTab = null; // Reset state on error
         if(soundsContainerEl) soundsContainerEl.innerHTML = '<p class="error-text">Failed to load tabs.</p>';
