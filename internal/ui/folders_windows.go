@@ -1,5 +1,7 @@
 package ui
 
+import "strings"
+
 // Rows of the sound library page: folders as drop fields, the import guide
 // with its little drag-and-drop picture, and the section caption with a
 // link on the home page.
@@ -149,12 +151,13 @@ func (f folderDropRow) paint(c *canvas, r rect, st rowState) {
 
 // --- Import guide ------------------------------------------------------------------
 
-type importGuideRow struct{ text string }
+type importGuideRow struct{ text, underline string }
 
 // ImportGuide is a paragraph with a small picture on its right: a
 // Myinstants-style sound button, its name being dragged along a dotted
-// path onto a folder drop field.
-func ImportGuide(text string) Row { return importGuideRow{text} }
+// path onto a folder drop field. The words of underline (a phrase in text)
+// are drawn brighter and underlined, like the link they describe.
+func ImportGuide(text, underline string) Row { return importGuideRow{text, underline} }
 
 const (
 	guideWL   = 118 // the picture's logical size
@@ -169,14 +172,76 @@ func (importGuideRow) keepsOpen() bool               { return true }
 
 func (g importGuideRow) measure(c *canvas, width int32) int32 {
 	textW := width - 2*c.px(padX) - c.px(guideWL+guideGapL)
-	return max(c.wrapHeight(g.text, textW, fontBody)+c.px(8), c.px(guideHL+6))
+	_, h := g.layout(c, textW)
+	return max(h+c.px(8), c.px(guideHL+6))
 }
 
 func (g importGuideRow) paint(c *canvas, r rect, _ rowState) {
 	in := inset(c, r)
 	pic := rect{in.Right - c.px(guideWL), r.Top + c.px(3), in.Right, r.Top + c.px(3+guideHL)}
-	c.textWrapped(g.text, rect{in.Left, r.Top + c.px(3), pic.Left - c.px(guideGapL), r.Bottom}, fontBody, colMuted)
+	left, top := in.Left, r.Top+c.px(3)
+	words, _ := g.layout(c, pic.Left-c.px(guideGapL)-left)
+	lineH := c.wrapHeight("Ag", c.px(200), fontBody)
+	for _, w := range words {
+		col := colMuted
+		if w.under {
+			col = colText
+		}
+		box := rect{left + w.x, top + w.y, left + w.x + w.w + c.px(2), top + w.y + lineH}
+		c.text(w.text, box, fontBody, col, dtLeft)
+		if w.under {
+			uw := w.w
+			if w.joined {
+				uw += w.space // the underline runs on to the next word
+			}
+			y := box.Bottom - c.px(2)
+			c.fill(rect{box.Left, y, box.Left + uw, y + max(1, c.px(1))}, colAccent)
+		}
+	}
 	paintGuide(c, pic)
+}
+
+// guideWord is one word of the guide's text, laid out.
+type guideWord struct {
+	text   string
+	x, y   int32 // relative to the text's top left
+	w      int32
+	space  int32 // the space after it
+	under  bool  // part of the underlined phrase
+	joined bool  // the next word is too, on the same line
+}
+
+// layout wraps the text into width, word by word (GDI's own word wrap
+// can't underline part of a paragraph), and returns the words and the
+// height they take.
+func (g importGuideRow) layout(c *canvas, width int32) ([]guideWord, int32) {
+	lineH := c.wrapHeight("Ag", c.px(200), fontBody)
+	if lineH == 0 { // no device context to measure with
+		return nil, c.wrapHeight(g.text, width, fontBody)
+	}
+	ulStart, ulEnd := -1, -1
+	if i := strings.Index(g.text, g.underline); g.underline != "" && i >= 0 {
+		ulStart, ulEnd = i, i+len(g.underline)
+	}
+	space := c.textWidth(" ", fontBody)
+	var words []guideWord
+	var x, y int32
+	pos := 0
+	for _, f := range strings.Fields(g.text) {
+		start := pos + strings.Index(g.text[pos:], f)
+		pos = start + len(f)
+		w := c.textWidth(f, fontBody)
+		if x > 0 && x+w > width {
+			x, y = 0, y+lineH
+		}
+		under := ulStart >= 0 && start >= ulStart && start+len(f) <= ulEnd
+		if n := len(words); n > 0 && under && words[n-1].under && words[n-1].y == y {
+			words[n-1].joined = true
+		}
+		words = append(words, guideWord{text: f, x: x, y: y, w: w, space: space, under: under})
+		x += w + space
+	}
+	return words, y + lineH
 }
 
 // paintGuide draws the drag-and-drop picture in box (guideWL × guideHL

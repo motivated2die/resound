@@ -34,6 +34,9 @@ const (
 	// importNoteFor is how long a folder shows "Added “…”" in place of
 	// its sound count.
 	importNoteFor = 3 * time.Second
+	// importErrorFor is how long a failed import's message, or a warning
+	// about a drop, stays on the page: long enough to read it.
+	importErrorFor = 8 * time.Second
 )
 
 type importState int
@@ -67,6 +70,7 @@ type importsState struct {
 	ctx     context.Context
 	cancel  context.CancelFunc
 	warn    string // a drop that went nowhere, shown at the top of the page
+	warnSeq int    // identifies the current warn, so an old timer leaves a newer one
 }
 
 func (s *importsState) init() {
@@ -92,16 +96,16 @@ func (a *App) onDropAnywhere(d ui.DropData) {
 	if !a.acceptsDrops() {
 		return
 	}
-	a.imports.warn = ""
+	a.setImportWarn("")
 	if len(d.Paths) > 0 {
 		a.addFolders(d.Paths)
 		return
 	}
 	if len(d.Links) > 0 {
 		if len(a.cfg.Folders) == 0 {
-			a.imports.warn = "Add a sound folder first, then drop sounds onto it."
+			a.setImportWarn("Add a sound folder first, then drop sounds onto it.")
 		} else {
-			a.imports.warn = "Drop the sound onto one of the folders below to download it there."
+			a.setImportWarn("Drop the sound onto one of the folders below to download it there.")
 		}
 		a.render()
 	}
@@ -110,7 +114,7 @@ func (a *App) onDropAnywhere(d ui.DropData) {
 // dropOnFolder returns the drop handler of the field for folder dir.
 func (a *App) dropOnFolder(dir string) func(ui.DropData) {
 	return func(d ui.DropData) {
-		a.imports.warn = ""
+		a.setImportWarn("")
 		for _, link := range d.Links {
 			a.importLink(dir, link)
 		}
@@ -135,7 +139,7 @@ func (a *App) dropOnFolder(dir string) func(ui.DropData) {
 		if len(sounds) > 0 {
 			a.copySounds(dir, sounds, skipped)
 		} else if skipped > 0 && len(folders) == 0 {
-			a.imports.warn = "Only MP3, WAV, FLAC and OGG files can be added."
+			a.setImportWarn("Only MP3, WAV, FLAC and OGG files can be added.")
 		}
 		a.render()
 	}
@@ -146,7 +150,7 @@ func (a *App) importLink(dir, link string) {
 	s := &a.imports
 	u, ok := importer.ParseLink(link)
 	if !ok {
-		s.warn = "That is not a web link to a sound."
+		a.setImportWarn("That is not a web link to a sound.")
 		return
 	}
 	s.seq++
@@ -179,8 +183,7 @@ func (a *App) finishImport(job *soundImport, saved importer.Saved, dups []librar
 	}
 	if err != nil {
 		logx.Printf("import from %s failed: %v", job.host, err)
-		job.state, job.err = importFailed, importMessage(err)
-		a.render()
+		a.failImport(job, importMessage(err))
 		return
 	}
 	logx.Printf("import: saved %s", saved.Path)
@@ -277,8 +280,7 @@ func (a *App) discardImport(job *soundImport) {
 		a.tray.Post(func() {
 			if err != nil {
 				logx.Printf("import: discarding %s: %v", path, err)
-				job.state, job.err = importFailed, "Could not delete the file: "+err.Error()
-				a.render()
+				a.failImport(job, "Could not delete the file: "+err.Error())
 				return
 			}
 			logx.Printf("import: discarded %s", path)
@@ -287,6 +289,41 @@ func (a *App) discardImport(job *soundImport) {
 		})
 	}()
 	a.render()
+}
+
+// failImport shows why an import failed under its folder, for
+// importErrorFor.
+func (a *App) failImport(job *soundImport, msg string) {
+	job.state, job.err = importFailed, msg
+	a.render()
+	time.AfterFunc(importErrorFor, func() {
+		a.tray.Post(func() {
+			if job.state == importFailed {
+				a.imports.remove(job)
+				a.render()
+			}
+		})
+	})
+}
+
+// setImportWarn shows a warning about a drop at the top of the library
+// page for importErrorFor; "" clears it.
+func (a *App) setImportWarn(text string) {
+	s := &a.imports
+	s.warnSeq++
+	s.warn = text
+	if text == "" {
+		return
+	}
+	seq := s.warnSeq
+	time.AfterFunc(importErrorFor, func() {
+		a.tray.Post(func() {
+			if s.warnSeq == seq && s.warn != "" {
+				s.warn = ""
+				a.render()
+			}
+		})
+	})
 }
 
 // noteThenForget shows the job's note on its folder for importNoteFor.
@@ -316,6 +353,7 @@ func (a *App) previewImport(job *soundImport) {
 					voiceMeta{soundID: id, name: name, preview: true}, false)
 				if err == nil {
 					job.voice = info.VoiceID
+					a.render() // Preview becomes Stop
 				}
 			}
 			if err != nil {
@@ -331,6 +369,17 @@ func (a *App) stopImportPreview(job *soundImport) {
 	if job.voice != 0 {
 		a.engine.Stop(job.voice)
 		job.voice = 0
+	}
+}
+
+// importPreviewEnded notes that a voice finished (stopped or played to its
+// end): a card whose preview it was offers Preview again.
+func (a *App) importPreviewEnded(voice uint64) {
+	for _, job := range a.imports.jobs {
+		if job.voice == voice && voice != 0 {
+			job.voice = 0
+			a.render()
+		}
 	}
 }
 
@@ -447,7 +496,7 @@ func (a *App) importRows(dir string) []ui.Row {
 			}
 			rows = append(rows, ui.Buttons(
 				ui.Action{Label: "Discard", Icon: ui.IconTrash, Style: ui.ButtonDanger, OnClick: func() { a.discardImport(j) }},
-				ui.Action{Label: "Preview", Icon: ui.IconPlay, OnClick: func() { a.previewImport(j) }},
+				a.previewAction(j),
 				ui.Action{Label: "Save", Style: ui.ButtonPrimary, OnClick: func() {
 					if text, ok := a.tray.Popup().FieldText(fieldID); ok {
 						a.saveImportName(j, text)
@@ -457,6 +506,15 @@ func (a *App) importRows(dir string) []ui.Row {
 		}
 	}
 	return rows
+}
+
+// previewAction is the card's Preview button, or Stop while its preview
+// plays.
+func (a *App) previewAction(j *soundImport) ui.Action {
+	if j.voice != 0 {
+		return ui.Action{Label: "Stop", Icon: ui.IconStop, OnClick: func() { a.stopImportPreview(j); a.render() }}
+	}
+	return ui.Action{Label: "Preview", Icon: ui.IconPlay, OnClick: func() { a.previewImport(j) }}
 }
 
 // importGroup puts a folder's field and the rows of the import into it

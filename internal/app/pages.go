@@ -127,7 +127,8 @@ func (a *App) homePage() []ui.Row {
 	}
 	rows = append(rows,
 		ui.SectionLink("Sound library", "Import buttons",
-			"Download sound buttons from Myinstants into your folders", func() { a.openPage(pageLibrary) }),
+			"Open Myinstants and the Sound library page, to drag sound buttons into your folders",
+			func() { a.openPage(pageLibrary); a.openMyinstants() }),
 		ui.NavTool(ui.IconRefresh, "Refresh the library: picks up new, renamed and edited files", refresh,
 			"Folders", libDetail, libTone, func() { a.openPage(pageLibrary) }),
 	)
@@ -420,14 +421,19 @@ func (a *App) indexStatus() library.IndexerStatus {
 }
 
 func (a *App) libraryPage() []ui.Row {
+	var refresh func()
+	if len(a.cfg.Folders) > 0 {
+		refresh = a.refreshLibrary
+	}
 	rows := []ui.Row{
-		ui.Header("Sound library", a.back),
+		ui.HeaderTool("Sound library", a.back, ui.IconRefresh,
+			"Refresh the library: picks up new folders, new, renamed and edited files", refresh),
 		ui.Paragraph("Each folder and each subfolder with sounds becomes a tab on the phone. Refresh after changing files or folders in Explorer.", ui.ToneMuted),
 	}
 	if len(a.cfg.Folders) > 0 {
 		rows = append(rows,
 			ui.Section("Import sounds"),
-			ui.ImportGuide("Find a sound on Myinstants and drag its name onto a folder below. Resound downloads it there. Sound files from Explorer work too."),
+			ui.ImportGuide("Find a sound on Myinstants and drag its name onto a folder below. Resound downloads it there. Sound files from Explorer work too.", "drag its name"),
 			ui.Buttons(ui.Action{Label: "Open Myinstants", Icon: ui.IconExternalLink, OnClick: a.openMyinstants}),
 		)
 	}

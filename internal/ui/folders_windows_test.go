@@ -10,9 +10,10 @@ import "testing"
 func TestLibraryRowsRender(t *testing.T) {
 	dropped := false
 	rows := []Row{
+		HeaderTool("Sound library", func() {}, IconRefresh, "Refresh", func() {}),
 		SectionLink("Sound library", "Import buttons", "Download sounds", func() {}),
 		Section("Import sounds"),
-		ImportGuide("Find a sound on Myinstants, then drag its name onto a folder below. Resound downloads it there."),
+		ImportGuide("Find a sound on Myinstants and drag its name onto a folder below. Resound downloads it there. Sound files from Explorer work too.", "drag its name"),
 		Section("Folders"),
 		FolderDrop(FolderSpec{Name: "Memes", Detail: "42 sounds · 3 tabs", ActionIcon: IconTrash, ActionTip: "Remove", OnAction: func() {}, OnClick: func() {}, OnDrop: func(DropData) { dropped = true }}),
 		FolderDrop(FolderSpec{Name: "Anime", Detail: "12 sounds", Depth: 1, OnDrop: func(DropData) {}}),
@@ -27,9 +28,10 @@ func TestLibraryRowsRender(t *testing.T) {
 		FolderDrop(FolderSpec{Name: "Classics", Detail: "Empty", Depth: 1, OnDrop: func(DropData) {}}),
 	}
 	states := map[int]rowState{
-		0:  {hover: 0, press: -1, open: -1},
-		4:  {hover: 1, press: -1, open: -1},
-		14: {hover: -1, press: -1, open: -1, drop: true},
+		0:  {hover: 1, press: -1, open: -1},
+		1:  {hover: 0, press: -1, open: -1},
+		5:  {hover: 1, press: -1, open: -1},
+		15: {hover: -1, press: -1, open: -1, drop: true},
 	}
 	for _, scale := range []float64{1, 1.5} {
 		img := renderRows(t, rows, scale, states)
@@ -38,7 +40,7 @@ func TestLibraryRowsRender(t *testing.T) {
 		}
 	}
 
-	d, ok := rows[4].(dropper)
+	d, ok := rows[5].(dropper)
 	if !ok || d.dropHandler() == nil {
 		t.Fatal("FolderDrop is not a drop field")
 	}
@@ -46,7 +48,7 @@ func TestLibraryRowsRender(t *testing.T) {
 	if !dropped {
 		t.Error("drop handler not called")
 	}
-	if _, ok := rows[0].(dropper); ok {
+	if _, ok := rows[1].(dropper); ok {
 		t.Error("SectionLink should not take drops")
 	}
 }

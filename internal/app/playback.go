@@ -230,6 +230,7 @@ func (a *App) onEngineEvent(ev audio.Event) {
 			a.render()
 		}
 	case audio.EventFinished:
+		a.importPreviewEnded(ev.VoiceID)
 		if n, ok := pb.remaining[ev.VoiceID]; ok {
 			if n <= 1 {
 				delete(pb.remaining, ev.VoiceID)
