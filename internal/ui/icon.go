@@ -42,6 +42,7 @@ const (
 	IconExternalLink Icon = "external-link"
 	IconFolder       Icon = "folder"
 	IconFolderPlus   Icon = "folder-plus"
+	IconHandGrab     Icon = "hand-grab"
 	IconInfo         Icon = "info-circle"
 	IconKeyboard     Icon = "keyboard"
 	IconMic          Icon = "microphone"
@@ -55,6 +56,7 @@ const (
 	IconSave         Icon = "device-floppy"
 	IconSettings     Icon = "settings"
 	IconStop         Icon = "player-stop"
+	IconTrash        Icon = "trash"
 )
 
 // rasterIcon renders an icon as an alpha mask of size×size pixels. The

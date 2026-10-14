@@ -3,6 +3,7 @@ package app
 import (
 	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"slices"
@@ -283,9 +284,10 @@ func (a *App) addFolder() {
 }
 
 // addFolders adds sound folders chosen in the picker or dropped from
-// Explorer. A dropped sound file adds the folder it is in. Folders already in
-// the library, or already one of its tabs (a direct subfolder), are skipped.
-// libNote says what happened.
+// Explorer, empty ones too (sounds can be put into them later). A dropped
+// sound file adds the folder it is in. Folders already in the library, or
+// inside one of its folders (scanned with it), are skipped; a folder that
+// contains library folders replaces them. libNote says what happened.
 func (a *App) addFolders(paths []string) {
 	var added, known []string
 	skipped := 0
@@ -318,6 +320,23 @@ func (a *App) addFolders(paths []string) {
 
 	var note []string
 	if len(added) > 0 {
+		// Library folders inside a new one are scanned with it from now on.
+		var merged []string
+		a.cfg.Folders = slices.DeleteFunc(slices.Clone(a.cfg.Folders), func(f string) bool {
+			for _, p := range added {
+				if within(f, p) {
+					merged = append(merged, f)
+					return true
+				}
+			}
+			return false
+		})
+		for _, f := range merged {
+			logx.Printf("library: %s is now part of a folder added above it", f)
+		}
+		if len(merged) > 0 {
+			note = append(note, fmt.Sprintf("It already contained %s of the library; they are part of it now.", plural(len(merged), "folder")))
+		}
 		a.cfg.Folders = append(a.cfg.Folders, added...)
 		a.save()
 		for _, p := range added {
@@ -326,11 +345,11 @@ func (a *App) addFolders(paths []string) {
 		_, before := a.lib.Stats()
 		a.rescan()
 		_, after := a.lib.Stats()
+		msg := fmt.Sprintf("Added %d folders: %s.", len(added), plural(after-before, "new sound"))
 		if len(added) == 1 {
-			note = append(note, fmt.Sprintf("Added “%s”: %s.", filepath.Base(added[0]), plural(after-before, "sound")))
-		} else {
-			note = append(note, fmt.Sprintf("Added %d folders: %s.", len(added), plural(after-before, "sound")))
+			msg = fmt.Sprintf("Added “%s”: %s.", filepath.Base(added[0]), plural(after-before, "new sound"))
 		}
+		note = append([]string{msg}, note...)
 	}
 	switch {
 	case len(known) == 1:
@@ -349,17 +368,21 @@ func (a *App) addFolders(paths []string) {
 	a.render()
 }
 
-// folderCovering reports whether p is a library folder already, or one of
-// its direct subfolders (which are tabs of it).
+// folderCovering reports whether p is a library folder already, or inside
+// one (its subfolders are scanned with it, at any depth).
 func (a *App) folderCovering(p string) bool {
-	lp := strings.ToLower(filepath.Clean(p))
 	for _, f := range a.cfg.Folders {
-		lf := strings.ToLower(filepath.Clean(f))
-		if lp == lf || strings.EqualFold(filepath.Dir(lp), lf) {
+		if within(p, f) {
 			return true
 		}
 	}
 	return false
+}
+
+// within reports whether path is root or inside it (ignoring case).
+func within(path, root string) bool {
+	rel, err := filepath.Rel(strings.ToLower(filepath.Clean(root)), strings.ToLower(filepath.Clean(path)))
+	return err == nil && rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator)) && !filepath.IsAbs(rel)
 }
 
 // acceptsDrops reports whether the current page adds folders by drag and
@@ -368,20 +391,58 @@ func (a *App) acceptsDrops() bool {
 	return a.page == pageLibrary || (a.page == pageWizard && a.wizardStep == 1)
 }
 
-// refreshLibrary rescans the folders and says what changed.
+// refreshLibrary drops library folders that no longer exist, rescans the
+// others with all their subfolders (new and moved ones included), and says
+// what changed.
 func (a *App) refreshLibrary() {
+	gone := a.pruneMissingFolders()
 	_, before := a.lib.Stats()
 	a.rescan()
 	_, after := a.lib.Stats()
+	var note []string
 	switch d := after - before; {
 	case d > 0:
-		a.libNote = fmt.Sprintf("Found %s.", plural(d, "new sound"))
+		note = append(note, fmt.Sprintf("Found %s.", plural(d, "new sound")))
 	case d < 0:
-		a.libNote = fmt.Sprintf("%s no longer found.", plural(-d, "sound"))
-	default:
-		a.libNote = "Up to date. Renamed and edited files are picked up too."
+		note = append(note, fmt.Sprintf("%s no longer found.", plural(-d, "sound")))
+	case len(gone) == 0:
+		note = append(note, "Up to date. New folders, renamed and edited files are picked up too.")
 	}
+	switch {
+	case len(gone) == 1:
+		note = append(note, "“"+filepath.Base(gone[0])+"” no longer exists and was removed from the library.")
+	case len(gone) > 1:
+		note = append(note, fmt.Sprintf("%s no longer exist and were removed from the library.", plural(len(gone), "folder")))
+	}
+	if len(gone) > 0 {
+		note = append(note, "Their sounds' settings are kept for 30 days in case they come back.")
+	}
+	a.libNote = strings.Join(note, " ")
 	a.render()
+}
+
+// pruneMissingFolders removes library folders that are gone (deleted,
+// moved or renamed in Explorer) and returns them. Only a folder Windows
+// reports as missing is removed; one that can't be read for another reason
+// (no access) stays.
+func (a *App) pruneMissingFolders() []string {
+	var gone []string
+	kept := make([]string, 0, len(a.cfg.Folders))
+	for _, f := range a.cfg.Folders {
+		if _, err := os.Stat(f); errors.Is(err, fs.ErrNotExist) {
+			gone = append(gone, f)
+			continue
+		}
+		kept = append(kept, f)
+	}
+	if len(gone) > 0 {
+		a.cfg.Folders = kept
+		a.save()
+		for _, f := range gone {
+			logx.Printf("library: %s no longer exists; removed", f)
+		}
+	}
+	return gone
 }
 
 // removeFolder removes a sound folder. Its sounds' settings are kept for 30

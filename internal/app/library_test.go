@@ -12,8 +12,8 @@ func TestFolderCovering(t *testing.T) {
 		`D:\Sounds`:           true,  // already a folder
 		`d:\sounds`:           true,  // case-insensitive
 		`E:\Clips`:            true,  // trailing separator in the config
-		`D:\Sounds\Memes`:     true,  // a direct subfolder is already a tab
-		`D:\Sounds\Memes\Old`: false, // deeper folders aren't scanned: add it
+		`D:\Sounds\Memes`:     true,  // subfolders are scanned with it
+		`D:\Sounds\Memes\Old`: true,  // at any depth
 		`D:\Other`:            false,
 		`D:\Sounds 2`:         false, // same prefix, different folder
 		`D:\`:                 false, // a parent becomes its own folder

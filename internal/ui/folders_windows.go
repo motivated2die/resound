@@ -1,7 +1,8 @@
 package ui
 
-// Rows of the sound library page: folders as drop fields, and the section
-// caption with a link on the home page.
+// Rows of the sound library page: folders as drop fields, the import guide
+// with its little drag-and-drop picture, and the section caption with a
+// link on the home page.
 
 // --- Folder drop field -------------------------------------------------------------
 
@@ -9,12 +10,22 @@ package ui
 type FolderSpec struct {
 	Name   string
 	Detail string // short, right-aligned, e.g. "12 sounds"
-	Tip    string // tooltip, e.g. the full path
-	// Sub indents the row: a subfolder below its library folder.
-	Sub bool
-	// Action is an optional small button on the right, e.g. "Remove".
-	Action   string
-	OnAction func()
+	Tip    string // tooltip on the field, e.g. the full path
+	// Depth indents subfolders: 0 for a library folder, 1 for its direct
+	// subfolders, and so on.
+	Depth int
+	// Note replaces Detail in the accent colour for a moment, e.g.
+	// "Added “Horn”" or "Downloading…".
+	Note string
+	// Active marks the folder something is being imported into: its icon
+	// takes the accent colour.
+	Active bool
+	// ActionIcon is an optional square icon button on the right, as tall as
+	// the field, e.g. a trash can to remove the folder; ActionTip is its
+	// tooltip.
+	ActionIcon Icon
+	ActionTip  string
+	OnAction   func()
 	// OnClick runs for a click on the field, e.g. to open the folder.
 	OnClick func()
 	// OnDrop receives files and links dropped on the field.
@@ -28,29 +39,28 @@ type folderDropRow struct{ s FolderSpec }
 // are over it.
 func FolderDrop(s FolderSpec) Row { return folderDropRow{s} }
 
+const (
+	folderIndentL   = 16 // per level of depth
+	folderMaxIndent = 4  // deeper levels line up with the fourth
+)
+
 func (f folderDropRow) height() int {
-	if f.s.Sub {
+	if f.s.Depth > 0 {
 		return 36
 	}
 	return 42
 }
 
 // geometry returns the dashed field and the action button (empty without
-// an action).
+// an action). The button is square and exactly as tall as the field.
 func (f folderDropRow) geometry(c *canvas, r rect) (box, action rect) {
 	in := inset(c, r)
-	left := in.Left
-	if f.s.Sub {
-		left += c.px(18)
+	box = rect{in.Left + c.px(folderIndentL*min(f.s.Depth, folderMaxIndent)), r.Top + c.px(3), in.Right, r.Bottom - c.px(3)}
+	if f.s.ActionIcon != "" {
+		action = rect{in.Right - box.h(), box.Top, in.Right, box.Bottom}
+		box.Right = action.Left - c.px(6)
 	}
-	right := in.Right
-	if f.s.Action != "" {
-		h := c.px(26)
-		top := r.Top + (r.h()-h)/2
-		action = rect{in.Right - c.px(72), top, in.Right, top + h}
-		right = action.Left - c.px(8)
-	}
-	return rect{left, r.Top + c.px(3), right, r.Bottom - c.px(3)}, action
+	return box, action
 }
 
 func (f folderDropRow) segments(c *canvas, r rect) []rect {
@@ -72,9 +82,13 @@ func (f folderDropRow) click(seg int) {
 
 func (folderDropRow) keepsOpen() bool               { return true }
 func (f folderDropRow) dropHandler() func(DropData) { return f.s.OnDrop }
+
 func (f folderDropRow) tip(_ *canvas, _ rect, seg int) string {
-	if seg == 0 {
+	switch seg {
+	case 0:
 		return f.s.Tip
+	case 1:
+		return f.s.ActionTip
 	}
 	return ""
 }
@@ -92,41 +106,138 @@ func (f folderDropRow) paint(c *canvas, r rect, st rowState) {
 	case st.hover == 0:
 		c.roundRect(box, c.px(10), colRowHover)
 		border = colMuted
+	case f.s.Active:
+		border = mix(colControl, colAccent, 0.6)
 	}
 	c.dashedFrame(box, c.px(10), border)
 
-	iconCol, font := colMuted, fontBold
-	if f.s.Sub {
+	font := fontBold
+	if f.s.Depth > 0 {
 		font = fontBody
 	}
-	if st.drop {
+	icon, iconCol := IconFolder, colMuted
+	switch {
+	case st.drop:
+		icon, iconCol = IconDownload, colAccent
+	case f.s.Active:
 		iconCol = colAccent
 	}
 	pad := c.px(10)
-	icon := IconFolder
-	if st.drop {
-		icon = IconDownload
-	}
 	iconBox := rect{box.Left + pad, box.Top, box.Left + pad + c.px(16), box.Bottom}
 	c.icon(icon, iconBox, 16, iconCol)
 	detail, detailCol := f.s.Detail, colMuted
-	if st.drop {
+	switch {
+	case st.drop:
 		detail, detailCol = "Drop to add here", colAccent
+	case f.s.Note != "":
+		detail, detailCol = f.s.Note, colAccent
 	}
-	detailW := min(c.textWidth(detail, fontCaption)+c.px(2), box.w()/2)
+	// A note may be long (a sound's name): it gets up to two thirds.
+	maxW := box.w() / 2
+	if f.s.Note != "" {
+		maxW = box.w() * 2 / 3
+	}
+	detailW := min(c.textWidth(detail, fontCaption)+c.px(2), maxW)
 	nameRight := box.Right - pad - detailW - c.px(8)
 	c.text(f.s.Name, rect{iconBox.Right + c.px(8), box.Top, nameRight, box.Bottom}, font, colText, dtLeft)
 	c.text(detail, rect{box.Right - pad - detailW, box.Top, box.Right - pad, box.Bottom}, fontCaption, detailCol, dtRight)
 
-	if f.s.Action != "" {
-		bg := colControl
-		if st.press == 1 {
-			bg = shade(bg, -18)
-		} else if st.hover == 1 {
-			bg = shade(bg, 14)
-		}
-		c.roundRect(action, c.px(8), bg)
-		c.text(f.s.Action, action, fontCaption, colText, dtCenter)
+	if f.s.ActionIcon != "" {
+		paintButton(c, action, "", f.s.ActionIcon, ButtonNormal, false, st.hover == 1, st.press == 1)
+	}
+}
+
+// --- Import guide ------------------------------------------------------------------
+
+type importGuideRow struct{ text string }
+
+// ImportGuide is a paragraph with a small picture on its right: a
+// Myinstants-style sound button, its name being dragged along a dotted
+// path onto a folder drop field.
+func ImportGuide(text string) Row { return importGuideRow{text} }
+
+const (
+	guideWL   = 118 // the picture's logical size
+	guideHL   = 84
+	guideGapL = 10
+)
+
+func (importGuideRow) height() int                   { return guideHL + 6 }
+func (importGuideRow) segments(*canvas, rect) []rect { return nil }
+func (importGuideRow) click(int)                     {}
+func (importGuideRow) keepsOpen() bool               { return true }
+
+func (g importGuideRow) measure(c *canvas, width int32) int32 {
+	textW := width - 2*c.px(padX) - c.px(guideWL+guideGapL)
+	return max(c.wrapHeight(g.text, textW, fontBody)+c.px(8), c.px(guideHL+6))
+}
+
+func (g importGuideRow) paint(c *canvas, r rect, _ rowState) {
+	in := inset(c, r)
+	pic := rect{in.Right - c.px(guideWL), r.Top + c.px(3), in.Right, r.Top + c.px(3+guideHL)}
+	c.textWrapped(g.text, rect{in.Left, r.Top + c.px(3), pic.Left - c.px(guideGapL), r.Bottom}, fontBody, colMuted)
+	paintGuide(c, pic)
+}
+
+// paintGuide draws the drag-and-drop picture in box (guideWL × guideHL
+// logical pixels): a Myinstants button with its name below; the name,
+// picked up by a hand, travelling along a dotted path; a folder field in
+// its "drop here" look below the hand.
+func paintGuide(c *canvas, box rect) {
+	at := func(x, y float64) (int32, int32) {
+		return box.Left + int32(x*c.scale+0.5), box.Top + int32(y*c.scale+0.5)
+	}
+	c.roundRect(box, c.px(10), colList) // one little scene
+
+	// A Myinstants button: a red dome on its darker base.
+	bx, by := at(26, 21)
+	c.circle(bx, by+c.px(3), c.px(14), rgb(0x8E, 0x16, 0x1B))
+	c.circle(bx, by, c.px(13), rgb(0xE5, 0x39, 0x35))
+	c.circle(bx-c.px(4), by-c.px(4), c.px(3), rgb(0xEE, 0x6A, 0x66))
+
+	// Its name below, underlined like the link it is.
+	const label = "Bruh"
+	nl, nt := at(6, 40)
+	nr, nb := at(46, 54)
+	name := rect{nl, nt, nr, nb}
+	c.text(label, name, fontCaption, colText, dtCenter)
+	w := c.textWidth(label, fontCaption)
+	c.fill(rect{name.Left + (name.w()-w)/2, nb - c.px(1), name.Left + (name.w()+w)/2, nb - c.px(1) + max(1, c.px(1))}, colAccent)
+
+	// The path: from the name, up and over to the hand.
+	dot := int32(1.6*c.scale + 0.5)
+	const dots = 7
+	for i := 1; i <= dots; i++ {
+		t := float64(i) / (dots + 1)
+		x := (1-t)*(1-t)*40 + 2*(1-t)*t*56 + t*t*76
+		y := (1-t)*(1-t)*44 + 2*(1-t)*t*6 + t*t*24
+		px, py := at(x, y)
+		c.circle(px, py, dot, mix(colList, colAccent, 0.3+0.6*t))
+	}
+
+	// The folder field, waiting below the hand.
+	fl, ft := at(68, 56)
+	fr, fb := at(float64(guideWL-6), float64(guideHL-6))
+	field := rect{fl, ft, fr, fb}
+	c.roundRect(field, c.px(7), mix(colList, colAccent, 0.18))
+	c.dashedFrame(field, c.px(7), colAccent)
+	c.icon(IconDownload, rect{field.Left + c.px(4), field.Top, field.Left + c.px(18), field.Bottom}, 12, colAccent)
+	bar := field.Top + field.h()/2
+	c.fill(rect{field.Left + c.px(21), bar - c.px(1), field.Right - c.px(6), bar - c.px(1) + max(2, c.px(2))}, mix(colList, colAccent, 0.5))
+
+	// The name being carried, and the hand holding it.
+	gl, gt := at(70, 22)
+	gr, gb := at(102, 36)
+	ghost := rect{gl, gt, gr, gb}
+	c.roundRect(ghost, c.px(6), colTip)
+	c.text(label, ghost, fontCaption, colText, dtCenter)
+	hx, hy := at(92, 30)
+	c.icon(IconHandGrab, rect{hx, hy, hx + c.px(18), hy + c.px(18)}, 16, colText)
+
+	// Two dots down: where it lands.
+	for i, y := range []float64{44, 50} {
+		px, py := at(86, y)
+		c.circle(px, py, dot, mix(colList, colAccent, 0.6+0.3*float64(i)))
 	}
 }
 

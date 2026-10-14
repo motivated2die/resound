@@ -421,12 +421,12 @@ func (a *App) indexStatus() library.IndexerStatus {
 func (a *App) libraryPage() []ui.Row {
 	rows := []ui.Row{
 		ui.Header("Sound library", a.back),
-		ui.Paragraph("Each folder and each of its subfolders becomes a tab on the phone. Refresh after adding or renaming files.", ui.ToneMuted),
+		ui.Paragraph("Each folder and each subfolder with sounds becomes a tab on the phone. Refresh after changing files or folders in Explorer.", ui.ToneMuted),
 	}
 	if len(a.cfg.Folders) > 0 {
 		rows = append(rows,
 			ui.Section("Import sounds"),
-			ui.Paragraph("Find a sound on Myinstants, then drag its name or its link icon onto a folder below. Resound downloads it there. Links to MP3, WAV, FLAC and OGG files and sound files from Explorer work too.", ui.ToneMuted),
+			ui.ImportGuide("Find a sound on Myinstants and drag its name onto a folder below. Resound downloads it there. Sound files from Explorer work too."),
 			ui.Buttons(ui.Action{Label: "Open Myinstants", Icon: ui.IconExternalLink, OnClick: a.openMyinstants}),
 		)
 	}
@@ -448,9 +448,10 @@ func (a *App) libraryPage() []ui.Row {
 	return append(rows, ui.Spacer(4))
 }
 
-// folderRows lists the sound folders and their direct subfolders as drop
-// fields: sounds dragged onto one are downloaded or copied into it (see
-// import.go). Each library folder has a Remove action that asks for
+// folderRows lists the sound folders and all their subfolders (empty ones
+// too, as the last scan found them) as drop fields: sounds dragged onto one
+// are downloaded or copied into it (see import.go), and the field shows how
+// that goes. Each library folder has a trash button that asks for
 // confirmation in place; clicking a field opens the folder in Explorer.
 func (a *App) folderRows() []ui.Row {
 	tabsByRoot := map[string][2]int{} // folder -> {tabs, sounds}
@@ -475,31 +476,34 @@ func (a *App) folderRows() []ui.Row {
 		if c[0] == 0 {
 			detail = "No sounds yet"
 		}
+		note, active := a.folderImport(f)
 		rows = append(rows, ui.FolderDrop(ui.FolderSpec{
-			Name: filepath.Base(f), Detail: detail, Tip: f,
-			Action: "Remove", OnAction: func() { a.removing = folder; a.render() },
-			OnClick: open(f), OnDrop: a.dropOnFolder(f),
+			Name: filepath.Base(f), Detail: detail, Tip: f, Note: note, Active: active,
+			ActionIcon: ui.IconTrash, ActionTip: "Remove from the library (the folder and its files stay on disk)",
+			OnAction: func() { a.removing = folder; a.render() },
+			OnClick:  open(f), OnDrop: a.dropOnFolder(f),
 		}))
 		rows = append(rows, a.importRows(f)...)
 		if a.removing == folder {
 			rows = append(rows,
-				ui.Paragraph("Remove this folder? Favorites, volumes and phone colors are kept for 30 days in case you add it back.", ui.ToneWarning),
+				ui.Paragraph("Remove this folder from the library? Its files stay on disk. Favorites, volumes and phone colors are kept for 30 days in case you add it back.", ui.ToneWarning),
 				ui.Buttons(
 					ui.Action{Label: "Cancel", OnClick: func() { a.removing = ""; a.render() }},
 					ui.Action{Label: "Remove", Style: ui.ButtonDanger, OnClick: func() { a.removeFolder(folder) }},
 				),
 				ui.Separator())
 		}
-		for _, sub := range a.subfolders(f) {
+		for _, sub := range a.lib.Folders(f) {
 			detail := "Empty"
-			if n := soundsIn[strings.ToLower(sub)]; n > 0 {
+			if n := soundsIn[strings.ToLower(sub.Path)]; n > 0 {
 				detail = plural(n, "sound")
 			}
+			note, active := a.folderImport(sub.Path)
 			rows = append(rows, ui.FolderDrop(ui.FolderSpec{
-				Name: filepath.Base(sub), Detail: detail, Tip: sub, Sub: true,
-				OnClick: open(sub), OnDrop: a.dropOnFolder(sub),
+				Name: filepath.Base(sub.Path), Detail: detail, Tip: sub.Path, Depth: sub.Depth,
+				Note: note, Active: active, OnClick: open(sub.Path), OnDrop: a.dropOnFolder(sub.Path),
 			}))
-			rows = append(rows, a.importRows(sub)...)
+			rows = append(rows, a.importRows(sub.Path)...)
 		}
 	}
 	return rows

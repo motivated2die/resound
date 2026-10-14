@@ -265,7 +265,6 @@ func (a *App) onPanelOpen() {
 		a.libNote, a.backupNote = "", ""
 		a.imports.clearFinished()
 	}
-	a.imports.subdirs = nil // folders may have changed in Explorer
 	a.refreshDevices(false)
 	a.refreshRouting(false)
 	a.addresses = server.LocalAddresses()
