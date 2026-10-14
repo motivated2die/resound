@@ -41,6 +41,7 @@ const (
 	mouseeventfXDown      = 0x0080
 	mouseeventfXUp        = 0x0100
 
+	mapvkVSCToVKEx = 3
 	mapvkVKToVSCEx = 4
 
 	// sendMarker tags Resound's own presses (dwExtraInfo), so the hotkey
@@ -125,19 +126,41 @@ func send(vk uint16, down bool) error {
 		return sendInput(unsafe.Pointer(&in), unsafe.Sizeof(in))
 	}
 
-	in := keyboardInput{Type: inputKeyboard, VK: vk, ExtraInfo: sendMarker}
-	scan, extended := scanCode(vk)
-	if scan != 0 {
-		in.Scan = scan
-		in.Flags |= keyeventfScanCode
-		if extended {
-			in.Flags |= keyeventfExtendedKey
-		}
-	}
+	in := keyInput(vk)
 	if !down {
 		in.Flags |= keyeventfKeyUp
 	}
 	return sendInput(unsafe.Pointer(&in), unsafe.Sizeof(in))
+}
+
+// keyInput describes a press of vk. Games read either the virtual key
+// (window messages) or the scan code (raw input, DirectInput), so both must
+// name the same key:
+//   - Most keys go by scan code, which Windows turns into the virtual key
+//     like a real key press.
+//   - Keys whose scan code means something else go by virtual key, with the
+//     scan code attached for raw input. With Num Lock off, the scan codes of
+//     Numpad 0–9 and Numpad . are Insert, End, … Delete.
+//   - Pause has an E1-prefixed scan code that SendInput cannot send; sent as
+//     a scan code it was Right Ctrl. A real Pause arrives as VK_PAUSE with
+//     scan code 0x45, so it is sent that way.
+func keyInput(vk uint16) keyboardInput {
+	in := keyboardInput{Type: inputKeyboard, VK: vk, ExtraInfo: sendMarker}
+	sc := scanCodeEx(vk)
+	switch prefix := sc & 0xFF00; {
+	case sc == 0:
+	case prefix == 0xE100:
+		in.Scan = 0x45
+	default:
+		in.Scan = sc & 0xFF
+		if prefix == 0xE000 {
+			in.Flags |= keyeventfExtendedKey
+		}
+		if back, _, _ := procMapVirtualKeyW.Call(uintptr(sc), mapvkVSCToVKEx); sameKey(uint16(back)) == sameKey(vk) {
+			in.Flags |= keyeventfScanCode
+		}
+	}
+	return in
 }
 
 func sendInput(in unsafe.Pointer, size uintptr) error {
@@ -148,11 +171,17 @@ func sendInput(in unsafe.Pointer, size uintptr) error {
 	return nil
 }
 
-// scanCode maps a virtual key to its scan code; extended keys (right Ctrl,
-// arrows, ...) carry an 0xE0 prefix.
-func scanCode(vk uint16) (scan uint16, extended bool) {
+// scanCodeEx maps a virtual key to its scan code with its prefix: 0xE0 for
+// extended keys (right Ctrl, arrows, ...), 0xE1 for Pause. 0 = none.
+func scanCodeEx(vk uint16) uint16 {
 	r, _, _ := procMapVirtualKeyW.Call(uintptr(vk), mapvkVKToVSCEx)
-	return uint16(r & 0xFF), r&0xFF00 == 0xE000 || r&0xFF00 == 0xE100
+	return uint16(r)
+}
+
+// scanCode is scanCodeEx split for GetKeyNameText.
+func scanCode(vk uint16) (scan uint16, extended bool) {
+	sc := scanCodeEx(vk)
+	return sc & 0xFF, sc&0xFF00 == 0xE000 || sc&0xFF00 == 0xE100
 }
 
 // Name returns a readable key name in the user's keyboard language.
