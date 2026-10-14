@@ -248,7 +248,9 @@ body {
 .icon[data-icon="edit"] { --icon: url("../assets/icons/edit.svg"); }
 .icon[data-icon="favorite"] { --icon: url("../assets/icons/favorite.svg"); }
 .icon[data-icon="favorite-fill"] { --icon: url("../assets/icons/favorite-fill.svg"); }
+.icon[data-icon="bolt"] { --icon: url("../assets/icons/bolt.svg"); }
 .icon[data-icon="help"] { --icon: url("../assets/icons/help.svg"); }
+.icon[data-icon="install_mobile"] { --icon: url("../assets/icons/install_mobile.svg"); }
 .icon[data-icon="mic"] { --icon: url("../assets/icons/mic.svg"); }
 .icon[data-icon="pause"] { --icon: url("../assets/icons/pause.svg"); }
 .icon[data-icon="play_arrow"] { --icon: url("../assets/icons/play_arrow.svg"); }
@@ -256,6 +258,7 @@ body {
 .icon[data-icon="restart_alt"] { --icon: url("../assets/icons/restart_alt.svg"); }
 .icon[data-icon="school"] { --icon: url("../assets/icons/school.svg"); }
 .icon[data-icon="settings"] { --icon: url("../assets/icons/settings.svg"); }
+.icon[data-icon="smartphone"] { --icon: url("../assets/icons/smartphone.svg"); }
 .icon[data-icon="stop_circle"] { --icon: url("../assets/icons/stop_circle.svg"); }
 .icon[data-icon="view_comfy"] { --icon: url("../assets/icons/view_comfy.svg"); }
 .icon[data-icon="view_list"] { --icon: url("../assets/icons/view_list.svg"); }
@@ -296,6 +299,58 @@ body {
   /* Default order (right side) */
 }
 
+/* The install pill (install.js), centred on the screen: the space before it
+   and the buttons after it grow alike (flex-basis 0), so it stays in the
+   middle until the buttons need more than half the bar, then moves aside.
+   The buttons never shrink below their own width. */
+.top-bar .top-bar-placeholder,
+.top-bar .action-buttons {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.top-bar .action-buttons {
+  min-width: max-content;
+  justify-content: flex-end;
+}
+
+.top-bar.buttons-left .action-buttons {
+  justify-content: flex-start;
+}
+
+.install-pill {
+  order: 1;
+  flex-shrink: 0;
+  margin: 0 8px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 28px; /* the top bar's round buttons' circles */
+  padding: 0 13px 0 10px;
+  border-radius: 14px;
+  border: 0;
+  background-color: var(--v-secondary-base);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background-color var(--transition-speed) ease;
+}
+
+.install-pill:active {
+  background-color: var(--v-secondary-darken2);
+}
+
+.install-pill .icon {
+  font-size: 17px;
+}
+
+.top-bar.edit-mode-active .install-pill {
+  display: none;
+}
+
 /* --- NEW: Left Alignment Styles --- */
 .top-bar.buttons-left .top-bar-placeholder {
   order: 2;
@@ -326,9 +381,13 @@ body {
 
 /* --- END Left Alignment Styles --- */
 
+/* 32 px to tap, but the circle is drawn 28 px: the height of the install
+   pill (the background stays inside the padding, so it stays round). */
 .icon-button.top-bar-button {
   width: 32px;
   height: 32px;
+  padding: 2px;
+  background-clip: content-box;
   color: var(--text-secondary);
 }
 
@@ -1073,6 +1132,132 @@ h1.brand {
   transform: translateY(0);
   transition: transform 0.3s cubic-bezier(0.2, 0.9, 0.25, 1),
     max-height 0.3s ease-out;
+}
+
+/* --- Install sheet (install.js) --- */
+.install-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1250; /* above the settings it can be opened from */
+}
+
+.install-backdrop {
+  position: absolute;
+  inset: 0;
+  background-color: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(2px);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.install-card {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  max-width: 520px;
+  margin: 0 auto;
+  max-height: 90vh;
+  overflow-y: auto;
+  background-color: var(--v-secondary-darken1);
+  border-radius: 16px 16px 0 0;
+  padding: 12px 20px calc(env(safe-area-inset-bottom) + 20px);
+  box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.5);
+  transform: translateY(110%);
+  transition: transform 0.3s cubic-bezier(0.2, 0.9, 0.25, 1);
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.install-overlay.open .install-backdrop { opacity: 1; }
+.install-overlay.open .install-card { transform: translateY(0); }
+
+.install-card .handle-bar { margin-bottom: 0; }
+
+.install-head {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.install-logo {
+  width: 52px;
+  height: 52px;
+  flex-shrink: 0;
+}
+
+.install-head h2 {
+  font-size: 1.25rem;
+  font-weight: 600;
+}
+
+.install-head p,
+.install-benefits div span {
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+}
+
+.install-benefits {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.install-benefits li {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.install-benefit-icon {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  background-color: rgba(var(--accent-rgb), 0.12);
+  color: var(--v-primary-base);
+}
+
+.install-benefit-icon .icon {
+  font-size: 22px;
+}
+
+.install-benefits div {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.3;
+}
+
+.install-steps {
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  padding-top: 16px;
+}
+
+.install-steps h3 {
+  font-size: 1rem;
+  font-weight: 500;
+  margin-bottom: 12px;
+}
+
+.install-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.install-actions .action-button {
+  flex: 1;
+  min-width: 0;
+}
+
+.install-actions .action-button.primary {
+  background-color: var(--v-primary-base);
+  color: var(--on-primary);
+  font-weight: 600;
 }
 
 /* The sound's button, floating above the sheet as a live preview

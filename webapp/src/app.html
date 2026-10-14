@@ -30,6 +30,11 @@
     <div class="top-bar" id="top-bar">
         <!-- Placeholder for left alignment -->
         <div class="top-bar-placeholder"></div>
+        <!-- Centred while installing works (install.js); moves aside for the buttons -->
+        <button id="install-pill" class="install-pill" type="button" hidden>
+            <span class="icon" data-icon="install_mobile" aria-hidden="true"></span>
+            <span>Install app</span>
+        </button>
         <!-- Edit Mode Info (Hidden by default) -->
         <div class="edit-mode-info hidden" id="edit-mode-info">
             <span>EDIT MODE</span>
@@ -267,12 +272,49 @@
                             <span class="icon" data-icon="school" aria-hidden="true"></span>
                             <span>Tour</span>
                         </button>
-                        <!-- Shown while the browser offers to install the app (device.js) -->
+                        <!-- Shown where this browser can install the app; opens the install sheet (install.js) -->
                         <button id="install-app-button" class="action-button wide" hidden>
                             <span>Install the app</span>
                         </button>
                     </div>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Installing the app: why and how (install.js) -->
+    <div id="install-sheet" class="install-overlay" hidden>
+        <div class="install-backdrop"></div>
+        <div class="install-card" role="dialog" aria-modal="true" aria-labelledby="install-title">
+            <div class="handle-bar"></div>
+            <div class="install-head">
+                <img src="assets/resound-192.png" alt="" class="install-logo">
+                <div>
+                    <h2 id="install-title">Install Resound</h2>
+                    <p>Free, no app store, a few seconds.</p>
+                </div>
+            </div>
+            <ul class="install-benefits">
+                <li>
+                    <span class="install-benefit-icon"><span class="icon" data-icon="install_mobile" aria-hidden="true"></span></span>
+                    <div><strong>On your home screen</strong><span>One tap opens your soundboard.</span></div>
+                </li>
+                <li>
+                    <span class="install-benefit-icon"><span class="icon" data-icon="smartphone" aria-hidden="true"></span></span>
+                    <div><strong>The whole screen</strong><span>No browser bars, more room for your buttons.</span></div>
+                </li>
+                <li>
+                    <span class="install-benefit-icon"><span class="icon" data-icon="bolt" aria-hidden="true"></span></span>
+                    <div><strong>Always at hand</strong><span>Never lost among your browser tabs.</span></div>
+                </li>
+            </ul>
+            <div id="install-steps" class="install-steps" hidden>
+                <h3>How to install</h3>
+                <ol id="install-steps-list" class="help-steps"></ol>
+            </div>
+            <div class="install-actions">
+                <button id="install-not-now" class="action-button" type="button">Not now</button>
+                <button id="install-confirm" class="action-button primary" type="button">Install</button>
             </div>
         </div>
     </div>
@@ -283,6 +325,7 @@
     <script src="js/screen-wake.js" defer></script>
     <script src="js/fullscreen.js" defer></script>
     <script src="js/device.js" defer></script>
+    <script src="js/install.js" defer></script>
     <script src="js/editMode.js" defer></script>
     <script src="js/layout.js" defer></script>
     <script src="js/dragDrop.js" defer></script>

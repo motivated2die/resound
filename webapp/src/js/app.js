@@ -3,7 +3,10 @@ const state = {
   currentlyPlaying: new Map(), // Map soundId -> playingId
   tabs: [],
   currentTab: null, // Can be tabId (string) or 'favorites' (string)
-  settings: {}, // Loaded by persistence module directly now
+  // Loaded at once: device.js, screen-wake.js and install.js read their
+  // preferences before init() runs (an empty object here made them miss
+  // saved ones, e.g. vibration off). init() loads them again.
+  settings: persistence.load(),
   apiBaseUrl: '', // Determined on init
   longPressTimer: null,
   longPressTarget: null,
