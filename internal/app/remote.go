@@ -203,6 +203,15 @@ func (a *App) resetRemote() {
 
 // --- library (UI thread) ---------------------------------------------------
 
+// libraryChanged tells the phones that are connected to reload the library,
+// once at the end of something that changed it: a refresh, added or
+// removed folders, a finished import (server.LibraryChanged).
+func (a *App) libraryChanged() {
+	if a.srv != nil {
+		a.srv.LibraryChanged()
+	}
+}
+
 func (a *App) rescan() {
 	start := time.Now()
 	n := a.lib.Scan(a.cfg.Folders)
@@ -344,6 +353,7 @@ func (a *App) addFolders(paths []string) {
 		}
 		_, before := a.lib.Stats()
 		a.rescan()
+		a.libraryChanged()
 		_, after := a.lib.Stats()
 		msg := fmt.Sprintf("Added %d folders: %s.", len(added), plural(after-before, "new sound"))
 		if len(added) == 1 {
@@ -422,6 +432,7 @@ func (a *App) refreshLibrary() {
 	gone := a.pruneMissingFolders()
 	_, before := a.lib.Stats()
 	a.rescan()
+	a.libraryChanged() // also when nothing changed: the phones pick up what they missed
 	_, after := a.lib.Stats()
 	var note []string
 	switch d := after - before; {
@@ -477,5 +488,6 @@ func (a *App) removeFolder(path string) {
 	a.removing = ""
 	logx.Printf("library: removed %s", path)
 	a.rescan()
+	a.libraryChanged()
 	a.render()
 }

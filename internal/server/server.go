@@ -123,6 +123,26 @@ func (s *Server) Close() {
 	}
 }
 
+// LibraryChanged tells the connected apps that tabs or sounds changed (a
+// refresh, added or removed folders, an imported sound), so they reload the
+// library now instead of on their next tab switch or start. The event
+// carries the library's ETag: an app that has that revision already skips
+// the reload. Sending never waits for the apps.
+func (s *Server) LibraryChanged() {
+	s.mu.Lock()
+	rtc := s.rtc
+	s.mu.Unlock()
+	if rtc == nil {
+		return
+	}
+	ev := map[string]any{"t": "event", "e": "library", "rev": s.libraryETag()}
+	go func() {
+		if n := rtc.broadcast(ev); n > 0 {
+			s.logf("app: library changed, told %d device(s)", n)
+		}
+	}()
+}
+
 // Status reports the port and whether the app can connect.
 func (s *Server) Status() (port int, running bool, err error) {
 	s.mu.Lock()

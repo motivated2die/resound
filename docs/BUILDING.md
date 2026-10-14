@@ -89,7 +89,7 @@ The phone remote is a separate web app in `webapp/`, hosted as a static site; no
 ```powershell
 go run ./cmd/webapp                          # builds webapp/dist: upload that folder to Cloudflare Pages
 go run ./cmd/webapp -serve :8095             # builds and serves it on http://localhost:8095
-go run ./cmd/devremote -folder <sounds>      # the PC side without audio; prints a pairing link for localhost:8095
+go run ./cmd/devremote -folder <sounds>      # the PC side without audio; prints a pairing link for localhost:8095; Enter = Refresh
 ```
 
 To test a local app with the real Resound, start it with `RESOUND_APP_URL=http://localhost:8095` set: its QR code and "Open the app on this PC" then use the local app (phones need the HTTPS deployment).

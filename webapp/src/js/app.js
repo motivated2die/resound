@@ -1144,6 +1144,57 @@ async function loadSounds(tabId) {
     }
 }
 
+// --- Library changes on the PC ---
+// After a refresh, added or removed folders, or an imported sound, the PC
+// sends {t: 'event', e: 'library', rev} (rtc.js). The tab bar is rebuilt
+// when tabs came or went, the open tab's sounds refresh in place from the
+// cache (no placeholder, no fade), the other tabs' lists are fetched again
+// when they are next shown, and an open search reloads its list. rev is the
+// library's revision: an event for the revision already shown is skipped.
+// Reloads don't overlap; one more runs if another event came meanwhile.
+let libraryRev = null;
+let libraryReload = null;
+let libraryReloadAgain = null; // the rev of an event that came during a reload
+
+const tabsKey = (tabs) => JSON.stringify((tabs || []).map(t => [String(t.id), t.name]));
+const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
+async function reloadLibrary(rev) {
+    if (!connection.loaded) return; // the first load is still to come and reads everything
+    if (rev && rev === libraryRev) return;
+    if (libraryReload) { libraryReloadAgain = rev || ''; return; }
+    libraryReload = (async () => {
+        try {
+            // Colours, emoji, favorites and layouts of new sounds.
+            await persistence.sync().catch(e => console.warn('Library reload: settings not refreshed:', e));
+            // A swipe in progress ends on the tabs it started with.
+            while (window.tabManager?.isCurrentlySwiping()) await sleep(200);
+            const current = String(state.currentTab);
+            for (const id of [...tabSoundsCache.keys()]) {
+                if (id !== current) tabSoundsCache.delete(id);
+            }
+            const tabs = await apiFetch('/api/tabs');
+            if (tabsKey(tabs) !== tabsKey(state.tabs)) {
+                await loadTabs(); // new, renamed or removed tabs; keeps the open one if it still exists
+            }
+            // In place; loadSounds also refetches the swipe previews' lists.
+            if (String(state.currentTab) === current) await loadSounds(current);
+            document.dispatchEvent(new CustomEvent('libraryChanged'));
+            libraryRev = rev || null;
+        } catch (e) {
+            console.warn('Library reload failed:', e); // the next tab switch or event tries again
+        }
+    })();
+    await libraryReload;
+    libraryReload = null;
+    if (libraryReloadAgain !== null) {
+        const again = libraryReloadAgain;
+        libraryReloadAgain = null;
+        reloadLibrary(again || undefined);
+    }
+}
+window.resoundRTC?.onEvent((msg) => { if (msg.e === 'library') reloadLibrary(msg.rev); });
+
 function reloadSoundsForCurrentTab() {
     if (state.currentTab !== null && typeof state.currentTab !== 'undefined') {
         console.log(`Reloading sounds requested for current tab: ${state.currentTab}`);

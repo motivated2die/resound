@@ -270,6 +270,7 @@ func (a *App) saveImportName(job *soundImport, typed string) {
 // a moment.
 func (a *App) finishNaming(job *soundImport) {
 	job.state, job.err = importDone, ""
+	a.libraryChanged() // the import is complete: phones show the sound now
 	a.noteThenForget(job)
 }
 
@@ -288,6 +289,7 @@ func (a *App) discardImport(job *soundImport) {
 			}
 			logx.Printf("import: discarded %s", path)
 			a.rescan()
+			a.libraryChanged() // a phone may have seen the sound meanwhile
 			a.noteThenForget(job)
 		})
 	}()
@@ -448,6 +450,7 @@ func (a *App) copySounds(dir string, files []string, skipped int) {
 			}
 			a.setLibNote(strings.Join(parts, " "), true)
 			a.rescan()
+			a.libraryChanged()
 			a.render()
 		})
 	}()

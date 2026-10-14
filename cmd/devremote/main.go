@@ -6,9 +6,13 @@
 //
 //	go run ./cmd/webapp -serve :8095
 //	go run ./cmd/devremote -folder D:\Sounds -port 8090
+//
+// Pressing Enter refreshes the library like the panel's Refresh button,
+// including the event that makes connected apps reload it.
 package main
 
 import (
+	"bufio"
 	"flag"
 	"fmt"
 	"log"
@@ -166,5 +170,14 @@ func main() {
 	} else {
 		fmt.Println("pairing: not available (see the log)")
 	}
-	select {}
+	// Enter does what the panel's Refresh does: rescan, and tell the
+	// connected apps to reload the library.
+	fmt.Println("press Enter to refresh the library (as the panel's Refresh button)")
+	in := bufio.NewScanner(os.Stdin)
+	for in.Scan() {
+		n := lib.Scan(dirs)
+		log.Printf("refresh: %d sound(s)", n)
+		srv.LibraryChanged()
+	}
+	select {} // stdin closed (e.g. started without a console): keep serving
 }
