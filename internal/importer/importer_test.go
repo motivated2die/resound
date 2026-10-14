@@ -41,6 +41,50 @@ func TestParsePageMyinstants(t *testing.T) {
 	}
 }
 
+func TestParsePageSoundButtonsWorld(t *testing.T) {
+	f, err := os.Open("testdata/soundbuttonsworld-button.html")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer f.Close()
+	got, err := ParsePage(f, mustURL(t, "https://soundbuttonsworld.com/sound-button/67-67-67-1739753521222"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	// This button's file, not a related one's, and its own name rather than
+	// the page title ("Sound Buttons: Sound Button View : 67-67-67-...").
+	if want := "https://soundbuttonsworld.com/uploads/bc5697e5-fff2-44e4-9daf-d5e5f63248aa.mp3"; got.AudioURL.String() != want {
+		t.Errorf("audio = %s, want %s", got.AudioURL, want)
+	}
+	if got.Name != "67 67 67" {
+		t.Errorf("name = %q", got.Name)
+	}
+}
+
+func TestSoundButtonsWorldState(t *testing.T) {
+	page := mustURL(t, "https://soundbuttonsworld.com/sound-button/horn-1")
+	esc := func(s string) string { return strings.ReplaceAll(s, `"`, "&q;") }
+	for name, tc := range map[string]struct {
+		state string
+		ok    bool
+	}{
+		"this page's button":      {esc(`{"/api/memes/button?url=horn-1":{"name":"Horn","fileName":"a.mp3"}}`), true},
+		"a category page":         {esc(`{"/api/memes/getall?page=1":{"data":[{"name":"Horn","fileName":"a.mp3"}]}}`), false},
+		"a file name with a path": {esc(`{"/api/memes/button?url=horn-1":{"name":"Horn","fileName":"../x.mp3"}}`), false},
+		"not a sound":             {esc(`{"/api/memes/button?url=horn-1":{"name":"Horn","fileName":"a.exe"}}`), false},
+		"broken JSON":             {"{&q;/api/memes/button?url=horn-1&q;:", false},
+	} {
+		got, ok := soundButtonsWorld(tc.state, page)
+		if ok != tc.ok {
+			t.Errorf("%s: ok = %v, want %v", name, ok, tc.ok)
+			continue
+		}
+		if ok && (got.AudioURL.String() != "https://soundbuttonsworld.com/uploads/a.mp3" || got.Name != "Horn") {
+			t.Errorf("%s: got %s %q", name, got.AudioURL, got.Name)
+		}
+	}
+}
+
 func TestParsePageSearchResults(t *testing.T) {
 	f, err := os.Open("testdata/myinstants-search.html")
 	if err != nil {

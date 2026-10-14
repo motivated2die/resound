@@ -22,6 +22,7 @@ func TestLibraryRowsRender(t *testing.T) {
 		FolderDrop(FolderSpec{Name: "Reactions", Note: "Name the new sound", Depth: 1, Active: true, OnDrop: func(DropData) {}}),
 		Paragraph("Already in your library: “Vine boom” in Memes.", ToneWarning),
 		TextField("f", "FAHHHHHHHHHHHHHH", 80, nil, nil),
+		Buttons(Action{Label: "Myinstants"}, Action{Label: "Sound Buttons World"}),
 		Buttons(Action{Label: "Discard", Icon: IconTrash, Style: ButtonDanger}, Action{Label: "Preview", Icon: IconPlay}, Action{Label: "Save", Style: ButtonPrimary}),
 		GroupEnd(),
 		FolderDrop(FolderSpec{Name: "Games", Detail: "7 sounds", Note: "Added “Mario jump”", Depth: 1, OnDrop: func(DropData) {}}),

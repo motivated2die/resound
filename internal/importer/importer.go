@@ -1,6 +1,7 @@
 // Package importer downloads a sound from a link dropped onto the panel: a
 // link to an audio file, or to a web page that names one, such as a
-// Myinstants sound page (its og:audio tag). The file is checked and saved
+// Myinstants sound page (its og:audio tag) or a Sound Buttons World one
+// (its server state). The file is checked and saved
 // into a library folder under a clean file name.
 //
 // Only public internet addresses are fetched (never this PC or the local
@@ -9,6 +10,7 @@ package importer
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -399,12 +401,16 @@ func MoveUnique(src, dir, name, ext string) (string, error) {
 // prefers the page's og:audio tag (Myinstants sound pages have it); without
 // one it takes the page's sound when there is exactly one: an <audio> or
 // <source> element, a data-url attribute, or a link to a sound file. Pages
-// with several (search results, categories) return ErrManySounds.
+// with several (search results, categories) return ErrManySounds. Pages
+// with none may still name their sound in their server state, as Sound
+// Buttons World's do (soundButtonsWorld).
 func ParsePage(r io.Reader, base *url.URL) (Found, error) {
+	page := base // base may change with a <base> element; the page doesn't
 	var (
 		ogAudio, ogTitle, title, heading string
-		inTitle, inHeading               bool
+		inTitle, inHeading, inState      bool
 		others                           []string
+		state                            string
 	)
 	z := html.NewTokenizer(r)
 	for {
@@ -418,6 +424,8 @@ func ParsePage(r io.Reader, base *url.URL) (Found, error) {
 		switch tt {
 		case html.TextToken:
 			switch {
+			case inState:
+				state += string(z.Text())
 			case inTitle:
 				title += string(z.Text())
 			case inHeading:
@@ -428,6 +436,8 @@ func ParsePage(r io.Reader, base *url.URL) (Found, error) {
 			switch string(name) {
 			case "title":
 				inTitle = false
+			case "script":
+				inState = false
 			case "h1":
 				inHeading = false
 			}
@@ -456,6 +466,11 @@ func ParsePage(r io.Reader, base *url.URL) (Found, error) {
 				}
 			case "title":
 				inTitle = tt == html.StartTagToken
+			case "script":
+				// Angular's server state (TransferState): serverApp-state,
+				// or ng-state in newer versions.
+				id := attrs["id"]
+				inState = tt == html.StartTagToken && (id == "serverApp-state" || id == "ng-state")
 			case "h1":
 				// Myinstants' sound name, exactly as the page shows it.
 				if attrs["id"] == "instant-page-title" {
@@ -489,6 +504,9 @@ func ParsePage(r io.Reader, base *url.URL) (Found, error) {
 		}
 		switch {
 		case len(distinct) == 0:
+			if found, ok := soundButtonsWorld(state, page); ok {
+				return found, nil
+			}
 			return Found{}, ErrNoSound
 		case len(distinct) > 1:
 			return Found{}, ErrManySounds
@@ -509,6 +527,51 @@ func ParsePage(r io.Reader, base *url.URL) (Found, error) {
 		name = nameFromURL(u)
 	}
 	return Found{AudioURL: u, Name: name}, nil
+}
+
+// soundButtonsWorld finds the sound of a Sound Buttons World page
+// (soundbuttonsworld.com/sound-button/<slug>). The site is an Angular app:
+// its pages have no audio link (the Download button is a script), but the
+// server state the page carries (JSON with Angular's &q;-style escapes)
+// holds the button under its API request, "/api/memes/button?url=<slug>",
+// with its name and fileName. The site plays it from /uploads/<fileName>
+// on its own host. Its other entries (related buttons, categories) are
+// never taken, so search and category pages find nothing.
+func soundButtonsWorld(state string, page *url.URL) (Found, bool) {
+	const prefix = "/api/memes/button?url="
+	if !strings.Contains(state, prefix) {
+		return Found{}, false
+	}
+	state = strings.NewReplacer("&q;", `"`, "&s;", "'", "&l;", "<", "&g;", ">", "&a;", "&").Replace(strings.TrimSpace(state))
+	var entries map[string]json.RawMessage
+	if json.Unmarshal([]byte(state), &entries) != nil {
+		return Found{}, false
+	}
+	raw, ok := entries[prefix+path.Base(strings.TrimSuffix(page.Path, "/"))]
+	if !ok { // another address for the same page: take its one button
+		for k, v := range entries {
+			if strings.HasPrefix(k, prefix) {
+				if raw != nil {
+					return Found{}, false
+				}
+				raw = v
+			}
+		}
+	}
+	var button struct {
+		Name     string `json:"name"`
+		FileName string `json:"fileName"`
+	}
+	if raw == nil || json.Unmarshal(raw, &button) != nil ||
+		button.FileName == "" || strings.ContainsAny(button.FileName, `/\?#%`) || !hasSoundExt(button.FileName) {
+		return Found{}, false
+	}
+	audio := page.ResolveReference(&url.URL{Path: "/uploads/" + button.FileName})
+	name := strings.TrimSpace(button.Name)
+	if name == "" {
+		name = strings.TrimSuffix(button.FileName, path.Ext(button.FileName))
+	}
+	return Found{AudioURL: audio, Name: name}, true
 }
 
 // cleanTitle drops the site's suffixes from a page title, e.g. Myinstants'

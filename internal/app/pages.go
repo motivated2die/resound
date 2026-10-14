@@ -127,8 +127,8 @@ func (a *App) homePage() []ui.Row {
 	}
 	rows = append(rows,
 		ui.SectionLink("Sound library", "Import buttons",
-			"Open Myinstants and the Sound library page, to drag sound buttons into your folders",
-			func() { a.openPage(pageLibrary); a.openMyinstants() }),
+			"Import sound buttons from websites into your folders, on the Sound library page",
+			func() { a.openPage(pageLibrary) }),
 		ui.NavTool(ui.IconRefresh, "Refresh the library: picks up new, renamed and edited files", refresh,
 			"Folders", libDetail, libTone, func() { a.openPage(pageLibrary) }),
 	)
@@ -433,8 +433,11 @@ func (a *App) libraryPage() []ui.Row {
 	if len(a.cfg.Folders) > 0 {
 		rows = append(rows,
 			ui.Section("Import sounds"),
-			ui.ImportGuide("Find a sound on Myinstants and drag its name onto a folder below. Resound downloads it there. Sound files from Explorer work too.", "drag its name"),
-			ui.Buttons(ui.Action{Label: "Open Myinstants", Icon: ui.IconExternalLink, OnClick: a.openMyinstants}),
+			ui.ImportGuide("Find a sound on a button site and drag its name onto a folder below. Resound downloads it there. Sound files from Explorer work too.", "drag its name"),
+			ui.Buttons(
+				ui.Action{Label: "Myinstants", OnClick: a.openSite(myinstantsURL)},
+				ui.Action{Label: "Sound Buttons World", OnClick: a.openSite(soundButtonsWorldURL)},
+			),
 		)
 	}
 	if a.imports.warn != "" {

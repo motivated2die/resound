@@ -26,8 +26,11 @@ import (
 	"github.com/motivated2die/resound/internal/ui"
 )
 
-// myinstantsURL opens in the browser from the library page.
-const myinstantsURL = "https://www.myinstants.com/"
+// The sites the library page links to; sounds dragged from them import.
+const (
+	myinstantsURL        = "https://www.myinstants.com/"
+	soundButtonsWorldURL = "https://soundbuttonsworld.com/"
+)
 
 const (
 	maxImportsShown = 6
@@ -223,7 +226,7 @@ func (a *App) duplicateWarning(dups []library.Sound) string {
 func importMessage(err error) string {
 	switch {
 	case errors.Is(err, importer.ErrNoSound):
-		return "No sound file found at this link. On Myinstants, drag a sound's name or its link icon; other links must lead to an MP3, WAV, FLAC or OGG file."
+		return "No sound file found at this link. On Myinstants or Sound Buttons World, drag one sound's name or its link; other links must lead to an MP3, WAV, FLAC or OGG file."
 	case errors.Is(err, importer.ErrManySounds):
 		return "This page has several sounds. Open the one you want and drag its link."
 	case errors.Is(err, importer.ErrUnsupported):
@@ -532,10 +535,13 @@ func (a *App) importGroup(active bool, field ui.Row, rows []ui.Row) []ui.Row {
 	return out
 }
 
-// openMyinstants opens Myinstants in the browser. The panel stays open, so
-// sounds can be dragged from the browser onto a folder.
-func (a *App) openMyinstants() {
-	if err := ui.ShellOpen(myinstantsURL); err != nil {
-		logx.Printf("opening %s: %v", myinstantsURL, err)
+// openSite returns an action that opens a sound button site in the
+// browser. The panel stays open, so sounds can be dragged from the browser
+// onto a folder.
+func (a *App) openSite(url string) func() {
+	return func() {
+		if err := ui.ShellOpen(url); err != nil {
+			logx.Printf("opening %s: %v", url, err)
+		}
 	}
 }
