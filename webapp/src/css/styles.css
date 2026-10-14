@@ -935,7 +935,7 @@ h1.brand {
   letter-spacing: 0.12em;
   margin: 4px 0 3px;
   position: relative;
-  top: 5px; /* about a third of a line lower; the status line stays put */
+  top: 2px; /* a little lower, with room above the status line, which stays put */
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1005,6 +1005,9 @@ h1.brand {
   padding: 8px;
   border-radius: 30px;
   gap: 8px;
+  /* A darker ring, like the talk button's (.btn-round) */
+  border: 2px solid #b53153; /* --error-color, a quarter darker */
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
 }
 
 .btn-danger:hover {
@@ -2433,8 +2436,8 @@ emoji-picker section#favorites
   background-color: var(--v-secondary-base);
   /* Default grey */
   color: var(--text-primary);
-  /* --- NEW: Explicitly set touch-action --- */
-  touch-action: manipulation;
+  /* Held, not panned: the touch belongs to push-to-talk (app.js) */
+  touch-action: none;
   /* Prevent text selection on accidental drag */
   user-select: none;
   -webkit-user-select: none;

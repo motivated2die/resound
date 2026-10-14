@@ -354,9 +354,7 @@ function setupEventListeners() {
     if (talkThroughButton) {
         // --- Use pointerdown for press ---
         talkThroughButton.addEventListener('pointerdown', (e) => {
-            // Don't need stopPropagation unless causing issues elsewhere
-            // Don't use preventDefault here unless absolutely needed for vibration suppression,
-            // as it might break clicks on some platforms. Test without it first.
+            // The browser's own long press is cancelled on touchstart (below).
 
             // --- Aggressively clear sound-card timer ---
             if (typeof soundSettingsManager !== 'undefined' && soundSettingsManager.clearLongPressSoundCardTimer) {
@@ -416,6 +414,15 @@ function setupEventListeners() {
         talkThroughButton.addEventListener('contextmenu', (e) => {
              e.preventDefault();
         });
+
+        // A touch on the button is only push-to-talk. Cancelling touchstart
+        // keeps the browser from treating it as a long press (Android's own
+        // long-press vibration, text selection), a scroll or a click; the
+        // pointer events above still arrive, so the only vibrations are ours
+        // on press and release.
+        talkThroughButton.addEventListener('touchstart', (e) => {
+            if (e.cancelable) e.preventDefault();
+        }, { passive: false });
 
     } else console.error("Talk-Through button not found");
 
