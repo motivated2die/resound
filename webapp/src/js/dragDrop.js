@@ -3,19 +3,94 @@ const dragDropManager = (() => {
     let sortableInstance = null;
     const soundsContainer = document.getElementById('sounds-container');
 
+    // --- Scrolling while dragging ---
+    // With the finger in the band along the grid's top or bottom edge, the
+    // grid scrolls that way: slowly where the band begins, faster towards
+    // the edge, fastest on it or beyond (over the top bar or the tabs).
+    // Sortable checks what is under the finger every 50 ms, so the outline
+    // follows the scrolling buttons even while the finger rests.
+    const autoScroll = (() => {
+        const EDGE = 80;        // px: the band along each edge
+        const MAX_SPEED = 900;  // px/s at the edge
+        let active = false;
+        let y = null;           // the finger's (or mouse's) clientY
+        let last = 0;
+        let carry = 0;          // sub-pixel scroll not applied yet
+
+        const track = (e) => {
+            const p = e.touches ? e.touches[0] : e;
+            if (p && typeof p.clientY === 'number') y = p.clientY;
+        };
+        // speed for a finger `inside` px into the band (negative: past the edge)
+        const speed = (inside) => MAX_SPEED * Math.min(1, Math.max(0, (EDGE - inside) / EDGE)) ** 2;
+
+        const frame = (now) => {
+            if (!active) return;
+            const dt = last ? Math.min(50, now - last) / 1000 : 0;
+            last = now;
+            if (y !== null) {
+                // The visible part of the grid: it runs on under the tab bar
+                // and the bottom bar, which cover it.
+                const r = soundsContainer.getBoundingClientRect();
+                const tabs = document.getElementById('tabs-container')?.getBoundingClientRect();
+                const top = r.top;
+                const bottom = tabs && tabs.top > top ? Math.min(r.bottom, tabs.top) : r.bottom;
+                const band = Math.min(EDGE, (bottom - top) / 3); // short grids keep a middle
+                let v = 0;
+                if (y - top < band) v = -speed((y - top) * EDGE / band);
+                else if (bottom - y < band) v = speed((bottom - y) * EDGE / band);
+                carry += v * dt;
+                const step = Math.trunc(carry);
+                if (step) {
+                    soundsContainer.scrollTop += step;
+                    carry -= step;
+                }
+                if (!v) carry = 0;
+            }
+            requestAnimationFrame(frame);
+        };
+
+        const start = (evt) => {
+            if (active) return;
+            active = true;
+            y = null;
+            last = 0;
+            carry = 0;
+            if (evt) track(evt);
+            for (const t of ['touchmove', 'pointermove', 'mousemove']) document.addEventListener(t, track, { capture: true, passive: true });
+            requestAnimationFrame(frame);
+        };
+        const stop = () => {
+            active = false;
+            for (const t of ['touchmove', 'pointermove', 'mousemove']) document.removeEventListener(t, track, { capture: true });
+        };
+        return { start, stop };
+    })();
+
     const initSortable = () => {
         if (!soundsContainer || typeof Sortable === 'undefined') {
             console.error("Drag & Drop Error: Sounds container or SortableJS library not found.");
             return;
         }
 
+        // Swapping: the held button stays in its place, raised
+        // (.sortable-ghost / .sortable-chosen), and nothing follows the
+        // finger; the button it would swap with shows a dashed outline. The
+        // pointer-based drag (forceFallback) works alike with touch and mouse
+        // and draws no browser drag image; its copy under the finger is
+        // hidden (.sortable-fallback). Near the grid's top or bottom edge it
+        // scrolls (autoScroll, below).
         sortableInstance = new Sortable(soundsContainer, {
             animation: 150,
-            ghostClass: 'sortable-ghost',   // Class for placeholder
-            chosenClass: 'sortable-chosen',  // Class for the item being dragged
-            dragClass: 'sortable-drag',    // Class applied to the dragged item
+            ghostClass: 'sortable-ghost',   // the held button, in its place
+            chosenClass: 'sortable-chosen',  // the held button, from the press on
+            dragClass: 'sortable-drag',    // the copy under the finger
             swap: true,                     // *** ENABLE SWAP BEHAVIOR ***
             swapClass: 'sortable-swap-highlight', // Class applied to the item being swapped *with*
+            forceFallback: true,
+            fallbackClass: 'sortable-fallback',
+            fallbackOnBody: true,
+            scroll: false,                  // autoScroll scrolls gradually instead
 
             delay: 100,                      // ms delay to prevent accidental drags on tap
             delayOnTouchOnly: true,
@@ -28,10 +103,11 @@ const dragDropManager = (() => {
                 if (navigator.vibrate) {
                     navigator.vibrate(40); // Haptic feedback
                 }
-                // console.log("Swap drag started"); // DEBUG
+                autoScroll.start(evt.originalEvent);
             },
 
             onEnd: function (evt) {
+                autoScroll.stop();
                 // Reset cursor immediately
                 soundsContainer.style.cursor = editMode.isActive() ? 'grab' : 'pointer';
 

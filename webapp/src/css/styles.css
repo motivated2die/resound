@@ -459,17 +459,19 @@ body {
   box-shadow: none;
 }
 
-.sortable-ghost {
-  opacity: 0.4;
-  background-color: var(--v-secondary-base) !important;
+/* Dragging in edit mode (dragDrop.js): the held button stays in its place,
+   raised; the button it would swap with gets a dashed outline
+   (.sortable-swap-highlight); the copy under the finger is hidden. */
+.sounds-grid .sound-card.sortable-chosen,
+.sounds-grid .sound-card.sortable-ghost {
+  z-index: 5;
+  transform: scale(1.06);
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.5);
+  cursor: grabbing !important;
 }
 
-.sortable-chosen,
-.sortable-drag {
-  opacity: 0.8;
-  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
-  transform: scale(1.05);
-  cursor: grabbing !important;
+.sortable-fallback {
+  opacity: 0 !important;
 }
 
 /* Playing State Highlight Animation */
