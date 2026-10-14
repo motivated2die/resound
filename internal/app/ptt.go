@@ -178,7 +178,8 @@ const pttSendDelay = 5
 
 // sendPTTToGame taps the push-to-talk keys after a countdown, so
 // the user can click the game's keybind field first. This is how keys that
-// don't exist on the keyboard (F13–F24) get bound in the game.
+// don't exist on the keyboard (F13–F24) or are awkward to press get bound
+// in the game.
 func (a *App) sendPTTToGame() {
 	if a.ptt.sendIn > 0 || len(a.cfg.PushToTalkKeys) == 0 {
 		return

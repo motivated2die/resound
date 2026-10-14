@@ -149,6 +149,8 @@ Check, within about 10 s: the home page's header shows `v0.7.0` and a dot with "
 
 `go test ./internal/input` covers the hotkey matching. The real keyboard hook has a live test that injects F24 (a key no keyboard has) into the desktop, so it only runs on request: `$env:RESOUND_HOOK_TEST="1"; go test -run WatcherLive -v ./internal/input`.
 
+It also checks what each push-to-talk preset sends (virtual key and scan code; Pause once went out as Right Ctrl). A live test presses every preset into a window of its own and checks what window messages and raw input see, with Num Lock on and off: `$env:RESOUND_KEYS_TEST="1"; go test -run PresetsLive -v ./internal/input`. Keys remapped on that PC (PowerToys Keyboard Manager, mouse software) fail there.
+
 `go test ./internal/update` covers the version comparison, the checksum and the allowed hosts against a fake GitHub.
 
 `go test ./internal/importer` covers finding the sound on a page (a trimmed Myinstants page in `testdata/`), names, the address guard and downloads against a local server. A live test downloads real sounds from Myinstants and Sound Buttons World with the real client and decoder (and checks that their list pages are refused): `$env:RESOUND_LIVE="1"; go test -run Live -v ./internal/importer`.

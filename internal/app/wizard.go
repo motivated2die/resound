@@ -167,7 +167,7 @@ func (a *App) connectCable() {
 func (a *App) wizardKeys() []ui.Row {
 	rows := []ui.Row{a.wizardHeader("Push-to-talk key"), a.pttIntro()}
 	if !a.ptt.capturing {
-		rows = append(rows, ui.Paragraph("TIP: pick a rarely used key, such as F13 (yes, that's a thing), and bind it as a secondary voice activation key. Or just bind your primary PTT key here. "+
+		rows = append(rows, ui.Paragraph("TIP: pick a rarely used key, such as Pause or a numpad key, and bind it as a secondary voice activation key. Or just bind your primary PTT key here. "+
 			"Use “Send it to the game”, then trigger the game's keybind field. No push-to-talk? Skip this step.", ui.ToneMuted))
 	}
 	rows = append(rows, a.pttRows()...)
