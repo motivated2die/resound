@@ -77,7 +77,7 @@
         };
         new IntersectionObserver(([entry]) => {
             clearInterval(timer);
-            if (entry.isIntersecting) timer = setInterval(tick, 750);
+            if (entry.isIntersecting) timer = setInterval(tick, 1500);
         }).observe(preview);
     }
 
@@ -214,13 +214,16 @@
         layer.append(icon);
         document.body.append(layer);
         const calm = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        // Out to the right, somewhere between up and down.
+        const way = (Math.random() * 110 - 75) * Math.PI / 180;
+        const fx = Math.cos(way), fy = Math.sin(way);
         icon.animate(calm ? [
             { transform: 'translate(-50%, -50%) scale(1.4)', opacity: 1 },
             { transform: 'translate(-50%, -50%) scale(1.4)', opacity: 0 },
         ] : [
             { transform: 'translate(-50%, -50%) scale(1)', opacity: 1 },
-            { transform: 'translate(calc(-50% + 120px), calc(-50% - 46px)) scale(2)', opacity: 1, offset: 0.5 },
-            { transform: 'translate(calc(-50% + 170px), calc(-50% - 60px)) scale(2.2)', opacity: 0 },
+            { transform: `translate(calc(-50% + ${fx * 128}px), calc(-50% + ${fy * 128}px)) scale(2)`, opacity: 1, offset: 0.5 },
+            { transform: `translate(calc(-50% + ${fx * 180}px), calc(-50% + ${fy * 180}px)) scale(2.2)`, opacity: 0 },
         ], { duration: calm ? 500 : 850, easing: 'cubic-bezier(0.2, 0.8, 0.2, 1)', fill: 'forwards' });
         if (!calm) {
             for (let i = 0; i < 22; i++) {
@@ -237,11 +240,11 @@
                 bit.animate([
                     { transform: 'translate(-50%, -50%) rotate(0deg)', opacity: 1 },
                     { transform: `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px)) rotate(${spin / 2}deg)`, opacity: 1, offset: 0.6 },
-                    { transform: `translate(calc(-50% + ${dx * 1.15}px), calc(-50% + ${dy + 40}px)) rotate(${spin}deg)`, opacity: 0 },
-                ], { duration: 650 + Math.random() * 350, easing: 'cubic-bezier(0.15, 0.7, 0.3, 1)', fill: 'forwards' });
+                    { transform: `translate(calc(-50% + ${dx * 1.15}px), calc(-50% + ${dy + 110}px)) rotate(${spin}deg)`, opacity: 0 },
+                ], { duration: 750 + Math.random() * 350, easing: 'cubic-bezier(0.15, 0.7, 0.3, 1)', fill: 'forwards' });
             }
         }
-        setTimeout(() => layer.remove(), 1100);
+        setTimeout(() => layer.remove(), 1200);
     }
 
     function stopAll() {
