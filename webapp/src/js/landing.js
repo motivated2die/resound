@@ -51,7 +51,7 @@
                 if (!open || !download) return;
                 open.classList.replace('btn-secondary', 'btn-primary');
                 download.classList.replace('btn-primary', 'btn-secondary');
-                row.insertBefore(open, download);
+                row.insertBefore(open.closest('.cta-stack') || open, download); // with its note
             });
         }
 
