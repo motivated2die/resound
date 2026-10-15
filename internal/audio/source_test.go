@@ -100,7 +100,7 @@ func drain(t testing.TB, s *Source, keep bool) (frames int, peak float32, pcm []
 func TestFileStreamResamples(t *testing.T) {
 	path := writeTestWAV(t, t.TempDir(), time.Second)
 	var exact atomic.Int64
-	srcs, err := openFileStreams(path, 48000, 1, 0, func(f int64) { exact.Store(f) })
+	srcs, err := openFileStreams(path, 48000, 1, 0, 1, func(f int64) { exact.Store(f) })
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -220,7 +220,7 @@ func TestStartLatencyIndependentOfLength(t *testing.T) {
 		var best time.Duration
 		for i := range 3 { // best of three: the file is in the OS cache after the first
 			start := time.Now()
-			srcs, err := openFileStreams(path, 48000, 2, 0, nil)
+			srcs, err := openFileStreams(path, 48000, 2, 0, 1, nil)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -255,7 +255,7 @@ func TestLongSoundUsesBoundedMemory(t *testing.T) {
 	var before runtime.MemStats
 	runtime.ReadMemStats(&before)
 
-	srcs, err := openFileStreams(path, 48000, 2, 0, nil)
+	srcs, err := openFileStreams(path, 48000, 2, 0, 1, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -312,7 +312,7 @@ func TestProbeDuration(t *testing.T) {
 	}
 	// The synthetic MP3 really decodes, and to the probed length.
 	path := writeTestMP3(t, t.TempDir(), 200, false, 0)
-	srcs, err := openFileStreams(path, 44100, 1, 0, nil)
+	srcs, err := openFileStreams(path, 44100, 1, 0, 1, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

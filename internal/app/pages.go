@@ -455,6 +455,11 @@ func (a *App) libraryPage() []ui.Row {
 	case st.Failed > 0:
 		rows = append(rows, ui.Paragraph(fmt.Sprintf("%s without a readable length; it is measured when they play.", plural(st.Failed, "sound")), ui.ToneMuted))
 	}
+	rows = append(rows,
+		ui.Section("Loudness"),
+		ui.Toggle("Even out the loudness of sounds", !a.cfg.NoNormalize, a.toggleNormalize),
+		ui.Paragraph("Loud sounds are turned down and quiet ones up, so every sound plays about equally loud. Volumes you set for a sound apply on top.", ui.ToneMuted),
+	)
 	return append(rows, ui.Spacer(4))
 }
 

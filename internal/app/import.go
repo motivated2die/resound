@@ -349,7 +349,7 @@ func (a *App) previewImport(job *soundImport) {
 	a.stopImportPreview(job)
 	path, name := job.path, job.name
 	go func() { // decoding starts off the UI thread
-		p, err := a.engine.PrepareSound(audio.SoundRef{Path: path}, []string{audio.RoleMonitor})
+		p, err := a.engine.PrepareSound(audio.SoundRef{Path: path, Gain: a.importGain(path)}, []string{audio.RoleMonitor})
 		a.tray.Post(func() {
 			if err == nil && job.state == importNaming && job.path == path {
 				id, _ := a.lib.FindPath(path)
@@ -368,6 +368,20 @@ func (a *App) previewImport(job *soundImport) {
 			}
 		})
 	}()
+}
+
+// importGain measures a new sound for its preview, which usually comes
+// before the indexer got to it, so the preview is as loud as the sound will
+// play. Not on the UI thread.
+func (a *App) importGain(path string) float32 {
+	if !a.normalize.Load() {
+		return 1
+	}
+	l, err := audio.MeasureLoudness(path)
+	if err != nil {
+		return 1 // the preview reports what's wrong with the file
+	}
+	return audio.NormGain(l.LUFS, l.Peak)
 }
 
 func (a *App) stopImportPreview(job *soundImport) {

@@ -65,7 +65,7 @@ Helper roles run before the single-instance mutex (`Local\Resound.SingleInstance
 | Package | Responsibility |
 |---|---|
 | `app` | Wiring and all app state. Panel pages (`pages.go`, `wizard.go`, `diagnostics.go`, `system.go`), the audio flow and its meters (`flow.go`), playback holds (`playback.go`), push-to-talk (`ptt.go`), devices and routing actions (`devices.go`), server bridge (`remote.go`) |
-| `audio` | WASAPI outputs (`output_windows.go`), mixer (`mixer.go`), streaming sources and ring buffer (`source.go`), streaming decoder (`decode.go`), header-only length probe (`probe.go`), engine API (`engine_windows.go`), mix-format parsing (`format_windows.go`), level meters (`levels.go`, `meter_windows.go`) |
+| `audio` | WASAPI outputs (`output_windows.go`), mixer (`mixer.go`), streaming sources and ring buffer (`source.go`), streaming decoder (`decode.go`), header-only length probe (`probe.go`), loudness measurement (`loudness.go`), engine API (`engine_windows.go`), mix-format parsing (`format_windows.go`), level meters (`levels.go`, `meter_windows.go`) |
 | `wincom` | Core Audio COM plumbing: COM threads, endpoint enumeration/lookup, and fixes for go-wca bugs |
 | `routing` | VB-Cable detection, mic mute, the undocumented "Listen" properties, the elevated apply command |
 | `vbcable` | Automatic VB-Cable install: download, signature check, silent elevated setup, default-device snapshot/restore, the pending-install state across the restart |
@@ -81,7 +81,7 @@ Helper roles run before the single-instance mutex (`Local\Resound.SingleInstance
 | `backup` | Backup zips of `config.json`, `library.json` and `remote.json` with a manifest; validation, clean restore, backup index |
 | `config`, `logx` | `config.json`; log file plus crash output |
 
-Platform-specific files use the `_windows.go` suffix. `mixer.go`, `source.go`, `decode.go`, `probe.go`, `library` and `server` are portable and unit-tested on any OS. `cmd/devremote` serves the phone remote with the real library and indexer but no audio output (plays are only timed, so progress, previews and their ends show as with the PC), for front-end work on any OS (`go run ./cmd/devremote -folder <sounds>`). Enter in its console refreshes the library like the panel's Refresh, including the `library` event.
+Platform-specific files use the `_windows.go` suffix. `mixer.go`, `source.go`, `decode.go`, `probe.go`, `loudness.go`, `library` and `server` are portable and unit-tested on any OS. `cmd/devremote` serves the phone remote with the real library and indexer but no audio output (plays are only timed, so progress, previews and their ends show as with the PC), for front-end work on any OS (`go run ./cmd/devremote -folder <sounds>`). Enter in its console refreshes the library like the panel's Refresh, including the `library` event.
 
 ## Threading model
 
@@ -103,7 +103,12 @@ Platform-specific files use the `_windows.go` suffix. `mixer.go`, `source.go`, `
   - Each role is one long-lived shared-mode WASAPI stream with a 20 ms requested buffer (22 ms measured), opened in about 10 ms.
   - The stream writes the device's mix format: 32-bit float or 16/24/32-bit integer, 1–8 channels. Stereo goes to front left/right, mono gets (L+R)/2.
 - **Volume curve** (`audio/volume.go`). Volume percentages (the panel's sliders, per-sound volumes) become gain through `audio.Gain`: (percent/100)³ up to 100%, so loudness changes evenly along the slider (75% ≈ −7.5 dB, 50% ≈ −18 dB, 25% ≈ −36 dB). Per-sound boosts above 100% stay linear (200% = +6 dB). Configs from before 0.9 (no `volumeScale` in `config.json`) were saved on a linear scale; `migrateVolumeScale` converts the defaults and every per-sound volume once to the percentage with the same loudness (50% → 79%).
-- **Mixer.** Sums voices into stereo float32 and hard-clips.
+- **Loudness normalization** (`audio/loudness.go`). Every sound plays with the gain that brings it to âˆ’16 LUFS (`audio.NormGain`), applied by its decoder before any volume, so volumes (defaults and per-sound) act on top of it. Settings â†’ Sound library â†’ "Even out the loudness of sounds" turns it off (`noNormalize` in `config.json`); sounds not measured yet play unchanged.
+  - The measure is ITU-R BS.1770-4 integrated loudness (as in EBU R 128): K-weighted energy over 400 ms blocks every 100 ms, gated at âˆ’70 LUFS and 10 LU below the average, so silence and quiet tails don't count and a single sharp impact barely moves it. Clips shorter than one block are measured as one block. The K-weighting is derived for the file's own sample rate (no resampling); at 48 kHz it is the standard's. Mono files count as two channels, as they play. Measured against ffmpeg's `ebur128` on the developer's library: 0.09 LU apart on average.
+  - Quiet sounds are boosted by at most 12 dB, and only until their robust peak (the level only the loudest 0.1% of frames exceed, from a histogram binned on the float's bits, without a logarithm per sample) reaches full scale. Transients above it are rounded off by the mixer's soft clipper rather than holding back the whole sound.
+  - Speed: MP3s are decoded by go-mp3 directly from memory (beep's wrapper converts every sample with `math.Pow`, a fifth of the time); files over 90 s (songs) are measured as six 10 s segments spread over the file (0.4 LU from a full measurement on average). go-mp3 decodes ~85Ã— real time per core; the indexer measures on up to 4 workers. A library of 151 sounds (110 clips, 41 songs, 2h43m) takes ~10 s, the clips alone ~2 s.
+  - An import's preview measures the new file on the spot, as the indexer usually hasn't reached it yet.
+- **Mixer.** Sums voices into stereo float32 and soft-clips: samples up to 0.9 pass unchanged, louder ones bend along a tanh curve towards Â±1.
   - A voice has a gain that either scales the role volume or, for per-sound custom volume, replaces it.
   - The same voice ID is queued on both mixers, so the two copies start in the same device period. Pause and stop address both copies by ID.
 - **Streaming playback.** Every play decodes the original file while it plays (`gopxl/beep`: mp3, wav, flac, ogg, resampled to the output rate). Nothing decoded is kept in memory or on disk after a sound ends.
@@ -197,10 +202,11 @@ The Sound library page lists each library folder and all its subfolders, indente
   4. otherwise a new sound. Copies stay separate sounds, because only vanished records can be claimed.
   - A folder that vanished hands its tab ID to the new folder that at least half of its sounds moved to (a renamed folder keeps its phone layout).
 - **Tombstones.** Records of missing files and folders are kept for 30 days (`missingSince`), so removing and re-adding a folder, or moving a file out and back, restores its settings.
-- **Index file.** `library.json` holds the records, settings (favorite, volumes, phone color and emoji) and phone layouts (mode and custom orders by sound ID). It is written atomically by a single debounced saver; an unreadable file is moved aside, never overwritten. `sounds.json` from earlier versions is migrated on first start and renamed to `sounds.json.migrated`.
-- **Indexer.** One background worker reads new and changed files, one at a time, without decoding audio:
+- **Index file.** `library.json` holds the records (with their measured `level`: loudness, robust peak and measurement version), settings (favorite, volumes, phone color and emoji) and phone layouts (mode and custom orders by sound ID). It is written atomically by a single debounced saver; an unreadable file is moved aside, never overwritten. `sounds.json` from earlier versions is migrated on first start and renamed to `sounds.json.migrated`.
+- **Indexer.** A background worker reads new and changed files in two stages. First, one at a time and without decoding audio:
   - a **fingerprint**: SHA-256 (first 128 bits) over the size, the first 64 KB and the last 64 KB, so at most 128 KB per file;
   - the **length** from the headers (`audio.ProbeDuration`): WAV/FLAC/OGG headers; for MP3 the Xing/Info or VBRI frame count, or the bit rate for constant-bit-rate files (an estimate for VBR files without a VBR header, corrected after the first full play).
+  - then the **loudness** (`audio.MeasureLoudness`, see Loudness normalization), on up to 4 workers (half the CPU's threads). Decoding to the end also gives the exact length. Levels from another `LoudnessVersion` are measured again; a file that can't be decoded is tried again when it changes. Edits clear the level like the fingerprint; moves and renames keep it.
   - Progress shows in the panel; sounds are playable before they are indexed.
 - `GET /api/tabs` and `GET /api/library` rescan when the last scan is more than 5 s old.
 

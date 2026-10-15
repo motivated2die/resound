@@ -130,6 +130,9 @@ type SoundRef struct {
 	// OnDecoded, if set, receives the exact length once the file was
 	// decoded to its end (called from a producer goroutine).
 	OnDecoded func(time.Duration)
+	// Gain normalizes the sound's loudness (NormGain) before any volume
+	// applies. 0 = unchanged.
+	Gain float32
 }
 
 // Prepared is a sound buffered and ready to start on the outputs that were
@@ -163,7 +166,11 @@ func (e *Engine) PrepareSound(ref SoundRef, roles []string) (*Prepared, error) {
 			onEnd = func(frames int64) { ref.OnDecoded(time.Duration(frames) * time.Second / time.Duration(rate)) }
 		}
 		length := int64(ref.Length) * int64(rate) / int64(time.Second)
-		return openFileStreams(ref.Path, rate, n, length, onEnd)
+		gain := ref.Gain
+		if gain <= 0 {
+			gain = 1
+		}
+		return openFileStreams(ref.Path, rate, n, length, gain, onEnd)
 	})
 }
 

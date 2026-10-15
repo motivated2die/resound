@@ -66,6 +66,9 @@ type Config struct {
 	// NoUpdateCheck turns off the automatic check for new releases on
 	// GitHub ("Check now" still works).
 	NoUpdateCheck bool `json:"noUpdateCheck,omitempty"`
+	// NoNormalize plays sounds at their own loudness instead of evening
+	// them out (audio.NormGain).
+	NoNormalize bool `json:"noNormalize,omitempty"`
 }
 
 // Default returns the configuration used on first start.

@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/motivated2die/resound/internal/audio"
+	"github.com/motivated2die/resound/internal/library"
 	"github.com/motivated2die/resound/internal/logx"
 	"github.com/motivated2die/resound/internal/routing"
 	"github.com/motivated2die/resound/internal/ui"
@@ -359,6 +360,26 @@ func (a *App) setVolume(role string, v int, done bool) {
 func (a *App) applyVolumes() {
 	a.engine.SetVolume(audio.RoleMonitor, audio.Gain(a.cfg.MonitorVolume))
 	a.engine.SetVolume(audio.RoleCable, audio.Gain(a.cfg.CableVolume))
+}
+
+// normGain is the gain that evens out a sound's loudness: 1 when
+// normalization is off or the sound wasn't measured yet (or by an older
+// measurement). Safe on any goroutine.
+func (a *App) normGain(lv *library.Level) float32 {
+	if !a.normalize.Load() || lv == nil || lv.Version != audio.LoudnessVersion {
+		return 1
+	}
+	return audio.NormGain(lv.LUFS, lv.Peak)
+}
+
+// toggleNormalize turns loudness normalization on or off. Sounds that are
+// playing keep their gain; the next plays use the new setting.
+func (a *App) toggleNormalize() {
+	a.cfg.NoNormalize = !a.cfg.NoNormalize
+	a.normalize.Store(!a.cfg.NoNormalize)
+	a.save()
+	logx.Printf("loudness normalization: %v", !a.cfg.NoNormalize)
+	a.render()
 }
 
 // --- home page playback status ---

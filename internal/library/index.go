@@ -37,6 +37,7 @@ type soundRec struct {
 	Fingerprint  string        `json:"fingerprint,omitempty"`
 	DurationMs   int64         `json:"durationMs,omitempty"`
 	ExactLength  bool          `json:"exactLength,omitempty"` // DurationMs measured by decoding, not probed
+	Level        *Level        `json:"level,omitempty"`
 	AddedAt      time.Time     `json:"addedAt"`
 	MissingSince *time.Time    `json:"missingSince,omitempty"`
 	Settings     SoundSettings `json:"settings,omitzero"`
@@ -46,6 +47,11 @@ func (r *soundRec) missing() bool { return r.MissingSince != nil }
 
 func (r *soundRec) sound() Sound {
 	base := filepath.Base(r.Path)
+	var level *Level
+	if r.Level != nil {
+		lv := *r.Level
+		level = &lv
+	}
 	return Sound{
 		ID:            r.ID,
 		TabID:         r.TabID,
@@ -55,6 +61,7 @@ func (r *soundRec) sound() Sound {
 		Size:          r.Size,
 		Fingerprint:   r.Fingerprint,
 		Duration:      time.Duration(r.DurationMs) * time.Millisecond,
+		Level:         level,
 		SoundSettings: r.Settings,
 	}
 }

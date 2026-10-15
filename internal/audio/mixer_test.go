@@ -53,8 +53,31 @@ func TestMixerClips(t *testing.T) {
 	m.Add(2, NewStaticSource("t", 48000, []float32{0.9, -0.9}), 1, false, time.Now())
 	out := make([]float32, 2)
 	m.Read(out)
-	if out[0] != 1 || out[1] != -1 {
-		t.Fatalf("expected hard clip to ±1, got %v", out)
+	if out[0] > 1 || out[0] < 0.99 || out[1] != -out[0] {
+		t.Fatalf("expected a soft clip to just under ±1, got %v", out)
+	}
+}
+
+// The soft clipper leaves samples up to the knee alone, stays continuous
+// and rising above it, and never reaches past full scale.
+func TestSoftClip(t *testing.T) {
+	m := NewMixer("test", nil)
+	m.Add(1, NewStaticSource("t", 48000, []float32{0.5, -clipKnee}), 1, false, time.Now())
+	out := make([]float32, 2)
+	m.Read(out)
+	if out[0] != 0.5 || out[1] != -clipKnee {
+		t.Fatalf("below the knee: got %v", out)
+	}
+	prev := float32(clipKnee)
+	for s := float32(clipKnee + 0.01); s < 4; s += 0.01 {
+		c := softClip(s)
+		if c < prev || c > 1 || c-prev > 0.0101 {
+			t.Fatalf("softClip(%v) = %v after %v", s, c, prev)
+		}
+		if softClip(-s) != -c {
+			t.Fatalf("softClip not symmetric at %v", s)
+		}
+		prev = c
 	}
 }
 

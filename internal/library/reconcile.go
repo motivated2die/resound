@@ -282,7 +282,7 @@ func (l *Library) apply(folders []string, dirs []foundDir, matches []match) bool
 			}
 			if m.changed {
 				r.Size, r.ModTime = f.size, f.mod
-				r.Fingerprint, r.DurationMs, r.ExactLength = m.fp, 0, false
+				r.Fingerprint, r.DurationMs, r.ExactLength, r.Level = m.fp, 0, false, nil
 				changed = true
 			} else if m.fp != "" && r.Fingerprint == "" {
 				r.Fingerprint = m.fp

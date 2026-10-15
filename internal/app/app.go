@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"golang.org/x/sys/windows"
@@ -86,13 +87,15 @@ type App struct {
 	levels     levelState // the audio flow's meters (flow.go)
 	flowOnPage bool       // the current page shows the audio flow
 
-	lib      *library.Library
-	indexer  *library.Indexer
-	removing string       // folder awaiting the remove confirmation
-	libNote  string       // result of the last refresh or add, shown for a moment (setLibNote)
-	libSeq   int          // identifies the current libNote, so an old timer leaves a newer one
-	keepNote bool         // reopening after a dialog: keep libNote and backupNote
-	imports  importsState // sounds dropped onto folders (import.go)
+	lib     *library.Library
+	indexer *library.Indexer
+	// normalize mirrors !cfg.NoNormalize for plays on HTTP goroutines.
+	normalize atomic.Bool
+	removing  string       // folder awaiting the remove confirmation
+	libNote   string       // result of the last refresh or add, shown for a moment (setLibNote)
+	libSeq    int          // identifies the current libNote, so an old timer leaves a newer one
+	keepNote  bool         // reopening after a dialog: keep libNote and backupNote
+	imports   importsState // sounds dropped onto folders (import.go)
 
 	backupNote       string // result of the last backup action
 	backupFailed     bool
@@ -191,6 +194,7 @@ func Run() int {
 	a.lib.Logf = logx.Printf
 	defer a.lib.Close()
 	a.migrateVolumeScale()
+	a.normalize.Store(!a.cfg.NoNormalize)
 	a.playback.init()
 	a.ptt.init()
 	a.imports.init()
