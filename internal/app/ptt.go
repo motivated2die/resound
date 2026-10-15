@@ -101,6 +101,9 @@ func (a *App) startCapture(t captureTarget) {
 	p.capturing, p.target, p.hotkeyNote = true, t, ""
 	p.captured = nil
 	clear(p.down)
+	if a.hotkeys != nil {
+		a.hotkeys.SetBindings(a.hotkeyBindings()) // without the overlay key
+	}
 	a.render()
 }
 
@@ -124,6 +127,7 @@ func (a *App) onPanelKey(ev ui.KeyEvent) bool {
 	if ev.VK == 0x1B { // Esc
 		if !ev.Down {
 			p.capturing = false
+			a.applyHotkeys() // the overlay key works again
 			a.render()
 		}
 		return true
@@ -146,6 +150,7 @@ func (a *App) onPanelKey(ev ui.KeyEvent) bool {
 		} else {
 			a.addHotkey(p.target, p.captured)
 		}
+		a.applyHotkeys() // the overlay key works again
 	}
 	return true
 }

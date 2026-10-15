@@ -40,6 +40,8 @@ func (a *App) rows() []ui.Row {
 		return a.backupPage()
 	case pageDiagnostics:
 		return a.diagnosticsPage()
+	case pageOverlay:
+		return a.overlayPage()
 	}
 	return a.homePage()
 }
@@ -172,11 +174,13 @@ func (a *App) settingsPage() []ui.Row {
 	remote, remoteTone := a.remoteSummary()
 	appDetail, appTone := a.appSummary()
 	backupDetail, backupTone := a.backupSummary()
+	overlayDetail, overlayTone := a.overlaySummary()
 	return []ui.Row{
 		ui.Header("Settings", func() { a.showPage(pageHome) }),
 		ui.Nav("Audio & voice chat", audioDetail, audioTone, func() { a.openPage(pageAudio) }),
 		ui.Nav("Push-to-talk", keys, keysTone, func() { a.openPage(pageKeys) }),
 		ui.Nav("Sound library", lib, libTone, func() { a.openPage(pageLibrary) }),
+		ui.Nav("In-game overlay", overlayDetail, overlayTone, func() { a.openPage(pageOverlay) }),
 		ui.Nav("Phone remote", remote, remoteTone, func() { a.openPage(pageRemote) }),
 		ui.Nav("App & startup", appDetail, appTone, func() { a.openPage(pageApp) }),
 		ui.Nav("Backup & restore", backupDetail, backupTone, func() { a.openPage(pageBackup) }),
@@ -455,7 +459,11 @@ func (a *App) libraryPage() []ui.Row {
 	case st.Failed > 0:
 		rows = append(rows, ui.Paragraph(fmt.Sprintf("%s without a readable length; it is measured when they play.", plural(st.Failed, "sound")), ui.ToneMuted))
 	}
+	overlayDetail, overlayTone := a.overlaySummary()
 	rows = append(rows,
+		ui.Section("In-game overlay"),
+		a.overlayPreviewRow(),
+		ui.Nav("Overlay settings", overlayDetail, overlayTone, func() { a.openPage(pageOverlay) }),
 		ui.Section("Loudness"),
 		ui.Toggle("Even out the loudness of sounds", !a.cfg.NoNormalize, a.toggleNormalize),
 		ui.Paragraph("Loud sounds are turned down and quiet ones up, so every sound plays about equally loud. Volumes you set for a sound apply on top.", ui.ToneMuted),

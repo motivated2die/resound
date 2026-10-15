@@ -1,0 +1,344 @@
+package app
+
+import (
+	"slices"
+
+	"github.com/motivated2die/resound/internal/input"
+	"github.com/motivated2die/resound/internal/library"
+	"github.com/motivated2die/resound/internal/logx"
+	"github.com/motivated2die/resound/internal/ui"
+)
+
+// The in-game overlay: one key slides a bar of the favorites in at the edge
+// of the primary screen; the mouse wheel moves the highlight, the key again
+// plays the highlighted sound, Esc closes it. It never takes the focus from
+// the game, and only its key, Esc and the wheel are kept from the game
+// while it is open (input.Filter decides that in the keyboard hook). It is
+// on while a key is set for it.
+//
+// The highlight comes back where it was left (cfg.OverlayLast), so a sound
+// can be picked ahead and played later with two presses; the very first
+// time it starts in the middle.
+
+const overlayEmptyText = "Star sounds on your phone to see them here"
+
+// overlayState is the overlay's UI-thread state.
+type overlayState struct {
+	win     *ui.Overlay // created on first use
+	err     string      // why it can't be shown, if it can't
+	open    bool
+	preview bool     // opened from the panel's button rather than the key
+	ids     []uint64 // the sounds shown, top to bottom
+	sel     int
+}
+
+// overlayFavorites returns the favorites in the order of the phone's
+// Favorites tab (its custom order for its current layout, the rest after
+// it), as overlay items.
+func (a *App) overlayFavorites() ([]uint64, []ui.OverlayItem) {
+	favs := a.lib.Favorites()
+	lay := a.lib.Layout(library.FavoritesKey)
+	mode := lay.Mode
+	if mode == "" {
+		mode = "grid-3" // the phone's default
+	}
+	pos := map[uint64]int{}
+	for i, id := range lay.Orders[mode] {
+		if _, dup := pos[id]; !dup {
+			pos[id] = i
+		}
+	}
+	slices.SortStableFunc(favs, func(x, y library.Sound) int {
+		px, okx := pos[x.ID]
+		py, oky := pos[y.ID]
+		switch {
+		case okx && oky:
+			return px - py
+		case okx:
+			return -1
+		case oky:
+			return 1
+		}
+		return 0
+	})
+	ids := make([]uint64, len(favs))
+	items := make([]ui.OverlayItem, len(favs))
+	for i, s := range favs {
+		ids[i] = s.ID
+		items[i] = ui.OverlayItem{Name: s.Name, Emoji: s.Emoji, Color: s.Color}
+	}
+	return ids, items
+}
+
+// overlaySelection is where the highlight starts: the sound highlighted
+// last, else the middle one.
+func (a *App) overlaySelection(ids []uint64) int {
+	if i := slices.Index(ids, a.cfg.OverlayLast); i >= 0 && a.cfg.OverlayLast != 0 {
+		return i
+	}
+	return (len(ids) - 1) / 2
+}
+
+// openOverlay slides the overlay in. It reports false when it can't show.
+func (a *App) openOverlay() bool {
+	if a.overlay.win == nil {
+		w, err := ui.NewOverlay()
+		if err != nil {
+			logx.Printf("overlay: %v", err)
+			a.overlay.err = "The overlay can't be shown on this PC: " + err.Error()
+			return false
+		}
+		a.overlay.win, a.overlay.err = w, ""
+	}
+	ids, items := a.overlayFavorites()
+	o := &a.overlay
+	o.ids, o.sel, o.open = ids, a.overlaySelection(ids), true
+	o.win.Show(items, o.sel, a.cfg.OverlayLeft, overlayEmptyText)
+	return true
+}
+
+// closeOverlay slides it out and remembers the highlight.
+func (a *App) closeOverlay() {
+	o := &a.overlay
+	if !o.open {
+		return
+	}
+	o.open = false
+	a.rememberOverlaySelection()
+	if o.preview {
+		o.preview = false
+		a.applyHotkeys() // the watcher may only have run for the preview
+		a.render()
+	}
+	o.win.Hide(nil)
+}
+
+func (a *App) rememberOverlaySelection() {
+	o := &a.overlay
+	if o.sel >= 0 && o.sel < len(o.ids) && o.ids[o.sel] != a.cfg.OverlayLast {
+		a.cfg.OverlayLast = o.ids[o.sel]
+		a.save()
+	}
+}
+
+// onOverlayEvent handles the overlay's hotkey events; it reports false for
+// other events. UI thread.
+func (a *App) onOverlayEvent(ev input.HotkeyEvent) bool {
+	o := &a.overlay
+	switch ev.Action {
+	case input.ActionOverlayOpen:
+		if a.ptt.capturing || !a.openOverlay() {
+			a.tellHookOverlay(false) // or Esc and the wheel would stay taken
+		}
+	case input.ActionOverlayScroll:
+		if o.open && len(o.ids) > 0 {
+			o.sel = max(0, min(len(o.ids)-1, o.sel+ev.Steps)) // stops at the ends
+			o.win.SetSelected(o.sel)
+		}
+	case input.ActionOverlaySelect:
+		a.selectOverlay()
+	case input.ActionOverlayClose:
+		a.closeOverlay()
+	default:
+		return false
+	}
+	return true
+}
+
+// selectOverlay plays the highlighted sound; the highlight flashes green,
+// or red when it can't play, and the overlay slides out.
+func (a *App) selectOverlay() {
+	o := &a.overlay
+	if !o.open {
+		return
+	}
+	if o.sel < 0 || o.sel >= len(o.ids) {
+		a.closeOverlay()
+		return
+	}
+	id := o.ids[o.sel]
+	o.open = false
+	a.rememberOverlaySelection()
+	if o.preview {
+		o.preview = false
+		a.applyHotkeys()
+		a.render()
+	}
+	go func() { // decodes off the UI thread, like a play from the phone
+		_, err := a.playSound(id, false)
+		if err != nil {
+			logx.Printf("overlay: playing sound %d: %v", id, err)
+		}
+		a.tray.Post(func() { o.win.Confirm(err == nil) })
+	}()
+}
+
+// tellHookOverlay tells the keyboard hook that the overlay opened or closed
+// without its key (the preview button), so Esc and the wheel are taken
+// exactly while it shows.
+func (a *App) tellHookOverlay(open bool) {
+	if a.hotkeys != nil {
+		a.hotkeys.SetOverlayOpen(open)
+	}
+}
+
+// toggleOverlayPreview shows the overlay from the panel, to see what it
+// looks like without a game. Esc and the wheel work as in a game.
+func (a *App) toggleOverlayPreview() {
+	o := &a.overlay
+	if o.open {
+		a.closeOverlay()
+		a.tellHookOverlay(false)
+		return
+	}
+	o.preview = true
+	a.applyHotkeys() // starts the watcher for Esc and the wheel if no key is set
+	if !a.openOverlay() {
+		o.preview = false
+		a.applyHotkeys()
+		a.render()
+		return
+	}
+	a.tellHookOverlay(true)
+	a.render()
+}
+
+// setOverlayKey sets the recorded key, unless another hotkey uses it.
+func (a *App) setOverlayKey(c input.Combo) {
+	switch {
+	case containsCombo(a.cfg.PauseHotkeys, c):
+		a.ptt.hotkeyNote = c.String() + " is already a pause key."
+	case containsCombo(a.cfg.StopHotkeys, c):
+		a.ptt.hotkeyNote = c.String() + " is already a stop key."
+	case input.SameCombo(c, a.cfg.PushToTalkKeys):
+		a.ptt.hotkeyNote = c.String() + " is the push-to-talk key Resound presses."
+	default:
+		a.cfg.OverlayKeys = slices.Clone(c)
+		a.save()
+		logx.Printf("overlay: key set to %s", c)
+		a.applyHotkeys()
+	}
+	a.render()
+}
+
+func (a *App) clearOverlayKey() {
+	if a.overlay.open && !a.overlay.preview {
+		a.closeOverlay()
+	}
+	a.cfg.OverlayKeys = nil
+	a.ptt.hotkeyNote = ""
+	a.save()
+	logx.Printf("overlay: off")
+	a.applyHotkeys()
+	a.render()
+}
+
+func (a *App) setOverlaySide(left bool) {
+	a.cfg.OverlayLeft = left
+	a.save()
+	if a.overlay.open { // show it on the new side at once
+		ids, items := a.overlayFavorites()
+		a.overlay.ids = ids
+		a.overlay.sel = max(0, min(a.overlay.sel, len(ids)-1))
+		a.overlay.win.Hide(func() {
+			if a.overlay.open {
+				a.overlay.win.Show(items, a.overlay.sel, a.cfg.OverlayLeft, overlayEmptyText)
+			}
+		})
+	}
+	a.render()
+}
+
+// --- panel ------------------------------------------------------------------
+
+func (a *App) overlayKeyText() string { return input.Combo(a.cfg.OverlayKeys).String() }
+
+func (a *App) overlaySummary() (string, ui.Tone) {
+	if len(a.cfg.OverlayKeys) == 0 {
+		return "Off", ui.ToneMuted
+	}
+	return a.overlayKeyText(), ui.ToneGood
+}
+
+// overlayPreviewRow is the small picture of the overlay with what it does,
+// showing the first favorites (or examples without any).
+func (a *App) overlayPreviewRow() ui.Row {
+	ids, items := a.overlayFavorites()
+	sel := a.overlaySelection(ids)
+	if len(items) == 0 {
+		items = []ui.OverlayItem{
+			{Name: "Airhorn", Emoji: "📯", Color: "red"}, {Name: "Bruh", Emoji: "😠"},
+			{Name: "Drumroll", Emoji: "🥁", Color: "yellow"}, {Name: "Sad trombone", Color: "blue"},
+			{Name: "Applause", Emoji: "👏", Color: "green"},
+		}
+		sel = 1
+	}
+	// The picture shows five at most, around the highlight.
+	first := max(0, min(sel-2, len(items)-5))
+	items, sel = items[first:first+min(5, len(items))], sel-first
+	text := "Bring up your favorite sounds in any game with one key, without leaving the game."
+	if k := a.overlayKeyText(); len(a.cfg.OverlayKeys) > 0 {
+		text = "Press " + k + " in a game, scroll to a favorite and press " + k + " again to play it. Esc closes the bar."
+	}
+	return ui.OverlayPreview(text, items, sel, a.cfg.OverlayLeft)
+}
+
+func (a *App) overlayPage() []ui.Row {
+	p := &a.ptt
+	rows := []ui.Row{
+		ui.Header("In-game overlay", a.back),
+		a.overlayPreviewRow(),
+		ui.Paragraph("Your game keeps the focus. While the bar shows, only its key, Esc and the mouse wheel are kept from the game.", ui.ToneMuted),
+		ui.Section("Key"),
+	}
+	switch {
+	case p.capturing && p.target == captureOverlay:
+		got := "…"
+		if len(p.captured) > 0 {
+			got = p.captured.String() + " …"
+		}
+		rows = append(rows,
+			ui.Text("Press the key or combination", got, ui.ToneWarning),
+			ui.Text("Keyboard keys only. Esc cancels.", "", ui.ToneMuted))
+	case len(a.cfg.OverlayKeys) == 0:
+		rows = append(rows, ui.Text("No key: the overlay is off", "", ui.ToneMuted))
+	default:
+		rows = append(rows, ui.Text(a.overlayKeyText(), "", ui.ToneGood))
+	}
+	if !(p.capturing && p.target == captureOverlay) {
+		label := "Set key"
+		if len(a.cfg.OverlayKeys) > 0 {
+			label = "Change key"
+		}
+		rows = append(rows, ui.Buttons(
+			ui.Action{Label: label, Disabled: p.capturing, OnClick: func() { a.startCapture(captureOverlay) }},
+			ui.Action{Label: "Turn off", Disabled: len(a.cfg.OverlayKeys) == 0, OnClick: a.clearOverlayKey},
+		))
+	}
+	if p.hotkeyNote != "" && p.noteFor == captureOverlay {
+		rows = append(rows, ui.Paragraph(p.hotkeyNote, ui.ToneWarning))
+	}
+	if a.hotkeyErr != "" && len(a.cfg.OverlayKeys) > 0 {
+		rows = append(rows, ui.Paragraph(a.hotkeyErr, ui.ToneBad))
+	}
+	rows = append(rows,
+		ui.Section("Screen edge"),
+		ui.Radio("Right", "", !a.cfg.OverlayLeft, func() { a.setOverlaySide(false) }),
+		ui.Radio("Left", "", a.cfg.OverlayLeft, func() { a.setOverlaySide(true) }),
+		ui.Section("Try it"),
+	)
+	label := "Show the overlay"
+	if a.overlay.open {
+		label = "Hide the overlay"
+	}
+	rows = append(rows,
+		ui.Button(label, ui.ButtonNormal, false, a.toggleOverlayPreview),
+		ui.Paragraph("Scroll to move the highlight while it shows. Esc closes it.", ui.ToneMuted),
+	)
+	if a.overlay.err != "" {
+		rows = append(rows, ui.Paragraph(a.overlay.err, ui.ToneBad))
+	}
+	return append(rows,
+		ui.Paragraph("Shows over games in borderless or windowed mode, not in exclusive fullscreen. Games running as administrator don't receive the key.", ui.ToneMuted),
+		ui.Spacer(4))
+}

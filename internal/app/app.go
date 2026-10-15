@@ -58,6 +58,7 @@ const (
 	pageApp
 	pageBackup
 	pageDiagnostics
+	pageOverlay // the in-game overlay
 )
 
 // App holds the running host state. Everything except the event pump and
@@ -91,6 +92,7 @@ type App struct {
 	indexer *library.Indexer
 	// normalize mirrors !cfg.NoNormalize for plays on HTTP goroutines.
 	normalize atomic.Bool
+	overlay   overlayState // the in-game overlay (overlay.go)
 	removing  string       // folder awaiting the remove confirmation
 	libNote   string       // result of the last refresh or add, shown for a moment (setLibNote)
 	libSeq    int          // identifies the current libNote, so an old timer leaves a newer one

@@ -23,6 +23,7 @@ const (
 	capturePTT captureTarget = iota
 	capturePause
 	captureStop
+	captureOverlay
 )
 
 func (a *App) hotkeyBindings() input.Bindings {
@@ -33,16 +34,21 @@ func (a *App) hotkeyBindings() input.Bindings {
 	for _, c := range a.cfg.StopHotkeys {
 		b.Stop = append(b.Stop, input.Combo(c))
 	}
+	// While a key is recorded in the panel, the overlay key isn't taken from
+	// it, so it can be recorded again.
+	if !a.ptt.capturing {
+		b.Overlay = input.Combo(a.cfg.OverlayKeys)
+	}
 	return b
 }
 
 // applyHotkeys starts, updates or stops watching the keyboard to match the
-// settings.
+// settings. The overlay's preview needs the watcher too (Esc and the wheel).
 func (a *App) applyHotkeys() {
 	b := a.hotkeyBindings()
 	a.setHoldPause(false) // a held pause key may no longer be one
 	switch {
-	case b.Empty():
+	case b.Empty() && !a.overlay.preview:
 		a.closeHotkeys()
 		a.hotkeyErr = ""
 	case a.hotkeys != nil:
@@ -59,7 +65,7 @@ func (a *App) applyHotkeys() {
 		a.hotkeys, a.hotkeyErr = w, ""
 	}
 	if a.hotkeys != nil {
-		logx.Printf("hotkeys: watching %d pause and %d stop key(s)", len(b.Pause), len(b.Stop))
+		logx.Printf("hotkeys: watching %d pause and %d stop key(s), overlay key %q", len(b.Pause), len(b.Stop), b.Overlay.String())
 	}
 }
 
@@ -73,6 +79,9 @@ func (a *App) closeHotkeys() {
 
 // onHotkey runs on the UI thread.
 func (a *App) onHotkey(ev input.HotkeyEvent) {
+	if a.onOverlayEvent(ev) {
+		return
+	}
 	if ev.Down && a.ptt.capturing {
 		return // the user is recording a key in the panel
 	}
@@ -97,12 +106,18 @@ func (a *App) hotkeyList(t captureTarget) *[][]uint16 {
 // in use.
 func (a *App) addHotkey(t captureTarget, c input.Combo) {
 	a.ptt.hotkeyNote, a.ptt.noteFor = "", t
+	if t == captureOverlay {
+		a.setOverlayKey(c)
+		return
+	}
 	list := a.hotkeyList(t)
 	other, otherName := a.cfg.StopHotkeys, "stop"
 	if t == captureStop {
 		other, otherName = a.cfg.PauseHotkeys, "pause"
 	}
 	switch {
+	case input.SameCombo(c, a.cfg.OverlayKeys):
+		a.ptt.hotkeyNote = c.String() + " opens the in-game overlay."
 	case containsCombo(*list, c):
 		a.ptt.hotkeyNote = c.String() + " is already in this list."
 	case containsCombo(other, c):

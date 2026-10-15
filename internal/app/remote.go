@@ -43,7 +43,14 @@ type remotePlayer struct{ a *App }
 var _ server.Player = remotePlayer{}
 
 func (r remotePlayer) Play(soundID uint64, preview bool) (server.Started, error) {
-	a := r.a
+	return r.a.playSound(soundID, preview)
+}
+
+// playSound plays a library sound for everyone, or for the user only
+// (preview), as the phone and the in-game overlay do. It decodes on the
+// calling goroutine and starts on the UI thread, so it must not be called
+// from the UI thread.
+func (a *App) playSound(soundID uint64, preview bool) (server.Started, error) {
 	snd, _, ok := a.lib.Sound(soundID)
 	if !ok {
 		return server.Started{}, server.ErrNotFound
