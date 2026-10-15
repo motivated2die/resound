@@ -346,3 +346,79 @@ func TestSliderPosition(t *testing.T) {
 		}
 	}
 }
+
+// The phone's tab order is stored, applied to /api/tabs and /api/library,
+// and validated.
+func TestTabOrder(t *testing.T) {
+	root := t.TempDir()
+	for _, d := range []string{"a", "b", "c"} {
+		if err := os.MkdirAll(filepath.Join(root, d), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(root, d, d+".mp3"), []byte(d), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	lib := library.Open(t.TempDir(), []string{".mp3"})
+	t.Cleanup(func() { _ = lib.Close() })
+	lib.Scan([]string{root})
+	auth, err := NewAuth(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := New(lib, &fakePlayer{lib: lib}, auth, t.Logf)
+	h, c := s.Handler(), login(t, s)
+	ids := map[string]uint64{}
+	for _, tab := range lib.Tabs() {
+		ids[tab.Name] = tab.ID
+	}
+	names := func(path string) string {
+		t.Helper()
+		var tabs []struct {
+			Name string `json:"name"`
+		}
+		body := do(t, h, "GET", path, "", c).Body.Bytes()
+		if path == "/api/library" {
+			var lib struct {
+				Tabs json.RawMessage `json:"tabs"`
+			}
+			_ = json.Unmarshal(body, &lib)
+			body = lib.Tabs
+		}
+		if err := json.Unmarshal(body, &tabs); err != nil {
+			t.Fatalf("%s: %v", path, err)
+		}
+		var out []string
+		for _, tab := range tabs {
+			out = append(out, tab.Name)
+		}
+		return strings.Join(out, ",")
+	}
+
+	body := fmt.Sprintf(`{"order":[%d,%d,%d,99]}`, ids["c"], ids["a"], ids["b"])
+	rec := do(t, h, "POST", "/api/library/tab-order", body, c)
+	var resp struct {
+		Order []uint64 `json:"order"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil || rec.Code != http.StatusOK ||
+		len(resp.Order) != 3 || resp.Order[0] != ids["c"] {
+		t.Fatalf("tab-order: %d %s", rec.Code, rec.Body)
+	}
+	for _, path := range []string{"/api/tabs", "/api/library"} {
+		if got := names(path); got != "c,a,b" {
+			t.Errorf("%s: tabs %s, want c,a,b", path, got)
+		}
+	}
+	for _, bad := range []string{`{"order":"x"}`, `{"order":[-1]}`, `nonsense`} {
+		if rec := do(t, h, "POST", "/api/library/tab-order", bad, c); rec.Code != http.StatusBadRequest {
+			t.Errorf("%s: %d", bad, rec.Code)
+		}
+	}
+	if rec := do(t, h, "POST", "/api/library/tab-order", `{"order":[]}`, ""); rec.Code == http.StatusOK {
+		t.Error("tab order accepted without a paired device")
+	}
+	do(t, h, "POST", "/api/library/reset-appearance", "", c)
+	if got := names("/api/tabs"); got != "a,b,c" {
+		t.Errorf("after reset: %s", got)
+	}
+}

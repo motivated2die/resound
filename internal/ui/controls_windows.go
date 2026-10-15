@@ -223,6 +223,83 @@ func (b buttonsRow) paint(c *canvas, r rect, st rowState) {
 	}
 }
 
+// --- Segmented ---------------------------------------------------------------
+
+type segmentedRow struct {
+	options  []string
+	selected int
+	disabled bool
+	onSelect func(int)
+}
+
+// Segmented is a choice of options in one outlined group, equally wide,
+// with the selected one highlighted. Disabled greys it out (the setting
+// doesn't apply right now) and ignores clicks.
+func Segmented(options []string, selected int, disabled bool, onSelect func(int)) Row {
+	return segmentedRow{options, selected, disabled, onSelect}
+}
+
+func (segmentedRow) height() int     { return 40 }
+func (segmentedRow) keepsOpen() bool { return true }
+
+// frame is the group's outline; boxes are the options inside it.
+func (s segmentedRow) frame(c *canvas, r rect) rect {
+	in := inset(c, r)
+	return rect{in.Left, r.Top + c.px(3), in.Right, r.Bottom - c.px(3)}
+}
+
+func (s segmentedRow) boxes(c *canvas, r rect) []rect {
+	f := s.frame(c, r)
+	pad := c.px(3)
+	n := int32(max(1, len(s.options)))
+	w := (f.w() - 2*pad) / n
+	out := make([]rect, len(s.options))
+	for i := range out {
+		left := f.Left + pad + int32(i)*w
+		out[i] = rect{left, f.Top + pad, left + w, f.Bottom - pad}
+	}
+	if len(out) > 0 {
+		out[len(out)-1].Right = f.Right - pad
+	}
+	return out
+}
+
+func (s segmentedRow) segments(c *canvas, r rect) []rect {
+	if s.disabled {
+		return nil
+	}
+	return s.boxes(c, r)
+}
+
+func (s segmentedRow) click(seg int) {
+	if seg >= 0 && seg < len(s.options) && seg != s.selected && s.onSelect != nil {
+		s.onSelect(seg)
+	}
+}
+
+func (s segmentedRow) paint(c *canvas, r rect, st rowState) {
+	border, selFill, selText, text := colControl, mix(colBackground, colAccent, 0.2), colAccent, colMuted
+	if s.disabled {
+		border, selFill, selText, text = colDivider, colRowHover, colCaption, colCaption
+	}
+	c.frame(s.frame(c, r), c.px(10), colBackground, border)
+	for i, box := range s.boxes(c, r) {
+		fg := text
+		switch {
+		case i == s.selected:
+			c.roundRect(box, c.px(8), selFill)
+			fg = selText
+		case !s.disabled && st.press == i:
+			c.roundRect(box, c.px(8), colRowPress)
+			fg = colText
+		case !s.disabled && st.hover == i:
+			c.roundRect(box, c.px(8), colRowHover)
+			fg = colText
+		}
+		c.text(s.options[i], box, fontBold, fg, dtCenter)
+	}
+}
+
 // --- Paragraph ---------------------------------------------------------------
 
 type paragraphRow struct {

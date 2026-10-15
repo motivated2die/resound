@@ -1,8 +1,11 @@
 package input
 
+import "time"
+
 // Hotkeys: keys the user holds or presses anywhere in Windows to pause or
-// stop Resound's sounds (see Watcher). The matching is portable and tested;
-// watching the keyboard is Windows-only (hook_windows.go).
+// stop Resound's sounds, or to open the in-game overlay (see Watcher). The
+// matching is portable and tested; watching the keyboard is Windows-only
+// (hook_windows.go).
 
 // Action is what a hotkey does.
 type Action int
@@ -10,29 +13,45 @@ type Action int
 const (
 	ActionPause Action = iota // held: pause playback; released: resume
 	ActionStop                // pressed: stop all sounds
+
+	// The overlay's events (Filter): its key pressed while it is closed
+	// opens it, pressed again plays the highlighted sound, and the wheel
+	// moves the highlight by Steps (positive: down the list). Esc going
+	// down while it is open reports EscDown; let go before EscHoldTime it
+	// closes the overlay (Close), held that long it closes it and stops
+	// all sounds (Stop).
+	ActionOverlayOpen
+	ActionOverlaySelect
+	ActionOverlayClose
+	ActionOverlayScroll
+	ActionOverlayEscDown
+	ActionOverlayStop
 )
 
+// EscHoldTime is how long Esc is held in the open overlay to stop all
+// sounds.
+const EscHoldTime = 700 * time.Millisecond
+
 func (a Action) String() string {
-	if a == ActionStop {
-		return "stop"
-	}
-	return "pause"
+	return [...]string{"pause", "stop", "overlay open", "overlay select", "overlay close", "overlay scroll", "overlay Esc down", "overlay stop"}[a]
 }
 
-// HotkeyEvent is a hotkey becoming active (Down) or inactive. Stop keys
-// only report Down.
+// HotkeyEvent is a hotkey becoming active (Down) or inactive. Stop keys and
+// the overlay's events only report Down.
 type HotkeyEvent struct {
 	Action Action
 	Down   bool
+	Steps  int // ActionOverlayScroll only
 }
 
 // Bindings are the hotkey combinations; any one of them triggers its action.
 type Bindings struct {
 	Pause, Stop []Combo
+	Overlay     Combo // opens the in-game overlay; empty = no overlay
 }
 
 // Empty reports whether no hotkey is set.
-func (b Bindings) Empty() bool { return len(b.Pause) == 0 && len(b.Stop) == 0 }
+func (b Bindings) Empty() bool { return len(b.Pause) == 0 && len(b.Stop) == 0 && len(b.Overlay) == 0 }
 
 // sameKey folds the left/right variants of Shift, Ctrl, Alt and Windows into
 // one key, so "Left Ctrl + F" also matches Right Ctrl + F.
@@ -150,3 +169,109 @@ func SameCombo(a, b Combo) bool {
 	}
 	return true
 }
+
+// The overlay takes a few inputs away from the game while it needs them,
+// and nothing else: its own key (always, as the user dedicated it to the
+// overlay), and Esc and the mouse wheel only while it is open. A key whose
+// press was swallowed has its auto-repeats and its release swallowed too,
+// so the game never sees half a key press. Of a combination, only the key
+// that completes it is swallowed; the others have reached the game already.
+//
+// Filter decides this inside the hook callback, which must answer at once,
+// so it also keeps whether the overlay is open: a quick Esc right after
+// opening is caught even before the UI thread has caught up.
+
+const (
+	vkEscape   = 0x1B
+	wheelDelta = 120 // one notch (WHEEL_DELTA); precise wheels send less per event
+)
+
+// Filter adds the overlay to a Matcher. It is not safe for concurrent use;
+// the Watcher drives it from its hook thread.
+type Filter struct {
+	Matcher
+	open        bool
+	escHeld     bool // Esc went down while open and isn't up yet
+	overlayHeld bool
+	swallowed   map[uint16]bool // keys whose press was swallowed
+	wheel       int             // wheel delta short of a whole step
+}
+
+// Key records a press or release. It returns the hotkey events it causes
+// and whether the key must be kept from the other programs.
+func (f *Filter) Key(b *Bindings, vk uint16, down bool) (events []HotkeyEvent, swallow bool) {
+	if f.swallowed == nil {
+		f.swallowed = map[uint16]bool{}
+	}
+	if f.swallowed[vk] {
+		if down {
+			return nil, true // auto-repeat
+		}
+		delete(f.swallowed, vk)
+		if vk == vkEscape && f.escHeld { // let go before EscHoldTime
+			f.SetOpen(false)
+			return []HotkeyEvent{{Action: ActionOverlayClose, Down: true}}, true
+		}
+		events = f.Matcher.Key(b, vk, false)
+		f.overlayHeld = b != nil && f.held(b.Overlay)
+		return events, true
+	}
+	if down && vk == vkEscape && f.open {
+		f.swallowed[vk] = true
+		f.escHeld = true // EscTimeout or the release decides
+		return []HotkeyEvent{{Action: ActionOverlayEscDown, Down: true}}, true
+	}
+	events = f.Matcher.Key(b, vk, down)
+	held := b != nil && f.held(b.Overlay)
+	if held && !f.overlayHeld && down {
+		f.overlayHeld = true
+		f.swallowed[vk] = true
+		action := ActionOverlayOpen
+		if f.open {
+			action = ActionOverlaySelect
+		}
+		f.SetOpen(!f.open)
+		return append(events, HotkeyEvent{Action: action, Down: true}), true
+	}
+	f.overlayHeld = held
+	return events, false
+}
+
+// Wheel records a mouse wheel turn (delta as in WM_MOUSEWHEEL: positive
+// away from the user). While the overlay is open it is swallowed and moves
+// the highlight a step per notch.
+func (f *Filter) Wheel(delta int) (events []HotkeyEvent, swallow bool) {
+	if !f.open {
+		return nil, false
+	}
+	f.wheel += delta
+	steps := f.wheel / wheelDelta
+	f.wheel -= steps * wheelDelta
+	if steps == 0 {
+		return nil, true
+	}
+	return []HotkeyEvent{{Action: ActionOverlayScroll, Down: true, Steps: -steps}}, true
+}
+
+// EscTimeout is called EscHoldTime after ActionOverlayEscDown. With Esc
+// still held in the open overlay, it closes it and stops the sounds; its
+// release is swallowed later.
+func (f *Filter) EscTimeout() []HotkeyEvent {
+	if !f.escHeld || !f.open {
+		return nil
+	}
+	f.SetOpen(false)
+	return []HotkeyEvent{{Action: ActionOverlayStop, Down: true}}
+}
+
+// EscHeld reports whether Esc is held in the open overlay.
+func (f *Filter) EscHeld() bool { return f.escHeld }
+
+// SetOpen records that the overlay was opened or closed (also by the app,
+// e.g. its preview button).
+func (f *Filter) SetOpen(open bool) {
+	f.open, f.wheel, f.escHeld = open, 0, false
+}
+
+// Open reports whether the overlay is open.
+func (f *Filter) Open() bool { return f.open }

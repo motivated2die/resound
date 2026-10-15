@@ -50,7 +50,16 @@ type Sound struct {
 	Fingerprint string
 	// Duration is known once the indexer probed the file (0 before).
 	Duration time.Duration
+	// Level is the measured loudness, nil until the indexer measured it.
+	Level *Level
 	SoundSettings
+}
+
+// Level is a sound's measured loudness, for normalizing it.
+type Level struct {
+	LUFS    float64 `json:"lufs"`    // integrated loudness
+	Peak    float64 `json:"peak"`    // level only the loudest moments exceed, dBFS
+	Version int     `json:"version"` // of the measurement (Indexer.LevelVersion)
 }
 
 // SoundSettings are the user's per-sound choices. They follow the sound
@@ -117,6 +126,7 @@ type Library struct {
 	sounds   map[uint64]*soundRec // every record, present or tombstoned
 	tabs     map[uint64]*tabRec
 	layouts  map[string]*Layout
+	tabOrder []uint64          // the phone's arrangement of the tabs (taborder.go)
 	byPath   map[string]uint64 // normalized path -> sound ID (all records)
 	order    []uint64          // present tabs in display order
 	tabSnd   map[uint64][]uint64
@@ -321,14 +331,15 @@ func (l *Library) FindPath(path string) (uint64, bool) {
 	return id, true
 }
 
-// ResetAppearance clears every sound's color and emoji and every layout.
-// Favorites and volumes are kept.
+// ResetAppearance clears every sound's color and emoji, every layout and
+// the phone's tab order. Favorites and volumes are kept.
 func (l *Library) ResetAppearance() error {
 	l.mu.Lock()
 	for _, r := range l.sounds {
 		r.Settings.Color, r.Settings.Emoji = "", ""
 	}
 	clear(l.layouts)
+	l.tabOrder = nil
 	l.revision++
 	l.mu.Unlock()
 	return l.saver.schedule()
@@ -403,8 +414,8 @@ func (l *Library) UpdateLayout(key string, fn func(*Layout)) (Layout, error) {
 }
 
 // MarkChanged records that a sound's file changed on disk (new size or
-// modification time) without waiting for the next scan. Its fingerprint and
-// duration are cleared, so the indexer reads it again.
+// modification time) without waiting for the next scan. Its fingerprint,
+// duration and level are cleared, so the indexer reads it again.
 func (l *Library) MarkChanged(id uint64, size int64, mod time.Time) {
 	l.mu.Lock()
 	r, ok := l.sounds[id]
@@ -413,7 +424,7 @@ func (l *Library) MarkChanged(id uint64, size int64, mod time.Time) {
 		return
 	}
 	r.Size, r.ModTime = size, mod
-	r.Fingerprint, r.DurationMs, r.ExactLength = "", 0, false
+	r.Fingerprint, r.DurationMs, r.ExactLength, r.Level = "", 0, false, nil
 	l.revision++
 	l.mu.Unlock()
 	_ = l.saver.schedule()
@@ -452,6 +463,21 @@ func (l *Library) SetDuration(id uint64, size int64, mod time.Time, d time.Durat
 	}
 	r.DurationMs, r.ExactLength = ms, exact
 	l.revision++
+	l.mu.Unlock()
+	_ = l.saver.schedule()
+}
+
+// SetLevel stores a sound's measured loudness, if its file is still the one
+// with this size and modification time. The phone doesn't show it, so the
+// revision stays.
+func (l *Library) SetLevel(id uint64, size int64, mod time.Time, lv Level) {
+	l.mu.Lock()
+	r, ok := l.sounds[id]
+	if !ok || r.Size != size || !r.ModTime.Equal(mod) || (r.Level != nil && *r.Level == lv) {
+		l.mu.Unlock()
+		return
+	}
+	r.Level = &lv
 	l.mu.Unlock()
 	_ = l.saver.schedule()
 }

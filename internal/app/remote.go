@@ -43,7 +43,14 @@ type remotePlayer struct{ a *App }
 var _ server.Player = remotePlayer{}
 
 func (r remotePlayer) Play(soundID uint64, preview bool) (server.Started, error) {
-	a := r.a
+	return r.a.playSound(soundID, preview)
+}
+
+// playSound plays a library sound for everyone, or for the user only
+// (preview), as the phone and the in-game overlay do. It decodes on the
+// calling goroutine and starts on the UI thread, so it must not be called
+// from the UI thread.
+func (a *App) playSound(soundID uint64, preview bool) (server.Started, error) {
 	snd, _, ok := a.lib.Sound(soundID)
 	if !ok {
 		return server.Started{}, server.ErrNotFound
@@ -57,7 +64,8 @@ func (r remotePlayer) Play(soundID uint64, preview bool) (server.Started, error)
 	}
 	size, mod := info0.Size(), info0.ModTime()
 	length := snd.Duration
-	if size != snd.Size || !mod.Equal(snd.Modified) {
+	changed := size != snd.Size || !mod.Equal(snd.Modified)
+	if changed {
 		a.lib.MarkChanged(soundID, size, mod)
 		a.indexer.Kick()
 		length = 0
@@ -68,6 +76,9 @@ func (r remotePlayer) Play(soundID uint64, preview bool) (server.Started, error)
 		// Decoding to the end gives the exact length (probes of VBR files
 		// without a VBR header are estimates).
 		OnDecoded: func(d time.Duration) { a.lib.SetDuration(soundID, size, mod, d, true) },
+	}
+	if !changed { // an edited file's level is measured again first
+		ref.Gain = a.normGain(snd.Level)
 	}
 	var roles []string
 	if preview {
@@ -222,16 +233,23 @@ func (a *App) rescan() {
 
 // --- indexer ------------------------------------------------------------
 
-// startIndexer fingerprints new sounds and reads their lengths from the file
-// headers in the background.
+// startIndexer fingerprints new sounds, reads their lengths from the file
+// headers and measures their loudness in the background.
 func (a *App) startIndexer() {
 	ix := library.NewIndexer(a.lib, audio.ProbeDuration)
+	ix.Measure, ix.LevelVersion = measureLevel, audio.LoudnessVersion
 	ix.Logf = logx.Printf
 	ix.OnProgress = func() { a.tray.Post(a.renderIndexProgress) }
 	a.indexer = ix
 	a.lib.OnChange = ix.Kick
 	ix.Start()
 	go removeOldCache()
+}
+
+// measureLevel adapts audio.MeasureLoudness to the indexer.
+func measureLevel(path string) (library.Measurement, error) {
+	l, err := audio.MeasureLoudness(path)
+	return library.Measurement{LUFS: l.LUFS, Peak: l.Peak, Length: l.Length, Exact: l.Complete}, err
 }
 
 // removeOldCache deletes the decoded-audio cache of 0.6 development builds

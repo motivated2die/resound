@@ -225,18 +225,31 @@ func (m *Mixer) Read(out []float32) {
 	m.voices = kept
 	m.mu.Unlock()
 
-	// Hard clip. A limiter can replace this later.
 	var outPeak float32
 	for i, s := range out {
-		if s > 1 {
-			out[i] = 1
-		} else if s < -1 {
-			out[i] = -1
+		if s > clipKnee || s < -clipKnee {
+			out[i] = softClip(s)
 		}
 		outPeak = max(outPeak, abs32(out[i]))
 	}
 	m.srcPeak.raise(srcPeak)
 	m.outPeak.raise(outPeak)
+}
+
+// clipKnee is where the soft clipper starts: samples up to it pass
+// unchanged, louder ones are bent smoothly towards full scale.
+const clipKnee = 0.9
+
+// softClip limits a sample above clipKnee to below ±1 along a tanh curve
+// that continues the straight line's slope at the knee. A transient that
+// overshoots (a sharp impact in a boosted quiet sound, or several sounds at
+// once) is rounded off instead of cut flat, which sounds far less harsh.
+func softClip(s float32) float32 {
+	const room = 1 - clipKnee
+	if s > 0 {
+		return clipKnee + room*float32(math.Tanh(float64(s-clipKnee)/room))
+	}
+	return -clipKnee - room*float32(math.Tanh(float64(-s-clipKnee)/room))
 }
 
 // takePeaks returns the loudest voice before the master volume and the

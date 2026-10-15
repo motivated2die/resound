@@ -12,10 +12,16 @@ import (
 )
 
 // Watcher watches the keyboard for hotkeys with a low-level keyboard hook
-// (WH_KEYBOARD_LL) on its own thread. The hook only observes: every key
-// still reaches the game, which matters because a pause key is usually
-// the game's push-to-talk for another channel. RegisterHotKey would
-// swallow the key instead.
+// (WH_KEYBOARD_LL) on its own thread. For pause and stop keys the hook only
+// observes: every key still reaches the game, which matters because a pause
+// key is usually the game's push-to-talk for another channel.
+// RegisterHotKey would swallow the key instead.
+//
+// The overlay is the exception (Filter): its key, and Esc and the mouse
+// wheel while it is open, are kept from the game. The wheel needs a
+// low-level mouse hook (WH_MOUSE_LL), installed only while the overlay is
+// open. Swallowing in a low-level hook keeps the input from every program,
+// raw input (most games) included.
 //
 // Resound's own push-to-talk presses carry a marker (sendMarker) and are
 // ignored, so they can never trigger a hotkey. Like SendInput, the hook does
@@ -43,7 +49,14 @@ var (
 
 const (
 	whKeyboardLL = 13
+	whMouseLL    = 14
 	wmQuit       = 0x0012
+	wmApp        = 0x8000
+	wmMouseWheel = 0x020A
+
+	// Thread messages to the hook thread.
+	wmSyncMouse  = wmApp + 1 // install or remove the mouse hook to match the overlay
+	wmSetOverlay = wmApp + 2 // wParam 1: the app opened the overlay, 0: closed it
 	wmTimer      = 0x0113
 	wmKeyDown    = 0x0100
 	wmSysKeyDown = 0x0104
@@ -65,34 +78,102 @@ type kbdLLHookStruct struct {
 	ExtraInfo uintptr
 }
 
-// The hook callback is a plain function; it finds its watcher here. Only
-// one Watcher runs at a time.
+// msLLHookStruct mirrors MSLLHOOKSTRUCT.
+type msLLHookStruct struct {
+	Pt        struct{ X, Y int32 }
+	MouseData uint32
+	Flags     uint32
+	Time      uint32
+	ExtraInfo uintptr
+}
+
+// The hook callbacks are plain functions; they find their watcher here.
+// Only one Watcher runs at a time.
 var (
 	activeMu sync.Mutex
 	active   *hookThread
 )
 
 type hookThread struct {
-	w       *Watcher
-	hook    uintptr
-	matcher Matcher
+	w         *Watcher
+	hook      uintptr
+	mouseHook uintptr // only while the overlay is open
+	escTimer  uintptr // thread timer for holding Esc (EscHoldTime), 0 = none
+	filter    Filter
+}
+
+func activeThread() *hookThread {
+	activeMu.Lock()
+	defer activeMu.Unlock()
+	return active
 }
 
 var hookCallback = windows.NewCallback(func(code, wparam uintptr, k *kbdLLHookStruct) uintptr {
 	if int32(code) >= 0 {
-		activeMu.Lock()
-		t := active
-		activeMu.Unlock()
-		if t != nil {
-			if k.ExtraInfo != sendMarker && k.VKCode > 0 && k.VKCode < 0xFF {
-				down := (wparam == wmKeyDown || wparam == wmSysKeyDown) && k.Flags&llkhfUp == 0
-				t.deliver(t.matcher.Key(t.w.bindings.Load(), uint16(k.VKCode), down))
+		if t := activeThread(); t != nil && k.ExtraInfo != sendMarker && k.VKCode > 0 && k.VKCode < 0xFF {
+			down := (wparam == wmKeyDown || wparam == wmSysKeyDown) && k.Flags&llkhfUp == 0
+			wasOpen := t.filter.Open()
+			events, swallow := t.filter.Key(t.w.bindings.Load(), uint16(k.VKCode), down)
+			t.deliver(events)
+			t.timeEsc(events)
+			if t.filter.Open() != wasOpen {
+				t.syncMouseLater()
+			}
+			if swallow {
+				return 1
 			}
 		}
 	}
 	r, _, _ := procCallNextHookEx.Call(0, code, wparam, uintptr(unsafe.Pointer(k)))
 	return r
 })
+
+var mouseCallback = windows.NewCallback(func(code, wparam uintptr, m *msLLHookStruct) uintptr {
+	if int32(code) >= 0 && wparam == wmMouseWheel {
+		if t := activeThread(); t != nil {
+			events, swallow := t.filter.Wheel(int(int16(m.MouseData >> 16)))
+			t.deliver(events)
+			if swallow {
+				return 1
+			}
+		}
+	}
+	r, _, _ := procCallNextHookEx.Call(0, code, wparam, uintptr(unsafe.Pointer(m)))
+	return r
+})
+
+// timeEsc starts (or restarts) the Esc hold timer when Esc goes down in
+// the open overlay, and stops it when it is let go early.
+func (t *hookThread) timeEsc(events []HotkeyEvent) {
+	for _, ev := range events {
+		switch {
+		case ev.Action == ActionOverlayEscDown:
+			t.escTimer, _, _ = procSetTimer.Call(0, t.escTimer, uintptr(EscHoldTime.Milliseconds()), 0)
+		case ev.Action == ActionOverlayClose && t.escTimer != 0:
+			procKillTimer.Call(0, t.escTimer)
+			t.escTimer = 0
+		}
+	}
+}
+
+// syncMouseLater has the message loop install or remove the mouse hook
+// (not from inside a hook callback).
+func (t *hookThread) syncMouseLater() {
+	procPostThreadMessageW.Call(uintptr(t.w.threadID), wmSyncMouse, 0, 0)
+}
+
+// syncMouse installs the mouse hook while the overlay is open and removes
+// it once it closes. Hook thread.
+func (t *hookThread) syncMouse() {
+	switch open := t.filter.Open(); {
+	case open && t.mouseHook == 0:
+		module, _, _ := procGetModuleHandleW.Call(0)
+		t.mouseHook, _, _ = procSetWindowsHookExW.Call(whMouseLL, mouseCallback, module, 0)
+	case !open && t.mouseHook != 0:
+		procUnhookWindowsHookEx.Call(t.mouseHook)
+		t.mouseHook = 0
+	}
+}
 
 // deliver passes events on. onEvent must return quickly (Windows drops a
 // hook whose callback is slow), e.g. by posting to the UI thread.
@@ -154,12 +235,25 @@ func (w *Watcher) run(started chan<- error) {
 		if int32(r) <= 0 { // WM_QUIT or error
 			break
 		}
-		if msg.Message == wmTimer {
+		switch {
+		case msg.Message == wmTimer && t.escTimer != 0 && msg.WParam == t.escTimer:
+			procKillTimer.Call(0, t.escTimer)
+			t.escTimer = 0
+			t.deliver(t.filter.EscTimeout())
+			t.syncMouse()
+		case msg.Message == wmTimer:
 			t.releaseStale()
+		case msg.Message == wmSetOverlay:
+			t.filter.SetOpen(msg.WParam == 1)
+			t.syncMouse()
+		case msg.Message == wmSyncMouse:
+			t.syncMouse()
 		}
 	}
 
 	procKillTimer.Call(0, timer)
+	t.filter.SetOpen(false)
+	t.syncMouse()
 	activeMu.Lock()
 	active = nil
 	activeMu.Unlock()
@@ -168,9 +262,10 @@ func (w *Watcher) run(started chan<- error) {
 
 // releaseStale treats keys that aren't down any more as released.
 func (t *hookThread) releaseStale() {
-	for _, vk := range t.matcher.Held() {
+	for _, vk := range t.filter.Held() {
 		if s, _, _ := procGetAsyncKeyState.Call(uintptr(vk)); s&0x8000 == 0 {
-			t.deliver(t.matcher.Key(t.w.bindings.Load(), vk, false))
+			events, _ := t.filter.Key(t.w.bindings.Load(), vk, false)
+			t.deliver(events)
 		}
 	}
 }
@@ -178,6 +273,17 @@ func (t *hookThread) releaseStale() {
 // SetBindings replaces the bindings. A pause key held at that moment that
 // no longer is a binding reports its release with the next key event.
 func (w *Watcher) SetBindings(b Bindings) { w.bindings.Store(&b) }
+
+// SetOverlayOpen tells the hook that the app opened or closed the overlay
+// itself (its preview button), so Esc and the wheel are taken while it is
+// open. Keys pressed meanwhile are judged by the hook's own state.
+func (w *Watcher) SetOverlayOpen(open bool) {
+	var wp uintptr
+	if open {
+		wp = 1
+	}
+	procPostThreadMessageW.Call(uintptr(w.threadID), wmSetOverlay, wp, 0)
+}
 
 // Close removes the hook and waits for its thread to end.
 func (w *Watcher) Close() {

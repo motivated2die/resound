@@ -7,6 +7,7 @@ toolchain go1.27.1
 require (
 	github.com/go-ole/go-ole v1.3.0
 	github.com/gopxl/beep/v2 v2.1.1
+	github.com/hajimehoshi/go-mp3 v0.3.4
 	github.com/moutend/go-wca v0.3.0
 	github.com/pion/ice/v4 v4.4.7
 	github.com/pion/logging v0.2.4
@@ -22,7 +23,6 @@ require (
 
 require (
 	github.com/google/uuid v1.6.0 // indirect
-	github.com/hajimehoshi/go-mp3 v0.3.4 // indirect
 	github.com/icza/bitio v1.1.0 // indirect
 	github.com/jfreymuth/oggvorbis v1.0.5 // indirect
 	github.com/jfreymuth/vorbis v1.0.2 // indirect

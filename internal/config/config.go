@@ -66,6 +66,17 @@ type Config struct {
 	// NoUpdateCheck turns off the automatic check for new releases on
 	// GitHub ("Check now" still works).
 	NoUpdateCheck bool `json:"noUpdateCheck,omitempty"`
+	// NoNormalize plays sounds at their own loudness instead of evening
+	// them out (audio.NormGain).
+	NoNormalize bool `json:"noNormalize,omitempty"`
+	// OverlayKeys opens the in-game overlay of favorites (a key
+	// combination, like PushToTalkKeys). Empty = no overlay.
+	OverlayKeys []uint16 `json:"overlayKeys,omitempty"`
+	// OverlayRight puts the overlay at the right screen edge (else the left).
+	OverlayRight bool `json:"overlayRight,omitempty"`
+	// OverlayLast is the sound last highlighted in the overlay, highlighted
+	// again when it opens. 0 = the middle one.
+	OverlayLast uint64 `json:"overlayLast,omitempty"`
 }
 
 // Default returns the configuration used on first start.
