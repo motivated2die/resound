@@ -68,7 +68,7 @@ func (s *Server) handleLibrary(w http.ResponseWriter, r *http.Request) {
 	defLocal, _ := s.player.DefaultVolumes()
 	tabs := []map[string]any{}
 	sounds := []map[string]any{}
-	for _, t := range s.lib.Tabs() {
+	for _, t := range s.lib.PhoneTabs() {
 		ids := make([]uint64, 0, len(t.Sounds))
 		for _, snd := range t.Sounds {
 			ids = append(ids, snd.ID)
@@ -202,6 +202,28 @@ func (s *Server) handleSetLayout(w http.ResponseWriter, r *http.Request) {
 	resp := layoutJSON(saved)
 	resp["success"] = true
 	writeJSON(w, http.StatusOK, resp)
+}
+
+// handleTabOrder stores the phone's arrangement of its tabs (edit mode:
+// long press and drag a tab) and tells the other phones. The answer is the
+// order the phone shows now, with tabs it hadn't seen yet placed.
+func (s *Server) handleTabOrder(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		Order []uint64 `json:"order"`
+	}
+	if err := json.NewDecoder(http.MaxBytesReader(nil, r.Body, 1<<20)).Decode(&body); err != nil || len(body.Order) > 10000 {
+		writeError(w, http.StatusBadRequest, "Invalid request")
+		return
+	}
+	order, err := s.lib.SetTabOrder(body.Order)
+	if err != nil {
+		s.logf("server: saving the tab order: %v", err)
+	}
+	s.LibraryChanged()
+	if order == nil {
+		order = []uint64{}
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"success": true, "order": order})
 }
 
 // importBody carries phone settings to adopt: from an exported settings

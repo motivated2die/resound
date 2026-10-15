@@ -904,6 +904,43 @@ nav#tabs-container::-webkit-scrollbar {
   color: var(--v-primary-base);
 }
 
+/* Arranging tabs in edit mode (tab-order.js): a long press lifts a tab,
+   which then follows the finger; its place in the bar shows as a dashed
+   slot. A long press must not select the label or open the callout. */
+.edit-mode #tabs-container .tab:not(.tab-icon-only) {
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+#tabs-container .tab.tab-drag-slot {
+  color: transparent;
+  outline: 2px dashed var(--v-primary-base);
+  outline-offset: -6px;
+  border-radius: 10px;
+  background-color: rgba(var(--accent-rgb), 0.1);
+}
+
+#tabs-container .tab.tab-drag-slot .icon {
+  color: transparent;
+}
+
+/* The indicator stays out of the way while tabs move. */
+#tabs-container.tab-dragging .tab-indicator {
+  opacity: 0 !important;
+}
+
+.tab.tab-drag-copy {
+  opacity: 1 !important;
+  z-index: 1000;
+  color: var(--v-primary-base);
+  background-color: var(--v-secondary-darken1);
+  border-top-color: var(--v-primary-base);
+  border-radius: 10px;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.5);
+  pointer-events: none;
+}
+
 /* --- Bottom Header --- */
 header {
   order: 3;

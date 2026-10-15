@@ -209,6 +209,9 @@ function initTabSwiping() {
     // --- keep the active tab visible in the (scrollable) tab bar ---
     const scrollActiveTabIntoView = () => {
         if (drag && drag.dir === 'h') return; // the swipe moves the tab bar itself
+        // A tab lifted or moved in edit mode (tab-order.js) changes classes
+        // and the tab list; the bar must stay under the finger.
+        if (window.tabOrder?.isDragging() || tabsContainer.querySelector('.tab-drag-chosen, .tab-drag-slot')) return;
         tabsContainer.querySelector('.tab.active')?.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
     };
     new MutationObserver(() => setTimeout(scrollActiveTabIntoView, 50))

@@ -128,7 +128,7 @@ func (s *Server) handleLogout(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleTabs(w http.ResponseWriter, r *http.Request) {
 	s.lib.Rescan(5 * time.Second) // a reload on the phone picks up new files
 	tabs := []map[string]any{}
-	for _, t := range s.lib.Tabs() {
+	for _, t := range s.lib.PhoneTabs() { // in the order the phone arranged
 		tabs = append(tabs, map[string]any{"id": t.ID, "name": t.Name, "path": t.Path, "sortMode": 0})
 	}
 	writeJSON(w, http.StatusOK, tabs)

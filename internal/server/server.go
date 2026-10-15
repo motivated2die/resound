@@ -222,6 +222,7 @@ func (s *Server) routes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/library", s.handleLibrary)
 	mux.HandleFunc("POST /api/library/import", s.handleImport)
 	mux.HandleFunc("POST /api/library/reset-appearance", s.handleResetAppearance)
+	mux.HandleFunc("POST /api/library/tab-order", s.handleTabOrder)
 	mux.HandleFunc("POST /api/sounds/{id}/appearance", s.handleAppearance)
 	mux.HandleFunc("POST /api/layouts/{key}", s.handleSetLayout)
 }

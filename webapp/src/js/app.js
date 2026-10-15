@@ -1167,8 +1167,8 @@ async function reloadLibrary(rev) {
         try {
             // Colours, emoji, favorites and layouts of new sounds.
             await persistence.sync().catch(e => console.warn('Library reload: settings not refreshed:', e));
-            // A swipe in progress ends on the tabs it started with.
-            while (window.tabManager?.isCurrentlySwiping()) await sleep(200);
+            // A swipe or a tab drag in progress ends on the tabs it started with.
+            while (window.tabManager?.isCurrentlySwiping() || window.tabOrder?.isDragging()) await sleep(200);
             const current = String(state.currentTab);
             for (const id of [...tabSoundsCache.keys()]) {
                 if (id !== current) tabSoundsCache.delete(id);

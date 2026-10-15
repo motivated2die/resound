@@ -388,6 +388,9 @@ func (l *Library) apply(folders []string, dirs []foundDir, matches []match) bool
 	}
 
 	l.order, l.tabSnd = order, tabSnd
+	if l.arrangeTabsLocked() {
+		dirty = true
+	}
 	l.folders = slices.Clone(folders)
 	l.scanned = time.Now()
 	if l.legacy != nil {

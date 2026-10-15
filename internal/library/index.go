@@ -80,6 +80,8 @@ type indexJSON struct {
 	Tabs    map[string]*tabRec   `json:"tabs"`
 	Sounds  map[string]*soundRec `json:"sounds"`
 	Layouts map[string]*Layout   `json:"layouts,omitempty"`
+	// TabOrder is the phone's arrangement of the tabs (tab IDs).
+	TabOrder []uint64 `json:"tabOrder,omitempty"`
 }
 
 func (l *Library) indexPath() string  { return filepath.Join(l.dataDir, indexFile) }
@@ -120,6 +122,7 @@ func (l *Library) load() {
 				l.layouts[k] = lay
 			}
 		}
+		l.tabOrder = idx.TabOrder
 		l.saver.size = int64(len(data))
 		return
 	case !errors.Is(err, os.ErrNotExist):
@@ -188,10 +191,11 @@ func (l *Library) freeTabID(want uint64) uint64 {
 // marshalLocked encodes the index. Callers hold at least the read lock.
 func (l *Library) marshalLocked() ([]byte, error) {
 	idx := indexJSON{
-		Version: indexFormat,
-		Tabs:    make(map[string]*tabRec, len(l.tabs)),
-		Sounds:  make(map[string]*soundRec, len(l.sounds)),
-		Layouts: make(map[string]*Layout, len(l.layouts)),
+		Version:  indexFormat,
+		Tabs:     make(map[string]*tabRec, len(l.tabs)),
+		Sounds:   make(map[string]*soundRec, len(l.sounds)),
+		Layouts:  make(map[string]*Layout, len(l.layouts)),
+		TabOrder: l.tabOrder,
 	}
 	for id, t := range l.tabs {
 		idx.Tabs[strconv.FormatUint(id, 10)] = t

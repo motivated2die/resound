@@ -126,6 +126,7 @@ type Library struct {
 	sounds   map[uint64]*soundRec // every record, present or tombstoned
 	tabs     map[uint64]*tabRec
 	layouts  map[string]*Layout
+	tabOrder []uint64          // the phone's arrangement of the tabs (taborder.go)
 	byPath   map[string]uint64 // normalized path -> sound ID (all records)
 	order    []uint64          // present tabs in display order
 	tabSnd   map[uint64][]uint64
@@ -330,14 +331,15 @@ func (l *Library) FindPath(path string) (uint64, bool) {
 	return id, true
 }
 
-// ResetAppearance clears every sound's color and emoji and every layout.
-// Favorites and volumes are kept.
+// ResetAppearance clears every sound's color and emoji, every layout and
+// the phone's tab order. Favorites and volumes are kept.
 func (l *Library) ResetAppearance() error {
 	l.mu.Lock()
 	for _, r := range l.sounds {
 		r.Settings.Color, r.Settings.Emoji = "", ""
 	}
 	clear(l.layouts)
+	l.tabOrder = nil
 	l.revision++
 	l.mu.Unlock()
 	return l.saver.schedule()
