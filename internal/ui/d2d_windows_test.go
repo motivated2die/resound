@@ -123,13 +123,17 @@ func TestOverlayPreviewRow(t *testing.T) {
 	}
 	rows := []Row{
 		Header("In-game overlay", func() {}),
-		OverlayPreview("Press F8 in a game, scroll to a favorite and press F8 again to play it.",
-			"Esc closes the bar. Hold Esc to also stop all sounds.", false),
+		OverlayPreview(true, "F8", "Press F8 in a game, scroll to a favorite and press F8 again to play it.",
+			"Esc closes the bar. Hold Esc to also stop all sounds.",
+			"Your game keeps the focus: only the key, Esc and the mouse wheel are kept from it while the bar shows."),
 		Section("Key"),
 		Text("F8", "", ToneGood),
 		Buttons(Action{Label: "Change key"}, Action{Label: "Turn off"}),
 		Section("Screen edge"),
-		Segmented([]string{"Left", "Right"}, 1, false, func(int) {}),
+		Segmented([]string{"Left", "Right"}, 0, false, func(int) {}),
+		Section("Try it"),
+		Paragraph("See the bar with your favorites on this screen, no game needed. It works as in a game: scroll through it, press your key to play a sound, Esc to close it.", ToneMuted),
+		Button("Show the overlay", ButtonNormal, false, func() {}),
 		Section("Turned off"),
 		Segmented([]string{"Left", "Right"}, 1, true, func(int) {}),
 	}

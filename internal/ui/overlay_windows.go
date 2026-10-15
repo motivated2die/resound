@@ -67,6 +67,9 @@ type overlayScene struct {
 	hold    float64 // how far Esc has been held to stop all sounds, 0..1
 	empty   string  // the message shown without favorites
 	shadow  overlayShadow
+	// hint replaces the highlighted name, with arrows above and below it
+	// (the panel's picture: "SCROLL").
+	hint string
 }
 
 const (
@@ -123,6 +126,9 @@ func renderOverlay(sc overlayScene) (*surface, error) {
 	if k := sel - first; k >= 0 && k < vis {
 		cy := cyOf(k)
 		label := TruncateName(sc.items[sel].Name, ovNameChars)
+		if sc.hint != "" {
+			label = sc.hint
+		}
 		nameW := min(g.measure(label, nameFont), px(sc.nameMax))
 		pw := px(ovPill)/2 + px(ovDot)/2 + px(ovNameGap) + nameW + px(ovNameLead)
 		top, bottom := cy-px(ovPill)/2, cy+px(ovPill)/2
@@ -144,6 +150,14 @@ func renderOverlay(sc overlayScene) (*surface, error) {
 		p.fillRound(pill, px(ovPill)/2, pillColor)
 		if name.R > name.L {
 			p.text(label, name, nameFont, textColor)
+		}
+		if sc.hint != "" { // arrows over and under the hint: the wheel moves it
+			arrow := fontSpec{family: "Segoe UI Symbol", size: 19 * s, weight: 400, align: alignCenter}
+			mid := name.L + min(g.measure(label, nameFont), name.R-name.L)/2 // over the (left-aligned) label
+			a := rectF{mid - px(16), top - px(28), mid + px(16), top - px(4)}
+			p.text("▲", a, arrow, ovTextColor)
+			a.T, a.B = bottom+px(4), bottom+px(28)
+			p.text("▼", a, arrow, ovTextColor)
 		}
 	}
 	if err := p.end(); err != nil {

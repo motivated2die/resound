@@ -95,7 +95,7 @@ func (a *App) openOverlay() bool {
 	ids, items := a.overlayFavorites()
 	o := &a.overlay
 	o.ids, o.sel, o.open = ids, a.overlaySelection(ids), true
-	o.win.Show(items, o.sel, a.cfg.OverlayLeft, overlayEmptyText)
+	o.win.Show(items, o.sel, !a.cfg.OverlayRight, overlayEmptyText)
 	return true
 }
 
@@ -244,7 +244,7 @@ func (a *App) clearOverlayKey() {
 }
 
 func (a *App) setOverlaySide(left bool) {
-	a.cfg.OverlayLeft = left
+	a.cfg.OverlayRight = !left
 	a.save()
 	if a.overlay.open { // show it on the new side at once
 		ids, items := a.overlayFavorites()
@@ -252,7 +252,7 @@ func (a *App) setOverlaySide(left bool) {
 		a.overlay.sel = max(0, min(a.overlay.sel, len(ids)-1))
 		a.overlay.win.Hide(func() {
 			if a.overlay.open {
-				a.overlay.win.Show(items, a.overlay.sel, a.cfg.OverlayLeft, overlayEmptyText)
+				a.overlay.win.Show(items, a.overlay.sel, !a.cfg.OverlayRight, overlayEmptyText)
 			}
 		})
 	}
@@ -271,21 +271,23 @@ func (a *App) overlaySummary() (string, ui.Tone) {
 }
 
 // overlayPreviewRow is the small picture of the overlay (always the same
-// examples) with what it does and a note beside it.
-func (a *App) overlayPreviewRow(note string) ui.Row {
-	text := "Bring up your favorite sounds in any game with one key, without leaving the game."
-	if k := a.overlayKeyText(); len(a.cfg.OverlayKeys) > 0 {
-		text = "Press " + k + " in a game, scroll to a favorite and press " + k + " again to play it."
+// examples) with what it does beside it, and further paragraphs below that.
+func (a *App) overlayPreviewRow(more ...string) ui.Row {
+	text, key := "Bring up your favorite sounds in any game with one key, without leaving the game.", ""
+	if len(a.cfg.OverlayKeys) > 0 {
+		key = a.overlayKeyText()
+		text = "Press " + key + " in a game, scroll to a favorite and press " + key + " again to play it."
 	}
-	return ui.OverlayPreview(text, note, a.cfg.OverlayLeft)
+	return ui.OverlayPreview(!a.cfg.OverlayRight, key, append([]string{text}, more...)...)
 }
 
 func (a *App) overlayPage() []ui.Row {
 	p := &a.ptt
 	rows := []ui.Row{
 		ui.Header("In-game overlay", a.back),
-		a.overlayPreviewRow("Esc closes the bar. Hold Esc to also stop all sounds."),
-		ui.Paragraph("Your game keeps the focus: only the key, Esc and the mouse wheel are kept from it while the bar shows.", ui.ToneMuted),
+		a.overlayPreviewRow(
+			"Esc closes the bar. Hold Esc to also stop all sounds.",
+			"Your game keeps the focus: only the key, Esc and the mouse wheel are kept from it while the bar shows."),
 		ui.Section("Key"),
 	}
 	switch {
@@ -321,22 +323,18 @@ func (a *App) overlayPage() []ui.Row {
 	rows = append(rows,
 		ui.Section("Screen edge"),
 		// Greyed out while the overlay is off (no key).
-		ui.Segmented([]string{"Left", "Right"}, map[bool]int{true: 0, false: 1}[a.cfg.OverlayLeft],
+		ui.Segmented([]string{"Left", "Right"}, map[bool]int{false: 0, true: 1}[a.cfg.OverlayRight],
 			len(a.cfg.OverlayKeys) == 0, func(i int) { a.setOverlaySide(i == 0) }),
 		ui.Section("Try it"),
+		ui.Paragraph("See the bar with your favorites on this screen, no game needed. It works as in a game: scroll through it, press your key to play a sound, Esc to close it.", ui.ToneMuted),
 	)
 	label := "Show the overlay"
 	if a.overlay.open {
 		label = "Hide the overlay"
 	}
-	rows = append(rows,
-		ui.Button(label, ui.ButtonNormal, false, a.toggleOverlayPreview),
-		ui.Paragraph("Scroll to move the highlight while it shows. Esc closes it; holding Esc also stops all sounds.", ui.ToneMuted),
-	)
+	rows = append(rows, ui.Button(label, ui.ButtonNormal, false, a.toggleOverlayPreview))
 	if a.overlay.err != "" {
 		rows = append(rows, ui.Paragraph(a.overlay.err, ui.ToneBad))
 	}
-	return append(rows,
-		ui.Paragraph("Shows over games in borderless or windowed mode, not in exclusive fullscreen. Games running as administrator don't receive the key.", ui.ToneMuted),
-		ui.Spacer(4))
+	return append(rows, ui.Spacer(4))
 }
