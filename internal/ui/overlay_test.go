@@ -39,3 +39,30 @@ func TestInitials(t *testing.T) {
 		}
 	}
 }
+
+// The overlay never reaches past its screen while it slides in, on either
+// side, also with a screen beside it (left screen of two here).
+func TestOverlayPlacement(t *testing.T) {
+	mon := rect{0, 0, 2560, 1440}
+	const w, h, edge = 400, 600, 30
+	for _, left := range []bool{false, true} {
+		for _, p := range []float64{0, 0.25, 0.5, 1} {
+			dst, src, cw, ch := overlayPlacement(mon, w, h, left, edge, p)
+			if dst.X < mon.Left || dst.X+cw > mon.Right || dst.Y < mon.Top || dst.Y+ch > mon.Bottom {
+				t.Errorf("left=%v p=%v: shown part %d,%d %dx%d outside %+v", left, p, dst.X, dst.Y, cw, ch, mon)
+			}
+			if src.X < 0 || src.X+cw > w {
+				t.Errorf("left=%v p=%v: source %d+%d outside the frame", left, p, src.X, cw)
+			}
+		}
+		// In place the whole frame shows, flush with the screen's edge.
+		dst, src, cw, _ := overlayPlacement(mon, w, h, left, edge, 1)
+		if cw != w || src.X != 0 || (left && dst.X != 0) || (!left && dst.X+cw != mon.Right) {
+			t.Errorf("left=%v in place: dst %d src %d width %d", left, dst.X, src.X, cw)
+		}
+		// At the start the frame is moved out by edge and cut there.
+		if _, src, cw, _ := overlayPlacement(mon, w, h, left, edge, 0); cw != w-edge || (left && src.X != edge) {
+			t.Errorf("left=%v at the start: src %d width %d", left, src.X, cw)
+		}
+	}
+}

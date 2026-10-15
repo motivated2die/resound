@@ -462,7 +462,7 @@ func (a *App) libraryPage() []ui.Row {
 	overlayDetail, overlayTone := a.overlaySummary()
 	rows = append(rows,
 		ui.Section("In-game overlay"),
-		a.overlayPreviewRow(),
+		a.overlayPreviewRow("Favorites from your phone show up here, in their order there."),
 		ui.Nav("Overlay settings", overlayDetail, overlayTone, func() { a.openPage(pageOverlay) }),
 		ui.Section("Loudness"),
 		ui.Toggle("Even out the loudness of sounds", !a.cfg.NoNormalize, a.toggleNormalize),

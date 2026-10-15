@@ -17,7 +17,9 @@ import (
 //
 // Drawing goes to a surface, a top-down 32-bit DIB with premultiplied alpha,
 // as UpdateLayeredWindow and AlphaBlend take it. A DC render target draws
-// into it in pixels (96 DPI: one DIP is one pixel).
+// into it in pixels (96 DPI: one DIP is one pixel). It renders in software:
+// a hardware target copies every frame back from the GPU, which made the
+// overlay's frames almost twice as slow (4.8 ms instead of 2.7 at 150%).
 
 var (
 	d2d1                   = windows.NewLazySystemDLL("d2d1.dll")
@@ -143,7 +145,7 @@ func getD2D() (*d2d, error) {
 		Type, Format, AlphaMode uint32
 		DpiX, DpiY              float32
 		Usage, MinLevel         uint32
-	}{Format: 87 /* B8G8R8A8_UNORM */, AlphaMode: 1 /* PREMULTIPLIED */, DpiX: 96, DpiY: 96}
+	}{Type: 1 /* SOFTWARE */, Format: 87 /* B8G8R8A8_UNORM */, AlphaMode: 1 /* PREMULTIPLIED */, DpiX: 96, DpiY: 96}
 	if err := hresult(g.factory.call(d2dFactoryCreateDCRenderTarget, uintptr(unsafe.Pointer(&props)), uintptr(unsafe.Pointer(&g.rt))), "CreateDCRenderTarget"); err != nil {
 		g.dwrite.release()
 		g.factory.release()

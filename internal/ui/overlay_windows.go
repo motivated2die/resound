@@ -2,6 +2,7 @@ package ui
 
 import (
 	"fmt"
+	"strings"
 	"time"
 	"unsafe"
 
@@ -18,7 +19,11 @@ import (
 // A frame is drawn with Direct2D (d2d_windows.go) into a surface: bar,
 // buttons and highlight, then the drop shadow beneath, in Go. Sliding in
 // and out only moves the window and fades it; a frame is drawn again only
-// when the highlight changes or grows.
+// when the highlight moves or flashes, or while Esc is held.
+//
+// It slides in from the screen's very edge, fading in as it moves away
+// from it, and is clipped to the primary screen throughout: nothing of it
+// is ever drawn on a screen next to it.
 
 const (
 	overlayClass   = "ResoundOverlay"
@@ -27,7 +32,6 @@ const (
 
 	overlaySlideIn  = 130 * time.Millisecond
 	overlaySlideOut = 100 * time.Millisecond
-	overlayGrow     = 90 * time.Millisecond
 	overlayFlash    = 150 * time.Millisecond
 
 	monitorDefaultToPrimary = 1
@@ -43,19 +47,26 @@ var (
 	ovFlashOK     = rgbaF(colAccent, 1)
 	ovFlashOKText = rgbaF(colAccentText, 1)
 	ovFlashBad    = rgbaF(colDanger, 1)
+	ovHoldColor   = rgbaF(rgb(0x7A, 0x1F, 0x36), 0.97) // the bar while Esc is held to stop
 )
+
+func mixF(a, b colorF, t float64) colorF {
+	u := float32(max(0, min(1, t)))
+	return colorF{a.R + (b.R-a.R)*u, a.G + (b.G-a.G)*u, a.B + (b.B-a.B)*u, a.A + (b.A-a.A)*u}
+}
 
 // overlayScene is what one frame shows.
 type overlayScene struct {
 	items   []OverlayItem
 	sel     int
-	left    bool    // the bar at the left edge (the highlight grows right)
+	left    bool    // the bar at the left edge (the highlight reaches right)
 	scale   float64 // device pixels per logical pixel
 	maxH    int     // the bar's logical height limit
 	nameMax int     // widest name, logical
-	grow    float64 // the highlight's growth, 0..1
 	flash   int     // 0, flashOK or flashBad: the highlight confirms a play
+	hold    float64 // how far Esc has been held to stop all sounds, 0..1
 	empty   string  // the message shown without favorites
+	shadow  overlayShadow
 }
 
 const (
@@ -81,17 +92,21 @@ func renderOverlay(sc overlayScene) (*surface, error) {
 	sel := clampSelection(sc.sel, n)
 	first := overlayFirst(n, vis, sel)
 	reach := ovNameGap + sc.nameMax + ovNameLead - ovInset // past the bar's inner edge
-	w := int32(px(2*ovPad + ovBar + reach))
-	h := int32(px(2*ovPad + overlayBarHeight(vis)))
+	// The screen edge's side is padded by the bar's distance to it; the
+	// shadow beyond that would fall off the screen anyway.
+	pad := sc.shadow.pad()
+	w := int32(px(ovEdge + ovBar + reach + pad))
+	h := int32(px(2*pad + overlayBarHeight(vis)))
 	surf, err := newSurface(w, h)
 	if err != nil {
 		return nil, err
 	}
-	barL := px(ovPad)
+	barL := px(ovEdge)
 	if !sc.left {
-		barL = float32(w) - px(ovPad+ovBar)
+		barL = float32(w) - px(ovEdge+ovBar)
 	}
-	bar := rectF{barL, px(ovPad), barL + px(ovBar), px(ovPad + overlayBarHeight(vis))}
+	bar := rectF{barL, px(pad), barL + px(ovBar), px(pad + overlayBarHeight(vis))}
+	barColor := mixF(ovBarColor, ovHoldColor, sc.hold)
 	cx := barL + px(ovBar)/2
 	cyOf := func(k int) float32 { return bar.T + px(ovInset) + float32(k)*px(ovDot+ovGap) + px(ovDot)/2 }
 
@@ -100,17 +115,16 @@ func renderOverlay(sc overlayScene) (*surface, error) {
 		surf.free()
 		return nil, err
 	}
-	p.fillRound(bar, px(ovBar)/2, ovBarColor)
+	p.fillRound(bar, px(ovBar)/2, barColor)
 
-	// The highlight: a pill around the button that grows inwards.
+	// The highlight: a pill around the button reaching inwards, with the
+	// name (its first nameChars characters) beside the icon.
 	var pill rectF
 	if k := sel - first; k >= 0 && k < vis {
 		cy := cyOf(k)
-		item := sc.items[sel]
-		nameW := min(g.measure(item.Name, nameFont), px(sc.nameMax))
-		minW := px(ovPill)
-		fullW := px(ovPill)/2 + px(ovDot)/2 + px(ovNameGap) + nameW + px(ovNameLead)
-		pw := minW + (fullW-minW)*float32(sc.grow)
+		label := TruncateName(sc.items[sel].Name, ovNameChars)
+		nameW := min(g.measure(label, nameFont), px(sc.nameMax))
+		pw := px(ovPill)/2 + px(ovDot)/2 + px(ovNameGap) + nameW + px(ovNameLead)
 		top, bottom := cy-px(ovPill)/2, cy+px(ovPill)/2
 		var name rectF
 		if sc.left {
@@ -128,31 +142,33 @@ func renderOverlay(sc overlayScene) (*surface, error) {
 			pillColor = ovFlashBad
 		}
 		p.fillRound(pill, px(ovPill)/2, pillColor)
-		if a := float32(max(0, (sc.grow-0.35)/0.65)); a > 0 && name.R > name.L {
-			textColor.A = a
-			p.text(item.Name, name, nameFont, textColor)
+		if name.R > name.L {
+			p.text(label, name, nameFont, textColor)
 		}
-	}
-	for k := range vis {
-		paintOverlayButton(p, sc.items[first+k], cx, cyOf(k), px(ovDot)/2, s)
 	}
 	if err := p.end(); err != nil {
 		surf.free()
 		return nil, err
 	}
+	// The buttons on top, from a layer drawn once per list and position:
+	// laying out emoji is most of a frame's work, and frames are drawn
+	// anew while Esc is held.
+	if buttons := overlayButtons(g, sc.items[first:first+vis], bar, s); buttons != nil {
+		buttons.over(surf, int32(bar.L), int32(bar.T))
+	}
 
 	// More buttons above or below: the edge buttons fade into the bar.
 	fade := px(ovInset) + px(ovDot)*0.95
 	if first > 0 {
-		fadeInto(surf, bar, bar.T, bar.T+fade, ovBarColor)
+		fadeInto(surf, bar, bar.T, bar.T+fade, barColor)
 	}
 	if first+vis < n {
-		fadeInto(surf, bar, bar.B, bar.B-fade, ovBarColor)
+		fadeInto(surf, bar, bar.B, bar.B-fade, barColor)
 	}
 	shadow := newShadowLayer(surf)
-	shadow.add(bar, px(ovBar)/2, s)
+	shadow.add(bar, px(ovBar)/2, s, sc.shadow)
 	if pill.R > pill.L {
-		shadow.add(pill, px(ovPill)/2, s)
+		shadow.add(pill, px(ovPill)/2, s, sc.shadow)
 	}
 	shadow.under(surf)
 	return surf, nil
@@ -164,28 +180,97 @@ func renderOverlayEmpty(g *d2d, sc overlayScene, font fontSpec) (*surface, error
 	s := float32(sc.scale)
 	px := func(v int) float32 { return float32(v) * s }
 	textW := g.measure(sc.empty, font)
-	w := int32(px(2*ovPad+2*ovNameLead) + textW)
-	h := int32(px(2*ovPad + ovPill))
+	pad := sc.shadow.pad()
+	w := int32(px(ovEdge+pad+2*ovNameLead) + textW)
+	h := int32(px(2*pad + ovPill))
 	surf, err := newSurface(w, h)
 	if err != nil {
 		return nil, err
 	}
-	pill := rectF{px(ovPad), px(ovPad), float32(w) - px(ovPad), float32(h) - px(ovPad)}
+	pill := rectF{px(ovEdge), px(pad), float32(w) - px(pad), float32(h) - px(pad)}
+	if !sc.left {
+		pill.L, pill.R = px(pad), float32(w)-px(ovEdge)
+	}
 	p, err := g.begin(surf)
 	if err != nil {
 		surf.free()
 		return nil, err
 	}
-	p.fillRound(pill, px(ovPill)/2, ovBarColor)
+	p.fillRound(pill, px(ovPill)/2, mixF(ovBarColor, ovHoldColor, sc.hold))
 	p.text(sc.empty, rectF{pill.L + px(ovNameLead), pill.T, pill.R - px(ovNameLead) + 4, pill.B}, font, ovMutedColor)
 	if err := p.end(); err != nil {
 		surf.free()
 		return nil, err
 	}
 	shadow := newShadowLayer(surf)
-	shadow.add(pill, px(ovPill)/2, s)
+	shadow.add(pill, px(ovPill)/2, s, sc.shadow)
 	shadow.under(surf)
 	return surf, nil
+}
+
+// buttonsCache holds the last buttons layer.
+var buttonsCache struct {
+	key  string
+	surf *surface
+}
+
+// overlayButtons returns a bar-sized layer with the buttons of items.
+func overlayButtons(g *d2d, items []OverlayItem, bar rectF, s float32) *surface {
+	w, h := int32(bar.R-bar.L+0.5), int32(bar.B-bar.T+0.5)
+	var key strings.Builder
+	fmt.Fprintf(&key, "%d|%d|%.3f", w, h, s)
+	for _, it := range items {
+		fmt.Fprintf(&key, "|%s\x00%s\x00%s", it.Name, it.Emoji, it.Color)
+	}
+	if buttonsCache.surf != nil && buttonsCache.key == key.String() {
+		return buttonsCache.surf
+	}
+	surf, err := newSurface(w, h)
+	if err != nil {
+		return nil
+	}
+	p, err := g.begin(surf)
+	if err != nil {
+		surf.free()
+		return nil
+	}
+	px := func(v int) float32 { return float32(v) * s }
+	for k, it := range items {
+		cy := px(ovInset) + float32(k)*px(ovDot+ovGap) + px(ovDot)/2
+		paintOverlayButton(p, it, float32(w)/2, cy, px(ovDot)/2, s)
+	}
+	if err := p.end(); err != nil {
+		surf.free()
+		return nil
+	}
+	buttonsCache.surf.free()
+	buttonsCache.key, buttonsCache.surf = key.String(), surf
+	return surf
+}
+
+// over composites the surface (premultiplied) over dst at x, y.
+func (s *surface) over(dst *surface, x, y int32) {
+	for row := range s.h {
+		ty := y + row
+		if ty < 0 || ty >= dst.h {
+			continue
+		}
+		for col := range s.w {
+			tx := x + col
+			if tx < 0 || tx >= dst.w {
+				continue
+			}
+			i := 4 * (int(row)*int(s.w) + int(col))
+			a := uint32(s.bits[i+3])
+			if a == 0 {
+				continue
+			}
+			j := 4 * (int(ty)*int(dst.w) + int(tx))
+			for c := range 4 {
+				dst.bits[j+c] = uint8(uint32(s.bits[i+c]) + uint32(dst.bits[j+c])*(255-a)/255)
+			}
+		}
+	}
 }
 
 // paintOverlayButton draws a round button: the sound's color with its emoji
@@ -232,12 +317,41 @@ func newShadowLayer(surf *surface) *shadowLayer {
 	return &shadowLayer{w: surf.w, h: surf.h, alpha: make([]uint8, int(surf.w)*int(surf.h))}
 }
 
-// add casts the shadow of a rounded rectangle.
-func (l *shadowLayer) add(r rectF, radius, s float32) {
-	blur, off := int(14*s+0.5), int(4*s+0.5)
+// shadowKey identifies a blurred mask; frames often reuse them (the bar's
+// while Esc is held, the highlight's while it moves).
+type shadowKey struct {
+	w, h, pad, blur, off, corner int
+	opacity                      float64
+}
+
+type shadowMasks struct {
+	mask   []uint8
+	cw, ch int
+}
+
+var shadowCache = map[shadowKey]shadowMasks{}
+
+// add casts the shadow of a rounded rectangle (s: device pixels per
+// logical pixel).
+func (l *shadowLayer) add(r rectF, radius, s float32, spec overlayShadow) {
+	px := func(v int) int { return int(float32(v)*s + 0.5) }
+	blur, off, spread := px(spec.blur), px(spec.offY), px(spec.spread)
+	r = rectF{r.L - float32(spread), r.T - float32(spread), r.R + float32(spread), r.B + float32(spread)}
 	pad := blur + off
-	w, h := int(r.R-r.L+0.5), int(r.B-r.T+0.5)
-	mask, cw, ch := shadowMask(w, h, pad, blur, off, int(radius+0.5), 0.5)
+	k := shadowKey{int(r.R - r.L + 0.5), int(r.B - r.T + 0.5), pad, blur, off, int(radius+0.5) + spread, spec.opacity}
+	m, ok := shadowCache[k]
+	if !ok {
+		if len(shadowCache) > 32 {
+			clear(shadowCache)
+		}
+		m.mask, m.cw, m.ch = shadowMask(k.w, k.h, pad, blur, off, k.corner, spec.opacity)
+		limit := uint8(spec.maxAlpha*255 + 0.5)
+		for i, a := range m.mask {
+			m.mask[i] = min(a, limit)
+		}
+		shadowCache[k] = m
+	}
+	mask, cw, ch := m.mask, m.cw, m.ch
 	ox, oy := int(r.L+0.5)-pad, int(r.T+0.5)-pad
 	for y := range ch {
 		ty := oy + y
@@ -291,8 +405,9 @@ type Overlay struct {
 
 	phase      overlayPhase
 	phaseStart time.Time
-	growStart  time.Time
 	flashAt    time.Time // when the confirming flash began
+	holdStart  time.Time // when Esc went down to stop all sounds; zero = not held
+	holdFor    time.Duration
 	timer      bool
 	onHidden   func()
 }
@@ -349,12 +464,13 @@ func (o *Overlay) Show(items []OverlayItem, sel int, left bool, empty string) {
 	o.scene = overlayScene{
 		items: items, sel: clampSelection(sel, len(items)), left: left, scale: scale,
 		maxH: int(float64(mon.h()) / scale * ovMaxShare), nameMax: ovNameMax, empty: empty,
+		shadow: ovShadowGame,
 	}
+	o.holdStart = time.Time{}
 	now := time.Now()
 	if o.phase == ovHidden || o.phase == ovHiding {
 		o.phase, o.phaseStart = ovShowing, now
 	}
-	o.growStart = now
 	o.flashAt, o.onHidden = time.Time{}, nil // opened again during a flash or slide-out
 	o.render()
 	o.present(o.slide(now))
@@ -363,15 +479,15 @@ func (o *Overlay) Show(items []OverlayItem, sel int, left bool, empty string) {
 	o.startTimer()
 }
 
-// SetSelected moves the highlight; it grows anew at its new place.
+// SetSelected moves the highlight, at once.
 func (o *Overlay) SetSelected(sel int) {
 	sel = clampSelection(sel, len(o.scene.items))
 	if sel == o.scene.sel || !o.Visible() {
 		return
 	}
 	o.scene.sel, o.scene.flash = sel, 0
-	o.growStart = time.Now()
-	o.startTimer()
+	o.render()
+	o.present(o.slide(time.Now()))
 }
 
 // Confirm flashes the highlight (green when the sound plays, red when it
@@ -380,13 +496,24 @@ func (o *Overlay) Confirm(ok bool) {
 	if !o.Visible() {
 		return
 	}
-	o.scene.flash, o.scene.grow = flashOK, 1
+	o.scene.flash = flashOK
 	if !ok {
 		o.scene.flash = flashBad
 	}
 	o.flashAt = time.Now()
 	o.render()
 	o.present(o.slide(time.Now()))
+	o.startTimer()
+}
+
+// HoldToStop starts tinting the bar towards red while Esc is held for d to
+// stop all sounds; the app closes the overlay when the time is up or Esc is
+// let go.
+func (o *Overlay) HoldToStop(d time.Duration) {
+	if !o.Visible() {
+		return
+	}
+	o.holdStart, o.holdFor = time.Now(), d
 	o.startTimer()
 }
 
@@ -457,16 +584,18 @@ func (o *Overlay) tick() {
 		o.Hide(nil)
 		p = o.slide(now)
 	}
-	grow := easeOut(float64(now.Sub(o.growStart)) / float64(overlayGrow))
-	if o.scene.flash != 0 {
-		grow = 1
+	hold := o.scene.hold
+	if !o.holdStart.IsZero() {
+		t := min(1, float64(now.Sub(o.holdStart))/float64(o.holdFor))
+		hold = t * t // slow at first: a quick tap barely tints
 	}
-	if grow != o.scene.grow {
-		o.scene.grow = grow
+	if hold != o.scene.hold {
+		o.scene.hold = hold
 		o.render()
 	}
 	o.present(p)
-	if o.phase == ovShown && grow >= 1 && o.flashAt.IsZero() {
+	holding := !o.holdStart.IsZero() && hold < 1
+	if o.phase == ovShown && o.flashAt.IsZero() && !holding {
 		o.stopTimer()
 	}
 }
@@ -486,20 +615,14 @@ func (o *Overlay) present(p float64) {
 	if o.surf == nil {
 		return
 	}
-	s := o.scene.scale
-	edge := int32(float64(ovEdge-ovPad) * s) // the shadow's padding reaches past the margin
-	travel := int32(float64(ovEdge+ovBar) * s * (1 - p))
-	y := o.mon.Top + (o.mon.h()-o.surf.h)/2
-	x := o.mon.Right - edge - o.surf.w + travel
-	if o.scene.left {
-		x = o.mon.Left + edge - travel
+	dst, src, w, h := overlayPlacement(o.mon, o.surf.w, o.surf.h, o.scene.left, int32(float64(ovEdge)*o.scene.scale), p)
+	if w <= 0 || h <= 0 {
+		return
 	}
 	screen, _, _ := procGetDC.Call(0)
 	mem, _, _ := procCreateCompatibleDC.Call(screen)
 	old, _, _ := procSelectObject.Call(mem, o.surf.bmp)
-	dst := point{x, y}
-	size := struct{ CX, CY int32 }{o.surf.w, o.surf.h}
-	var src point
+	size := struct{ CX, CY int32 }{w, h}
 	alpha := uint32(max(0, min(255, p*255)))
 	blend := uint32(0 | 0<<8 | alpha<<16 | 1<<24) // AC_SRC_OVER, constant alpha, AC_SRC_ALPHA
 	procUpdateLayeredWindow.Call(o.hwnd, screen, uintptr(unsafe.Pointer(&dst)), uintptr(unsafe.Pointer(&size)),

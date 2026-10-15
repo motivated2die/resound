@@ -11,7 +11,9 @@ import (
 
 // The in-game overlay: one key slides a bar of the favorites in at the edge
 // of the primary screen; the mouse wheel moves the highlight, the key again
-// plays the highlighted sound, Esc closes it. It never takes the focus from
+// plays the highlighted sound, Esc closes it. Holding Esc for
+// input.EscHoldTime closes it and stops all sounds; the bar turns red
+// meanwhile. It never takes the focus from
 // the game, and only its key, Esc and the wheel are kept from the game
 // while it is open (input.Filter decides that in the keyboard hook). It is
 // on while a key is set for it.
@@ -137,7 +139,15 @@ func (a *App) onOverlayEvent(ev input.HotkeyEvent) bool {
 		}
 	case input.ActionOverlaySelect:
 		a.selectOverlay()
+	case input.ActionOverlayEscDown:
+		if o.open {
+			o.win.HoldToStop(input.EscHoldTime)
+		}
 	case input.ActionOverlayClose:
+		a.closeOverlay()
+	case input.ActionOverlayStop:
+		logx.Printf("overlay: Esc held, stopping all sounds")
+		a.stopAll()
 		a.closeOverlay()
 	default:
 		return false
@@ -260,35 +270,22 @@ func (a *App) overlaySummary() (string, ui.Tone) {
 	return a.overlayKeyText(), ui.ToneGood
 }
 
-// overlayPreviewRow is the small picture of the overlay with what it does,
-// showing the first favorites (or examples without any).
-func (a *App) overlayPreviewRow() ui.Row {
-	ids, items := a.overlayFavorites()
-	sel := a.overlaySelection(ids)
-	if len(items) == 0 {
-		items = []ui.OverlayItem{
-			{Name: "Airhorn", Emoji: "📯", Color: "red"}, {Name: "Bruh", Emoji: "😠"},
-			{Name: "Drumroll", Emoji: "🥁", Color: "yellow"}, {Name: "Sad trombone", Color: "blue"},
-			{Name: "Applause", Emoji: "👏", Color: "green"},
-		}
-		sel = 1
-	}
-	// The picture shows five at most, around the highlight.
-	first := max(0, min(sel-2, len(items)-5))
-	items, sel = items[first:first+min(5, len(items))], sel-first
+// overlayPreviewRow is the small picture of the overlay (always the same
+// examples) with what it does and a note beside it.
+func (a *App) overlayPreviewRow(note string) ui.Row {
 	text := "Bring up your favorite sounds in any game with one key, without leaving the game."
 	if k := a.overlayKeyText(); len(a.cfg.OverlayKeys) > 0 {
-		text = "Press " + k + " in a game, scroll to a favorite and press " + k + " again to play it. Esc closes the bar."
+		text = "Press " + k + " in a game, scroll to a favorite and press " + k + " again to play it."
 	}
-	return ui.OverlayPreview(text, items, sel, a.cfg.OverlayLeft)
+	return ui.OverlayPreview(text, note, a.cfg.OverlayLeft)
 }
 
 func (a *App) overlayPage() []ui.Row {
 	p := &a.ptt
 	rows := []ui.Row{
 		ui.Header("In-game overlay", a.back),
-		a.overlayPreviewRow(),
-		ui.Paragraph("Your game keeps the focus. While the bar shows, only its key, Esc and the mouse wheel are kept from the game.", ui.ToneMuted),
+		a.overlayPreviewRow("Esc closes the bar. Hold Esc to also stop all sounds."),
+		ui.Paragraph("Your game keeps the focus: only the key, Esc and the mouse wheel are kept from it while the bar shows.", ui.ToneMuted),
 		ui.Section("Key"),
 	}
 	switch {
@@ -323,8 +320,9 @@ func (a *App) overlayPage() []ui.Row {
 	}
 	rows = append(rows,
 		ui.Section("Screen edge"),
-		ui.Radio("Right", "", !a.cfg.OverlayLeft, func() { a.setOverlaySide(false) }),
-		ui.Radio("Left", "", a.cfg.OverlayLeft, func() { a.setOverlaySide(true) }),
+		// Greyed out while the overlay is off (no key).
+		ui.Segmented([]string{"Left", "Right"}, map[bool]int{true: 0, false: 1}[a.cfg.OverlayLeft],
+			len(a.cfg.OverlayKeys) == 0, func(i int) { a.setOverlaySide(i == 0) }),
 		ui.Section("Try it"),
 	)
 	label := "Show the overlay"
@@ -333,7 +331,7 @@ func (a *App) overlayPage() []ui.Row {
 	}
 	rows = append(rows,
 		ui.Button(label, ui.ButtonNormal, false, a.toggleOverlayPreview),
-		ui.Paragraph("Scroll to move the highlight while it shows. Esc closes it.", ui.ToneMuted),
+		ui.Paragraph("Scroll to move the highlight while it shows. Esc closes it; holding Esc also stops all sounds.", ui.ToneMuted),
 	)
 	if a.overlay.err != "" {
 		rows = append(rows, ui.Paragraph(a.overlay.err, ui.ToneBad))

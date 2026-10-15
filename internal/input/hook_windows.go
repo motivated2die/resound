@@ -98,6 +98,7 @@ type hookThread struct {
 	w         *Watcher
 	hook      uintptr
 	mouseHook uintptr // only while the overlay is open
+	escTimer  uintptr // thread timer for holding Esc (EscHoldTime), 0 = none
 	filter    Filter
 }
 
@@ -114,6 +115,7 @@ var hookCallback = windows.NewCallback(func(code, wparam uintptr, k *kbdLLHookSt
 			wasOpen := t.filter.Open()
 			events, swallow := t.filter.Key(t.w.bindings.Load(), uint16(k.VKCode), down)
 			t.deliver(events)
+			t.timeEsc(events)
 			if t.filter.Open() != wasOpen {
 				t.syncMouseLater()
 			}
@@ -139,6 +141,20 @@ var mouseCallback = windows.NewCallback(func(code, wparam uintptr, m *msLLHookSt
 	r, _, _ := procCallNextHookEx.Call(0, code, wparam, uintptr(unsafe.Pointer(m)))
 	return r
 })
+
+// timeEsc starts (or restarts) the Esc hold timer when Esc goes down in
+// the open overlay, and stops it when it is let go early.
+func (t *hookThread) timeEsc(events []HotkeyEvent) {
+	for _, ev := range events {
+		switch {
+		case ev.Action == ActionOverlayEscDown:
+			t.escTimer, _, _ = procSetTimer.Call(0, t.escTimer, uintptr(EscHoldTime.Milliseconds()), 0)
+		case ev.Action == ActionOverlayClose && t.escTimer != 0:
+			procKillTimer.Call(0, t.escTimer)
+			t.escTimer = 0
+		}
+	}
+}
 
 // syncMouseLater has the message loop install or remove the mouse hook
 // (not from inside a hook callback).
@@ -219,13 +235,18 @@ func (w *Watcher) run(started chan<- error) {
 		if int32(r) <= 0 { // WM_QUIT or error
 			break
 		}
-		switch msg.Message {
-		case wmTimer:
+		switch {
+		case msg.Message == wmTimer && t.escTimer != 0 && msg.WParam == t.escTimer:
+			procKillTimer.Call(0, t.escTimer)
+			t.escTimer = 0
+			t.deliver(t.filter.EscTimeout())
+			t.syncMouse()
+		case msg.Message == wmTimer:
 			t.releaseStale()
-		case wmSetOverlay:
+		case msg.Message == wmSetOverlay:
 			t.filter.SetOpen(msg.WParam == 1)
 			t.syncMouse()
-		case wmSyncMouse:
+		case msg.Message == wmSyncMouse:
 			t.syncMouse()
 		}
 	}

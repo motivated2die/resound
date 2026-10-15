@@ -119,7 +119,8 @@ func startObserver(t *testing.T) {
 // TestOverlayHookLive checks with real input that the overlay key, and Esc
 // and the wheel while the overlay is open, are kept from other programs,
 // and that other keys aren't. It injects F23/F24 (keys no keyboard has),
-// one Esc and one wheel notch, all swallowed when it passes:
+// two Esc presses (one held) and one wheel notch, all swallowed when it
+// passes:
 //
 //	$env:RESOUND_HOOK_TEST="1"; go test -run OverlayHookLive -v ./internal/input
 func TestOverlayHookLive(t *testing.T) {
@@ -195,8 +196,27 @@ func TestOverlayHookLive(t *testing.T) {
 	key(0x86, false)
 	expectSeen(obs.keys, true, "F23 while open")
 
-	key(vkEscape, true)
+	key(vkEscape, true) // a tap closes
 	key(vkEscape, false)
+	expectEvent(ActionOverlayEscDown)
 	expectEvent(ActionOverlayClose)
 	expectSeen(obs.keys, false, "Esc while open")
+
+	key(0x87, true) // open again, then hold Esc: stop
+	key(0x87, false)
+	expectEvent(ActionOverlayOpen)
+	start := time.Now()
+	key(vkEscape, true)
+	expectEvent(ActionOverlayEscDown)
+	expectEvent(ActionOverlayStop)
+	if held := time.Since(start); held < EscHoldTime-20*time.Millisecond || held > EscHoldTime+200*time.Millisecond {
+		t.Errorf("stopped after %v, want about %v", held, EscHoldTime)
+	}
+	key(vkEscape, false)
+	expectSeen(obs.keys, false, "the held Esc")
+	select {
+	case ev := <-events:
+		t.Fatalf("event after the release: %v", ev)
+	case <-time.After(200 * time.Millisecond):
+	}
 }

@@ -104,10 +104,12 @@ func TestFilterOverlay(t *testing.T) {
 		{"Esc after select passes", vkEscape, true, nil, false},
 		{"release", vkEscape, false, nil, false},
 		{"open again", vkF8, true, []ev{{ActionOverlayOpen, true, 0}}, true},
-		{"Esc closes while the key is held", vkEscape, true, []ev{{ActionOverlayClose, true, 0}}, true},
+		{"Esc down while the key is held", vkEscape, true, []ev{{ActionOverlayEscDown, true, 0}}, true},
 		{"Esc repeat swallowed", vkEscape, true, nil, true},
 		{"overlay key release swallowed", vkF8, false, nil, true},
-		{"Esc release swallowed", vkEscape, false, nil, true},
+		{"tapping Esc closes on its release", vkEscape, false, []ev{{ActionOverlayClose, true, 0}}, true},
+		{"Esc while closed passes again", vkEscape, true, nil, false},
+		{"release", vkEscape, false, nil, false},
 	}
 	for i, s := range steps {
 		got, swallow := f.Key(b, s.vk, s.down)
@@ -162,5 +164,33 @@ func TestFilterWheel(t *testing.T) {
 	f.SetOpen(false)
 	if _, sw := f.Wheel(120); sw {
 		t.Fatal("wheel taken after closing")
+	}
+}
+
+// Holding Esc in the open overlay until EscTimeout stops the sounds; its
+// release is swallowed afterwards and doesn't close anything again. A
+// timeout after an early release does nothing.
+func TestFilterEscHold(t *testing.T) {
+	const vkF8 = 0x77
+	b := &Bindings{Overlay: Combo{vkF8}}
+	var f Filter
+	f.Key(b, vkF8, true)
+	f.Key(b, vkF8, false)
+	if ev, sw := f.Key(b, vkEscape, true); !sw || len(ev) != 1 || ev[0].Action != ActionOverlayEscDown || !f.EscHeld() {
+		t.Fatalf("Esc down: %v %v", ev, sw)
+	}
+	if ev := f.EscTimeout(); len(ev) != 1 || ev[0].Action != ActionOverlayStop || f.Open() {
+		t.Fatalf("held: %v open=%v", ev, f.Open())
+	}
+	if ev, sw := f.Key(b, vkEscape, false); !sw || len(ev) != 0 {
+		t.Fatalf("release after the stop: %v %v", ev, sw)
+	}
+	// A tap, then the timer of that press firing late: nothing.
+	f.Key(b, vkF8, true)
+	f.Key(b, vkF8, false)
+	f.Key(b, vkEscape, true)
+	f.Key(b, vkEscape, false)
+	if ev := f.EscTimeout(); ev != nil {
+		t.Fatalf("timeout after a tap: %v", ev)
 	}
 }

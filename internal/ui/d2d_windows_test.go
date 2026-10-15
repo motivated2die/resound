@@ -79,12 +79,13 @@ func TestRenderOverlay(t *testing.T) {
 	}
 	many := append(append(append([]OverlayItem{}, overlayTestItems...), overlayTestItems...), overlayTestItems...)
 	scenes := map[string]overlayScene{
-		"right":     {items: overlayTestItems, sel: 3, scale: 1.5, maxH: 800, nameMax: ovNameMax, grow: 1},
-		"left":      {items: overlayTestItems, sel: 3, left: true, scale: 1.5, maxH: 800, nameMax: ovNameMax, grow: 1},
-		"growing":   {items: overlayTestItems, sel: 3, scale: 1.5, maxH: 800, nameMax: ovNameMax, grow: 0.5},
-		"flash":     {items: overlayTestItems, sel: 3, scale: 1.5, maxH: 800, nameMax: ovNameMax, grow: 1, flash: flashOK},
-		"scrolling": {items: many, sel: 12, scale: 1.5, maxH: 500, nameMax: ovNameMax, grow: 1},
-		"empty":     {scale: 1.5, empty: "Star sounds on your phone to see them here"},
+		"right":     {items: overlayTestItems, sel: 3, scale: 1.5, maxH: 800, nameMax: ovNameMax, shadow: ovShadowGame},
+		"left":      {items: overlayTestItems, sel: 3, left: true, scale: 1.5, maxH: 800, nameMax: ovNameMax, shadow: ovShadowGame},
+		"flash":     {items: overlayTestItems, sel: 3, scale: 1.5, maxH: 800, nameMax: ovNameMax, flash: flashOK, shadow: ovShadowGame},
+		"long name": {items: []OverlayItem{{Name: "A very long sound name that goes on", Emoji: "📢", Color: "orange"}}, scale: 1.5, maxH: 800, nameMax: ovNameMax, shadow: ovShadowGame},
+		"scrolling": {items: many, sel: 12, scale: 1.5, maxH: 500, nameMax: ovNameMax, shadow: ovShadowGame},
+		"empty":     {scale: 1.5, empty: "Star sounds on your phone to see them here", shadow: ovShadowGame},
+		"holding":   {items: overlayTestItems, sel: 3, scale: 1.5, maxH: 800, nameMax: ovNameMax, hold: 0.6, shadow: ovShadowGame},
 	}
 	for name, sc := range scenes {
 		s, err := renderOverlay(sc)
@@ -122,15 +123,56 @@ func TestOverlayPreviewRow(t *testing.T) {
 	}
 	rows := []Row{
 		Header("In-game overlay", func() {}),
-		OverlayPreview("Press F8 in a game, scroll to a favorite and press F8 again to play it. Esc closes the bar.", overlayTestItems[1:6], 2, false),
-		Paragraph("Your game keeps the focus. While the bar shows, only its key, Esc and the mouse wheel are kept from the game.", ToneMuted),
+		OverlayPreview("Press F8 in a game, scroll to a favorite and press F8 again to play it.",
+			"Esc closes the bar. Hold Esc to also stop all sounds.", false),
 		Section("Key"),
 		Text("F8", "", ToneGood),
 		Buttons(Action{Label: "Change key"}, Action{Label: "Turn off"}),
 		Section("Screen edge"),
-		Radio("Right", "", true, func() {}),
-		Radio("Left", "", false, func() {}),
+		Segmented([]string{"Left", "Right"}, 1, false, func(int) {}),
+		Section("Turned off"),
+		Segmented([]string{"Left", "Right"}, 1, true, func(int) {}),
 	}
-	img := renderRows(t, rows, 1.5, nil)
+	// A measuring DC, so paragraphs wrap as in the panel.
+	img := renderRowsMeasured(t, rows, 1.5)
 	savePNG(t, img, "overlay-page")
+}
+
+// renderRowsMeasured is renderRows measuring with a device context, so
+// wrapped text gets its height as in the panel.
+func renderRowsMeasured(t *testing.T, rows []Row, scale float64) image.Image {
+	t.Helper()
+	dc, _, _ := procCreateCompatibleDC.Call(0)
+	defer procDeleteDC.Call(dc)
+	f := newFonts(scale)
+	defer f.destroy()
+	m := &canvas{dc: dc, scale: scale, fonts: f}
+	w := m.px(popupWidthL)
+	heights, total := make([]int32, len(rows)), int32(0)
+	for i, r := range rows { // as Popup.layout does
+		heights[i] = m.px(r.height())
+		if ms, ok := r.(measurer); ok {
+			heights[i] = ms.measure(m, w)
+		}
+		total += heights[i]
+	}
+	h := total + 2*m.px(popupPadL)
+	return renderCanvas(t, w, h, scale, func(c *canvas) {
+		c.fill(rect{0, 0, w, h}, colBackground)
+		paintRows(c, rows, heights, 0, c.px(popupPadL), nil)
+	})
+}
+
+func TestTruncateName(t *testing.T) {
+	for in, want := range map[string]string{
+		"Bruh":                      "Bruh",
+		"Exactly sixteen!":          "Exactly sixteen!",
+		"A very long sound name":    "A very long soun…",
+		"Ends at a space here too":  "Ends at a space…",
+		"Ärger über Ölpreise heute": "Ärger über Ölpre…",
+	} {
+		if got := TruncateName(in, 16); got != want {
+			t.Errorf("TruncateName(%q) = %q, want %q", in, got, want)
+		}
+	}
 }

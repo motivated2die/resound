@@ -48,8 +48,19 @@ func TestOverlayLive(t *testing.T) {
 		t.Fatal(err)
 	}
 	fg, _, _ := procGetForegroundWindow.Call()
+	mon, _ := primaryMonitor()
 	o.Show(overlayTestItems, 3, false, "")
-	pump(250 * time.Millisecond)
+	// While it slides in, it never reaches past the primary screen.
+	for end := time.Now().Add(250 * time.Millisecond); time.Now().Before(end); {
+		pump(5 * time.Millisecond)
+		var r rect
+		procGetWindowRect.Call(o.hwnd, uintptr(unsafe.Pointer(&r)))
+		if r.Right > mon.Right || r.Left < mon.Left {
+			t.Fatalf("while sliding in: window %+v past the screen %+v", r, mon)
+		}
+	}
+	o.HoldToStop(700 * time.Millisecond)
+	pump(400 * time.Millisecond) // the bar turning red
 	o.SetSelected(4)
 	pump(250 * time.Millisecond)
 	if now, _, _ := procGetForegroundWindow.Call(); now != fg {
@@ -57,8 +68,7 @@ func TestOverlayLive(t *testing.T) {
 	}
 	var r rect
 	procGetWindowRect.Call(o.hwnd, uintptr(unsafe.Pointer(&r)))
-	mon, _ := primaryMonitor()
-	if r.Right > mon.Right || r.Left < mon.Left || r.Right < mon.Right-r.w() {
+	if r.Right != mon.Right || r.Left < mon.Left {
 		t.Errorf("window %+v not at the right edge of %+v", r, mon)
 	}
 	if dir := os.Getenv("RESOUND_RENDER_DIR"); dir != "" {
