@@ -193,33 +193,34 @@
             </div>
         </section>
 
-        <!-- The in-game overlay, with a live demo (js/overlay-demo.js) -->
+        <!-- The in-game overlay, with a live demo (js/overlay-demo.js): a band on
+             phones, a framed card on wider screens -->
         <section class="section ovl-section" id="overlay" aria-labelledby="overlay-title">
-            <div class="wrap ovl-inner">
-                <div class="ovl-copy">
-                    <p class="eyebrow">In-game overlay</p>
-                    <h2 id="overlay-title" class="section-title">Never leave the action!</h2>
-                    <p class="section-lead">Press one key in any game and your favorites slide in at the edge of the screen. Scroll to a sound and press the key again to play it. Your game keeps the focus the whole time.</p>
-                    <div class="ovl-try">
-                        <button class="btn btn-primary" type="button" data-ovl-open>
-                            <kbd data-ovl-key>Alt</kbd><span data-ovl-label>Try it now</span>
-                        </button>
-                        <p class="ovl-hint" data-ovl-hint>Press <kbd>Alt</kbd> to open it, scroll to pick a sound, <kbd>Alt</kbd> again to play it and <kbd>Esc</kbd> to close it. Hold <kbd>Esc</kbd> to stop all sounds. In Resound you pick your own key.</p>
-                    </div>
-                    <p class="ovl-status" data-ovl-status aria-live="polite"></p>
-                </div>
-
-                <!-- A small picture of the overlay, like the one in Resound's settings -->
-                <div class="ovl-visual" aria-hidden="true">
-                    <div class="ovb ovb-mini">
-                        <div class="ovb-bar">
-                            <span class="ovb-item red"><b>📯</b></span>
-                            <span class="ovb-item orange"><b>🥁</b></span>
-                            <span class="ovb-item purple on"><b>😑</b><span class="ovb-name">SCROLL<i class="ovb-arrow up"></i><i class="ovb-arrow down"></i></span></span>
-                            <span class="ovb-item green"><b>👏</b></span>
-                            <span class="ovb-item blue"><b>🎺</b></span>
-                            <span class="ovb-item pink"><b>💥</b></span>
+            <div class="wrap">
+                <div class="ovl-card">
+                    <!-- A small picture of the overlay, like the one in Resound's settings -->
+                    <div class="ovl-visual" aria-hidden="true">
+                        <div class="ovb ovb-mini">
+                            <div class="ovb-bar">
+                                <span class="ovb-item red"><b>📯</b></span>
+                                <span class="ovb-item orange"><b>🥁</b></span>
+                                <span class="ovb-item purple on"><b>😑</b><span class="ovb-name">SCROLL<i class="ovb-arrow up"></i><i class="ovb-arrow down"></i></span></span>
+                                <span class="ovb-item green"><b>👏</b></span>
+                                <span class="ovb-item blue"><b>🎺</b></span>
+                                <span class="ovb-item pink"><b>💥</b></span>
+                            </div>
                         </div>
+                    </div>
+
+                    <div class="ovl-copy">
+                        <p class="eyebrow">In-game overlay</p>
+                        <h2 id="overlay-title" class="section-title">Never leave the action!</h2>
+                        <p class="section-lead">Press one key in any game and your favorites slide in. Scroll to a sound, press the key again, and it plays.</p>
+                        <button class="ovl-callout" type="button" data-ovl-open>
+                            <kbd class="kbd-big" data-ovl-key>Alt</kbd>
+                            <span data-ovl-label><strong>Try it now:</strong> press <kbd>Alt</kbd> to bring up the overlay.</span>
+                        </button>
+                        <p class="ovl-status" data-ovl-status aria-live="polite"></p>
                     </div>
                 </div>
             </div>

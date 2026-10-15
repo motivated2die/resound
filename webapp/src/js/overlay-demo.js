@@ -45,12 +45,10 @@
         status = document.querySelector('[data-ovl-status]');
         if (!trigger) return;
         build();
-        if (touch) {
+        if (touch) { // no Alt key to press: the box is the way in
             document.querySelector('[data-ovl-key]')?.remove();
             const label = document.querySelector('[data-ovl-label]');
-            if (label) label.textContent = 'Try the overlay';
-            const hint = document.querySelector('[data-ovl-hint]');
-            if (hint) hint.textContent = 'Swipe or tap to pick a sound, tap it again to play it. Swipe on past the first or last one to close the bar.';
+            if (label) label.innerHTML = '<strong>Try it now:</strong> tap here to bring up the overlay.';
         }
         trigger.setAttribute('aria-expanded', 'false');
         trigger.addEventListener('click', () => (open ? close() : show()));
@@ -99,7 +97,13 @@
         closeBtn.innerHTML = '<span class="icon" data-icon="close" aria-hidden="true"></span>';
         closeBtn.addEventListener('click', () => close());
         ovb.append(bar, closeBtn);
-        live.append(shade, ovb);
+        // What to do now, at the bottom of the window.
+        const tip = document.createElement('div');
+        tip.className = 'ovl-tip';
+        tip.innerHTML = touch
+            ? '<span><strong>Swipe</strong> to pick a sound, <strong>tap it again</strong> to play it. Swipe past the end to close.</span>'
+            : '<kbd class="kbd-big">Alt</kbd><span><strong>Press Alt</strong> to play the highlighted sound, or <strong>scroll</strong> to pick another. <kbd>Esc</kbd> closes, held it stops all sounds.</span>';
+        live.append(shade, ovb, tip);
         document.body.append(live);
         render();
     }
