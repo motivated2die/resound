@@ -791,6 +791,11 @@ kbd {
     box-shadow: 0 6px 24px rgba(0, 0, 0, 0.45);
 }
 .ovl-close:hover { background: #454955; }
+/* A "played" sound: its emoji flies out of the bar with confetti, above
+   the overlay (js/overlay-demo.js burst). */
+.ovl-burst { position: fixed; inset: 0; z-index: 210; pointer-events: none; overflow: hidden; }
+.ovl-burst-icon { position: absolute; font-size: 26px; line-height: 1; filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.5)); }
+.ovl-confetti { position: absolute; width: 6px; height: 10px; border-radius: 1px; }
 /* What to do while it is open, at the bottom of the window. */
 .ovl-tip {
     position: absolute;

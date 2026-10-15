@@ -2,7 +2,8 @@
 // #overlay). It works like the overlay in Resound (internal/app/overlay.go):
 // Alt (Resound lets the user pick the key) slides a bar of favorites in at
 // the left edge; the wheel moves the highlight and stops at the ends; Alt
-// again "plays" the highlighted sound (the highlight flashes green); Esc
+// again "plays" the highlighted sound (the highlight flashes green and its
+// emoji flies out of the bar with a little confetti); Esc
 // closes it, held for 700 ms it "stops all sounds" (the bar turns red
 // meanwhile). While it is open, the wheel and those keys are kept from the
 // page; a large close button and a click beside the bar close it too.
@@ -181,16 +182,66 @@
         }, CLOSE_MS);
     }
 
-    // play is the overlay key pressed again: the highlight flashes, the bar
-    // slides out and the page says what would have played.
+    // play is the overlay key pressed again: the highlight flashes, its
+    // emoji flies out with some confetti, and the bar slides out.
     function play() {
         if (!open) return;
         if (flashing) return;
         flashing = true;
         items[sel].classList.add('ok');
-        const s = SOUNDS[sel];
+        burst(items[sel].querySelector('b'), SOUNDS[sel].emoji);
         setTimeout(() => { flashing = false; close(); }, FLASH_MS);
-        say(`${s.emoji} ${s.name} plays. In Resound, your friends would hear it now.`);
+        say('');
+    }
+
+    const CONFETTI = ['#50dea8', '#f2416f', '#f2c14e', '#6aa8ff', '#b388ff', '#ececf0'];
+
+    // burst sends a copy of the emoji in from to the right, growing and
+    // fading, with confetti scattering from the same spot. It lives on its
+    // own layer above the overlay and is gone within a second.
+    function burst(from, emoji) {
+        if (!from || !document.body.animate) return;
+        const r = from.getBoundingClientRect();
+        const x = r.left + r.width / 2, y = r.top + r.height / 2;
+        const layer = document.createElement('div');
+        layer.className = 'ovl-burst';
+        layer.setAttribute('aria-hidden', 'true');
+        const icon = document.createElement('span');
+        icon.className = 'ovl-burst-icon';
+        icon.textContent = emoji;
+        icon.style.left = x + 'px';
+        icon.style.top = y + 'px';
+        layer.append(icon);
+        document.body.append(layer);
+        const calm = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        icon.animate(calm ? [
+            { transform: 'translate(-50%, -50%) scale(1.4)', opacity: 1 },
+            { transform: 'translate(-50%, -50%) scale(1.4)', opacity: 0 },
+        ] : [
+            { transform: 'translate(-50%, -50%) scale(1)', opacity: 1 },
+            { transform: 'translate(calc(-50% + 120px), calc(-50% - 46px)) scale(2)', opacity: 1, offset: 0.5 },
+            { transform: 'translate(calc(-50% + 170px), calc(-50% - 60px)) scale(2.2)', opacity: 0 },
+        ], { duration: calm ? 500 : 850, easing: 'cubic-bezier(0.2, 0.8, 0.2, 1)', fill: 'forwards' });
+        if (!calm) {
+            for (let i = 0; i < 22; i++) {
+                const bit = document.createElement('i');
+                bit.className = 'ovl-confetti';
+                bit.style.left = x + 'px';
+                bit.style.top = y + 'px';
+                bit.style.background = CONFETTI[i % CONFETTI.length];
+                layer.append(bit);
+                const angle = (Math.random() * 140 - 70) * Math.PI / 180; // to the right, fanned out
+                const dist = 70 + Math.random() * 130;
+                const dx = Math.cos(angle) * dist, dy = Math.sin(angle) * dist;
+                const spin = (Math.random() * 2 - 1) * 540;
+                bit.animate([
+                    { transform: 'translate(-50%, -50%) rotate(0deg)', opacity: 1 },
+                    { transform: `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px)) rotate(${spin / 2}deg)`, opacity: 1, offset: 0.6 },
+                    { transform: `translate(calc(-50% + ${dx * 1.15}px), calc(-50% + ${dy + 40}px)) rotate(${spin}deg)`, opacity: 0 },
+                ], { duration: 650 + Math.random() * 350, easing: 'cubic-bezier(0.15, 0.7, 0.3, 1)', fill: 'forwards' });
+            }
+        }
+        setTimeout(() => layer.remove(), 1100);
     }
 
     function stopAll() {
