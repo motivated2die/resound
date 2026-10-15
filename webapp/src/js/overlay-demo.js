@@ -45,6 +45,7 @@
         status = document.querySelector('[data-ovl-status]');
         if (!trigger) return;
         build();
+        animatePreview(document.querySelector('[data-ovl-preview]'));
         if (touch) { // no Alt key to press: the box is the way in
             document.querySelector('[data-ovl-key]')?.remove();
             const label = document.querySelector('[data-ovl-label]');
@@ -54,11 +55,35 @@
         trigger.addEventListener('click', () => (open ? close() : show()));
         document.addEventListener('keydown', onKeyDown, true);
         document.addEventListener('keyup', onKeyUp, true);
-        window.addEventListener('blur', () => { altAlone = false; stopHold(); });
+        window.addEventListener('blur', () => { altAlone = false; pressKeys(false); stopHold(); });
         window.addEventListener('wheel', onWheel, { passive: false });
         document.addEventListener('touchstart', onTouchStart, { passive: true });
         document.addEventListener('touchmove', onTouchMove, { passive: false });
     });
+
+    // animatePreview moves the small picture's highlight as the wheel would:
+    // one notch up, two down, one up, over and over, while it is in view.
+    function animatePreview(preview) {
+        if (!preview || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+        const rows = Array.from(preview.querySelectorAll('.ovb-item'));
+        const home = rows.findIndex((r) => r.classList.contains('on'));
+        if (home < 1 || home > rows.length - 2) return;
+        const steps = [-1, 0, 1, 0]; // from home: up one, back, down one more (two notches), back up
+        let step = 0, timer = 0;
+        const tick = () => {
+            step = (step + 1) % steps.length;
+            rows.forEach((r, i) => r.classList.toggle('on', i === home + steps[step]));
+        };
+        new IntersectionObserver(([entry]) => {
+            clearInterval(timer);
+            if (entry.isIntersecting) timer = setInterval(tick, 750);
+        }).observe(preview);
+    }
+
+    // pressKeys shows the page's big Alt keys going down while Alt is held.
+    function pressKeys(down) {
+        document.querySelectorAll('.kbd-big').forEach((k) => k.classList.toggle('down', down));
+    }
 
     // build adds the live overlay to the page, hidden.
     function build() {
@@ -195,6 +220,7 @@
     function onKeyDown(e) {
         if (e.key === 'Alt') {
             if (!e.repeat) altAlone = true;
+            pressKeys(true);
             e.preventDefault();
             return;
         }
@@ -230,6 +256,7 @@
 
     function onKeyUp(e) {
         if (e.key === 'Alt') {
+            pressKeys(false);
             e.preventDefault(); // Firefox would show its menu bar
             if (altAlone) (open ? play : show)();
             altAlone = false;

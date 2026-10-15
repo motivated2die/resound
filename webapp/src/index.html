@@ -198,16 +198,17 @@
         <section class="section ovl-section" id="overlay" aria-labelledby="overlay-title">
             <div class="wrap">
                 <div class="ovl-card">
-                    <!-- A small picture of the overlay, like the one in Resound's settings -->
+                    <!-- A small picture of the overlay; its highlight moves up and
+                         down (js/overlay-demo.js), as the wheel moves it -->
                     <div class="ovl-visual" aria-hidden="true">
-                        <div class="ovb ovb-mini">
+                        <div class="ovb ovb-mini" data-ovl-preview>
                             <div class="ovb-bar">
-                                <span class="ovb-item red"><b>📯</b></span>
-                                <span class="ovb-item orange"><b>🥁</b></span>
-                                <span class="ovb-item purple on"><b>😑</b><span class="ovb-name">SCROLL<i class="ovb-arrow up"></i><i class="ovb-arrow down"></i></span></span>
-                                <span class="ovb-item green"><b>👏</b></span>
-                                <span class="ovb-item blue"><b>🎺</b></span>
-                                <span class="ovb-item pink"><b>💥</b></span>
+                                <span class="ovb-item red"><b>📯</b><span class="ovb-name">Airhorn</span></span>
+                                <span class="ovb-item orange"><b>🥁</b><span class="ovb-name">Drumroll</span></span>
+                                <span class="ovb-item purple on"><b>😑</b><span class="ovb-name">Bruh</span></span>
+                                <span class="ovb-item green"><b>👏</b><span class="ovb-name">Applause</span></span>
+                                <span class="ovb-item blue"><b>🎺</b><span class="ovb-name">Trombone</span></span>
+                                <span class="ovb-item pink"><b>💥</b><span class="ovb-name">Boom</span></span>
                             </div>
                         </div>
                     </div>
@@ -216,6 +217,9 @@
                         <p class="eyebrow">In-game overlay</p>
                         <h2 id="overlay-title" class="section-title">Never leave the action!</h2>
                         <p class="section-lead">Press one key in any game and your favorites slide in. Scroll to a sound, press the key again, and it plays.</p>
+                    </div>
+
+                    <div class="ovl-action">
                         <button class="ovl-callout" type="button" data-ovl-open>
                             <kbd class="kbd-big" data-ovl-key>Alt</kbd>
                             <span data-ovl-label><strong>Try it now:</strong> press <kbd>Alt</kbd> to bring up the overlay.</span>
