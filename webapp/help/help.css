@@ -345,6 +345,19 @@ kbd {
     .hc-site { display: none; }
     .hc-search { flex: 1 1 auto; margin-left: auto; max-width: 380px; }
     .hc-search-key { display: none; }
+    /* Results span the screen below the header, whatever the field's width.
+       The header (sticky at the top, with a backdrop filter) may be their
+       containing block or not: both start at the top of the screen. */
+    .hc-results {
+        position: fixed;
+        top: calc(var(--header) + env(safe-area-inset-top) + 8px);
+        left: max(var(--gutter), env(safe-area-inset-left));
+        right: max(var(--gutter), env(safe-area-inset-right));
+        width: auto;
+        max-height: calc(100vh - var(--header) - env(safe-area-inset-top) - 24px);
+        max-height: calc(100dvh - var(--header) - env(safe-area-inset-top) - 24px);
+        overscroll-behavior: contain;
+    }
     .js .hc-nav {
         position: fixed;
         z-index: 25;
