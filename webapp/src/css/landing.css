@@ -71,6 +71,7 @@ code { font-family: Consolas, "Cascadia Mono", monospace; background: var(--rais
 .icon[data-icon="favorite-fill"] { --icon: url("../assets/icons/favorite-fill.svg"); }
 .icon[data-icon="folder_open"] { --icon: url("../assets/icons/folder_open.svg"); }
 .icon[data-icon="graphic_eq"] { --icon: url("../assets/icons/graphic_eq.svg"); }
+.icon[data-icon="help"] { --icon: url("../assets/icons/help.svg"); }
 .icon[data-icon="headset_mic"] { --icon: url("../assets/icons/headset_mic.svg"); }
 .icon[data-icon="install_mobile"] { --icon: url("../assets/icons/install_mobile.svg"); }
 .icon[data-icon="keyboard"] { --icon: url("../assets/icons/keyboard.svg"); }
@@ -126,6 +127,23 @@ code { font-family: Consolas, "Cascadia Mono", monospace; background: var(--rais
     white-space: nowrap;
 }
 .header-cta:hover { color: var(--on-accent); background: var(--accent-light); }
+/* Help: a pill like the soundboard button, outlined so the soundboard stays first. */
+.header-help {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin-right: -10px; /* closer to its neighbour than the header's gap */
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--accent);
+    padding: 6px 14px 6px 10px;
+    border-radius: 999px;
+    border: 1px solid rgba(var(--accent-rgb), 0.5);
+    background: rgba(var(--accent-rgb), 0.08);
+    white-space: nowrap;
+}
+.header-help .icon { font-size: 18px; }
+.header-help:hover { color: var(--accent-light); background: rgba(var(--accent-rgb), 0.16); border-color: var(--accent); }
 
 /* --- Buttons --- */
 .btn {
@@ -993,7 +1011,7 @@ h3 { font-size: 18px; line-height: 1.3; margin-bottom: 6px; }
     .ovl-callout { width: 100%; flex-direction: column; align-items: flex-start; gap: 12px; padding: 14px; font-size: 14px; }
     .ovl-status { font-size: 14px; }
     .site-nav { display: none; }
-    .header-cta { margin-left: auto; }
+    .header-help { margin-left: auto; }
     .steps, .features, .how-grid { grid-template-columns: 1fr; }
     .section { padding: 44px 0; }
     .lead { font-size: 17px; }

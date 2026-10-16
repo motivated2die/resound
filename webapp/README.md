@@ -19,6 +19,7 @@ Nothing here is embedded into `Resound.exe`.
 | `js/rtc.js` | The connection: pairing, reconnecting, `fetch()` for `/api/` over the data channel, and events from the PC (`onEvent`, e.g. `library`: `app.js` reloads tabs and sounds). The first script on every page |
 | `connect.html`, `js/connect.js`, `css/connect.css` | Pairing (link, in-app QR scanner, pasted link) and the list of paired PCs |
 | `js/connection-help.js`, `css/connection-help.css` | What to check when the PC doesn't answer, on the remote and the connect page. Keep its steps in line with the panel's Phone remote page (`internal/app/pages.go`) |
+| `css/scrollbar.css` | Scrollbars on every page, the help center's too: no track or arrows, a slim thumb that widens on hover |
 | `js/screen-wake.js` | Keeps the screen on (Screen Wake Lock API), on by default |
 | `js/fullscreen.js` | Fullscreen in a browser tab; the installed app opens fullscreen by itself (`manifest.json`) |
 | `js/device.js` | Vibration on play and stop, persistent storage for the pairing keys |

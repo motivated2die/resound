@@ -1,0 +1,24 @@
+/* Scrollbars on every page (landing, app, connect, help): no track, no
+   arrow buttons, a slim thumb that widens under the pointer. Places that
+   hide their scrollbar on purpose (the sound grid, the tab bar, the emoji
+   picker) keep doing so: their own rules are more specific. */
+
+/* Chromium and Safari. The bar is 12px wide; a transparent border on the
+   thumb shows only its middle (4px), and less of it on hover (8px). */
+::-webkit-scrollbar { width: 12px; height: 12px; background: transparent; }
+::-webkit-scrollbar-track, ::-webkit-scrollbar-corner { background: transparent; }
+::-webkit-scrollbar-button { display: none; width: 0; height: 0; }
+::-webkit-scrollbar-thumb {
+    min-height: 40px;
+    border: 4px solid transparent;
+    border-radius: 999px;
+    background: rgba(236, 236, 240, 0.22) padding-box;
+}
+::-webkit-scrollbar-thumb:hover { border-width: 2px; background-color: rgba(236, 236, 240, 0.38); }
+::-webkit-scrollbar-thumb:active { border-width: 2px; background-color: rgba(80, 222, 168, 0.7); }
+
+/* Firefox has no thumb of its own to style; a thin bar is the closest.
+   Only there: in Chromium, scrollbar-width would switch off the rules above. */
+@supports not selector(::-webkit-scrollbar) {
+    html, * { scrollbar-width: thin; scrollbar-color: rgba(236, 236, 240, 0.28) transparent; }
+}
