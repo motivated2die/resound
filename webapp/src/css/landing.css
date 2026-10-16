@@ -208,7 +208,9 @@ h1 { font-size: clamp(32px, 5vw, 52px); line-height: 1.1; font-weight: 700; lett
     border-radius: 34px;
     padding: 8px;
     background: linear-gradient(160deg, #30323a, #18191d);
-    box-shadow: 0 30px 80px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(255, 255, 255, 0.06), 0 0 90px rgba(var(--accent-rgb), 0.12);
+    /* A close, dark shadow all round as well: the cable runs beneath it. */
+    box-shadow: 0 30px 80px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(255, 255, 255, 0.06), 0 0 90px rgba(var(--accent-rgb), 0.12),
+        0 2px 6px rgba(0, 0, 0, 0.55), 0 0 22px 6px rgba(0, 0, 0, 0.4);
     transform: rotate(-6deg); /* the cable's ends in index.html are placed for this */
 }
 /* The screen follows the remote's layout (app.html): a slim top bar, the
@@ -399,7 +401,11 @@ h1 { font-size: clamp(32px, 5vw, 52px); line-height: 1.1; font-weight: 700; lett
 .rc-pulse { stroke: #e6fff5; stroke-width: 3.2; }
 .rc-pulse-glow { stroke: var(--accent); stroke-width: 9; opacity: 0.75; }
 /* The PC: a small monitor with Windows' logo, Resound's in the corner. */
-.rc-pc { position: absolute; z-index: 2; left: 288px; top: 6px; width: 84px; display: flex; flex-direction: column; align-items: center; }
+.rc-pc {
+    position: absolute; z-index: 2; left: 288px; top: 6px; width: 84px; display: flex; flex-direction: column; align-items: center;
+    /* The cable loops beneath the PC: a shadow around screen and stand sets them apart. */
+    filter: drop-shadow(0 3px 5px rgba(0, 0, 0, 0.6)) drop-shadow(0 0 12px rgba(0, 0, 0, 0.45));
+}
 .rc-screen {
     position: relative;
     width: 84px;
@@ -427,7 +433,7 @@ h1 { font-size: clamp(32px, 5vw, 52px); line-height: 1.1; font-weight: 700; lett
     from { box-shadow: 0 0 0 4px rgba(var(--accent-rgb), 0.35), 0 0 34px rgba(var(--accent-rgb), 0.7); }
     to { box-shadow: 0 10px 26px rgba(0, 0, 0, 0.45); }
 }
-.rc-apps { position: absolute; z-index: 2; left: 311px; top: 168px; list-style: none; display: grid; gap: 26px; }
+.rc-apps { position: absolute; z-index: 2; left: 311px; top: 182px; list-style: none; display: grid; gap: 26px; }
 .rc-app {
     position: relative;
     width: 38px;
