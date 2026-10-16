@@ -72,7 +72,8 @@
                 <!-- The remote and the PC it controls, drawn in CSS and SVG (not a
                      screenshot). Every few seconds, or when tapped, a pad plays: 
                      waves ring out from the phone to the PC, and the sound\'s emoji
-                     pops up at each app (landing.js, animateRemote). The stage has a fixed
+                     pops up at each app (landing.js, animateRemote), from when the page has
+                     loaded; no pad plays before. The stage has a fixed
                      layout in px; landing.js zooms it to the column's width. -->
                 <div class="hero-visual" aria-hidden="true">
                     <div class="rc" data-remote>
@@ -121,7 +122,7 @@
                                     <span class="icon" data-icon="settings"></span>
                                 </div>
                                 <div class="mock-grid">
-                                    <div class="tile red playing"><b>📯</b><span>Airhorn</span></div>
+                                    <div class="tile red"><b>📯</b><span>Airhorn</span></div>
                                     <div class="tile"><b>🥁</b><span>Ba dum tss</span></div>
                                     <div class="tile blue"><b>👏</b><span>Applause</span></div>
                                     <div class="tile yellow fav"><b>😂</b><span>Laugh track</span></div>
