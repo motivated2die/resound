@@ -1,8 +1,9 @@
 // The help center's pages (/help/): the topics drawer on small screens,
 // links to headings, checklists to tick off, search across all articles,
 // "On this page" following the reading position, and the visualizations'
-// switches. Nothing is stored: a reload starts afresh. Not part of the
-// installed app.
+// switches. The only thing kept is the sidebar's scroll position, for this
+// tab (sessionStorage); checklists start afresh. Not part of the installed
+// app.
 (() => {
     'use strict';
 
@@ -28,15 +29,62 @@
         document.addEventListener('keydown', (e) => {
             if (e.key === 'Escape' && document.body.classList.contains('nav-open')) { set(false); button.focus(); }
         });
-        // The current article in view in the sidebar. Only the sidebar
-        // scrolls: scrollIntoView would scroll the page too, and an article
-        // far down the list would open far below its top.
+    };
+
+    // --- Sidebar position ---------------------------------------------------
+
+    // The sidebar keeps where it was scrolled to from page to page (for this
+    // tab only), so the links stay where they were. It is placed as soon as
+    // it is parsed, before it is first drawn, so nothing jumps. It only
+    // moves when the current article would be out of sight (from search or
+    // Previous/Next), and then just far enough; on a first visit it centres
+    // it. Only the sidebar scrolls, never the page.
+    const navKey = 'resound.help.navScroll';
+
+    const placeNav = (nav) => {
+        let saved = null;
+        try { saved = sessionStorage.getItem(navKey); } catch (e) { /* storage blocked */ }
+        if (saved !== null) nav.scrollTop = Number(saved) || 0;
         const current = nav.querySelector('[aria-current="page"]');
-        if (current) {
-            const offset = current.getBoundingClientRect().top - nav.getBoundingClientRect().top + nav.scrollTop;
-            nav.scrollTop = Math.max(0, offset - (nav.clientHeight - current.offsetHeight) / 2);
+        if (!current) return;
+        const view = nav.getBoundingClientRect();
+        const box = current.getBoundingClientRect();
+        const offset = box.top - view.top + nav.scrollTop; // within the sidebar's content
+        if (saved === null) {
+            nav.scrollTop = offset - (nav.clientHeight - box.height) / 2;
+        } else if (box.top < view.top) {
+            nav.scrollTop = offset - 16;
+        } else if (box.bottom > view.bottom) {
+            nav.scrollTop = offset + box.height - nav.clientHeight + 16;
         }
     };
+
+    // watchNav places the sidebar the moment its last part is parsed: this
+    // script runs in <head>, and mutation callbacks run before the browser
+    // draws what was parsed.
+    const watchNav = () => {
+        let placed = false;
+        const ready = () => {
+            const nav = document.getElementById('hc-nav');
+            if (placed || !nav || !nav.nextElementSibling) return placed;
+            placed = true;
+            placeNav(nav);
+            return true;
+        };
+        if (ready()) return;
+        const observer = new MutationObserver(() => { if (ready()) observer.disconnect(); });
+        observer.observe(document.documentElement, { childList: true, subtree: true });
+        document.addEventListener('DOMContentLoaded', () => { observer.disconnect(); ready(); }, { once: true });
+    };
+
+    const saveNav = () => {
+        const nav = document.getElementById('hc-nav');
+        if (!nav) return;
+        try { sessionStorage.setItem(navKey, String(Math.round(nav.scrollTop))); } catch (e) { /* storage blocked */ }
+    };
+    window.addEventListener('pagehide', saveNav);
+    document.addEventListener('click', (e) => { if (e.target.closest && e.target.closest('#hc-nav a')) saveNav(); });
+    watchNav();
 
     // --- Headings: a "#" link to each ---------------------------------------
 
