@@ -82,7 +82,7 @@
         const PLAY = 2600;          // a pad's progress bar (--play in landing.css)
         const RING_STEP = 55;       // between one ring lighting up and the next
         const RING_FLASH = 520;     // each ring's flash
-        const ARRIVE = 260;         // until the waves reach the PC
+        const ARRIVE = 300;         // until the waves reach the PC (rings at its distance peak then)
         const EVERY = 3400;         // between plays by themselves
         const RESUME = 7000;        // after a tap, before they start again
         const host = stage.parentElement;

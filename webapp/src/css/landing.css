@@ -392,12 +392,11 @@ h1 { font-size: clamp(32px, 5vw, 52px); line-height: 1.1; font-weight: 700; lett
 .rc-waves { position: absolute; left: 0; top: 0; width: 380px; height: 540px; z-index: 0; overflow: visible; pointer-events: none; }
 .rc-waves circle { fill: none; stroke: url(#rc-wave-tone); stroke-width: 4; }
 .rc-rings { opacity: 0.14; }
-.rc-ring { opacity: 0; }
-.rc-waves .rc-ring-glow { stroke-width: 12; opacity: 0.25; }
+.rc-ring { opacity: 0; } /* lit: the same line at full strength, with a glow (#rc-ring-glow) */
 .rc.still .rc-ring { opacity: 0.5; }
 /* The PC: a small monitor with Windows' logo, Resound's in the corner. */
 .rc-pc {
-    position: absolute; z-index: 2; left: 288px; top: 6px; width: 84px; display: flex; flex-direction: column; align-items: center;
+    position: absolute; z-index: 2; left: 288px; top: 40px; width: 84px; display: flex; flex-direction: column; align-items: center;
     /* The waves pass beneath the PC: a shadow around screen and stand sets them apart. */
     filter: drop-shadow(0 3px 5px rgba(0, 0, 0, 0.6)) drop-shadow(0 0 12px rgba(0, 0, 0, 0.45));
 }
@@ -429,7 +428,7 @@ h1 { font-size: clamp(32px, 5vw, 52px); line-height: 1.1; font-weight: 700; lett
     to { box-shadow: 0 10px 26px rgba(0, 0, 0, 0.45); }
 }
 /* Under the PC's right half, right-aligned with its screen (288 + 84 = 372). */
-.rc-apps { position: absolute; z-index: 2; left: 334px; top: 100px; list-style: none; display: grid; gap: 26px; }
+.rc-apps { position: absolute; z-index: 2; left: 334px; top: 124px; list-style: none; display: grid; gap: 16px; }
 .rc-app {
     position: relative;
     width: 38px;
@@ -441,10 +440,11 @@ h1 { font-size: clamp(32px, 5vw, 52px); line-height: 1.1; font-weight: 700; lett
     align-items: center;
     justify-content: center;
     color: var(--muted);
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.55), 0 1px 3px rgba(0, 0, 0, 0.5);
     transition: color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
 }
 .rc-app .icon { font-size: 20px; }
-.rc-app.on { color: var(--text); border-color: rgba(var(--accent-rgb), 0.6); box-shadow: 0 0 16px rgba(var(--accent-rgb), 0.3); }
+.rc-app.on { color: var(--text); border-color: rgba(var(--accent-rgb), 0.6); box-shadow: 0 6px 16px rgba(0, 0, 0, 0.55), 0 1px 3px rgba(0, 0, 0, 0.5), 0 0 16px rgba(var(--accent-rgb), 0.3); }
 /* The sound's emoji, popping up at the app's top right. */
 .rc-pop {
     position: absolute;

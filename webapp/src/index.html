@@ -82,11 +82,16 @@
                              towards the PC and fade out on the far side. -->
                         <svg class="rc-waves" viewBox="0 0 380 540" width="380" height="540">
                             <defs>
-                                <linearGradient id="rc-wave-tone" gradientUnits="userSpaceOnUse" x1="-35" y1="491" x2="355" y2="9">
+                                <linearGradient id="rc-wave-tone" gradientUnits="userSpaceOnUse" x1="-52" y1="476" x2="372" y2="24">
                                     <stop offset="0.3" stop-color="#50dea8" stop-opacity="0"/>
                                     <stop offset="0.6" stop-color="#50dea8" stop-opacity="0.3"/>
                                     <stop offset="1" stop-color="#50dea8" stop-opacity="1"/>
                                 </linearGradient>
+                                <!-- A lit ring glows: its blurred copy under it -->
+                                <filter id="rc-ring-glow" x="-20%" y="-20%" width="140%" height="140%">
+                                    <feGaussianBlur stdDeviation="4" result="blur"/>
+                                    <feMerge><feMergeNode in="blur"/><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+                                </filter>
                             </defs>
                             <g class="rc-rings" transform="translate(160 250)">
                                 <circle r="130"/>
@@ -97,14 +102,14 @@
                                 <circle r="280"/>
                                 <circle r="310"/>
                             </g>
-                            <g class="rc-rings-lit" transform="translate(160 250)">
-                                <g class="rc-ring" data-ring><circle class="rc-ring-glow" r="130"/><circle r="130"/></g>
-                                <g class="rc-ring" data-ring><circle class="rc-ring-glow" r="160"/><circle r="160"/></g>
-                                <g class="rc-ring" data-ring><circle class="rc-ring-glow" r="190"/><circle r="190"/></g>
-                                <g class="rc-ring" data-ring><circle class="rc-ring-glow" r="220"/><circle r="220"/></g>
-                                <g class="rc-ring" data-ring><circle class="rc-ring-glow" r="250"/><circle r="250"/></g>
-                                <g class="rc-ring" data-ring><circle class="rc-ring-glow" r="280"/><circle r="280"/></g>
-                                <g class="rc-ring" data-ring><circle class="rc-ring-glow" r="310"/><circle r="310"/></g>
+                            <g class="rc-rings-lit" transform="translate(160 250)" filter="url(#rc-ring-glow)">
+                                <circle class="rc-ring" r="130" data-ring/>
+                                <circle class="rc-ring" r="160" data-ring/>
+                                <circle class="rc-ring" r="190" data-ring/>
+                                <circle class="rc-ring" r="220" data-ring/>
+                                <circle class="rc-ring" r="250" data-ring/>
+                                <circle class="rc-ring" r="280" data-ring/>
+                                <circle class="rc-ring" r="310" data-ring/>
                             </g>
                         </svg>
 
