@@ -28,8 +28,14 @@
         document.addEventListener('keydown', (e) => {
             if (e.key === 'Escape' && document.body.classList.contains('nav-open')) { set(false); button.focus(); }
         });
-        // The current article in view in the sidebar.
-        nav.querySelector('[aria-current="page"]')?.scrollIntoView({ block: 'center' });
+        // The current article in view in the sidebar. Only the sidebar
+        // scrolls: scrollIntoView would scroll the page too, and an article
+        // far down the list would open far below its top.
+        const current = nav.querySelector('[aria-current="page"]');
+        if (current) {
+            const offset = current.getBoundingClientRect().top - nav.getBoundingClientRect().top + nav.scrollTop;
+            nav.scrollTop = Math.max(0, offset - (nav.clientHeight - current.offsetHeight) / 2);
+        }
     };
 
     // --- Headings: a "#" link to each ---------------------------------------
