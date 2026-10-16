@@ -405,7 +405,7 @@ h1 { font-size: clamp(32px, 5vw, 52px); line-height: 1.1; font-weight: 700; lett
     width: 84px;
     height: 58px;
     border-radius: 9px;
-    border: 3px solid #2f3139;
+    border: 2px solid #2f3139;
     background: radial-gradient(ellipse at 30% 20%, #23405f, #142235 75%);
     display: flex;
     align-items: center;
