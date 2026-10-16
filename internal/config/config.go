@@ -63,6 +63,10 @@ type Config struct {
 	// virtual-key combinations, like PushToTalkKeys.
 	PauseHotkeys [][]uint16 `json:"pauseHotkeys,omitempty"`
 	StopHotkeys  [][]uint16 `json:"stopHotkeys,omitempty"`
+	// NoPushToTalkHandOver passes pause and stop keys on at once, even while
+	// sounds hold push-to-talk. By default the key waits for Resound to let
+	// go of push-to-talk first (input.Watcher.LendPTT).
+	NoPushToTalkHandOver bool `json:"noPushToTalkHandOver,omitempty"`
 	// NoUpdateCheck turns off the automatic check for new releases on
 	// GitHub ("Check now" still works).
 	NoUpdateCheck bool `json:"noUpdateCheck,omitempty"`

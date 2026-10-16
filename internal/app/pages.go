@@ -324,7 +324,21 @@ func (a *App) keysPage() []ui.Row {
 	rows = append(rows, a.pttRows()...)
 	rows = append(rows, a.hotkeyRows(capturePause)...)
 	rows = append(rows, a.hotkeyRows(captureStop)...)
+	rows = append(rows, a.handOverRows()...)
 	return append(rows, ui.Spacer(4))
+}
+
+// handOverRows is the switch for letting go of push-to-talk before a pause
+// or stop key reaches the game, shown while it can matter.
+func (a *App) handOverRows() []ui.Row {
+	if len(a.cfg.PushToTalkKeys) == 0 || len(a.cfg.PauseHotkeys) == 0 && len(a.cfg.StopHotkeys) == 0 {
+		return nil
+	}
+	return []ui.Row{
+		ui.Toggle("Let go of push-to-talk first", !a.cfg.NoPushToTalkHandOver, a.togglePTTHandOver),
+		ui.Paragraph("While sounds hold push-to-talk, a pause or stop key waits a moment for Resound to let go of it, "+
+			"so the game doesn't end your own push-to-talk too. Turn this off if a game ignores your key while sounds play.", ui.ToneMuted),
+	}
 }
 
 func (a *App) pttIntro() ui.Row {
