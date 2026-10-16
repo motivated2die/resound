@@ -1,0 +1,45 @@
+<!-- Where your voice and your sounds go: the panel's audio flow, simplified.
+     Lines are help.css .vf-*; the left column's centre is --col. -->
+<div class="vf" role="img" aria-label="Your microphone reaches VB-Cable through Windows' Listen to this device. Resound plays your sounds into VB-Cable too, and to your own headphones. Discord and games use CABLE Output as their microphone, so they get your voice and your sounds together.">
+    <div class="vf-node vf-mic">
+        <span class="icon" data-icon="mic" aria-hidden="true"></span>
+        <strong>Your microphone</strong>
+        <span>your voice</span>
+    </div>
+    <div class="vf-node vf-board">
+        <img src="/assets/resound-192.png" alt="" width="26" height="26">
+        <strong>Resound</strong>
+        <span>your sounds</span>
+    </div>
+
+    <div class="vf-links" aria-hidden="true">
+        <span class="vf-line vf-v vf-l"></span>
+        <span class="vf-line vf-h"></span>
+        <span class="vf-line vf-v vf-r"></span>
+        <span class="vf-label vf-label-mic">Listen to this device</span>
+        <span class="vf-label vf-label-others">Others hear</span>
+        <span class="vf-label vf-label-you">You hear</span>
+    </div>
+
+    <div class="vf-node vf-cable">
+        <span class="icon" data-icon="graphic_eq" aria-hidden="true"></span>
+        <strong>VB-Cable</strong>
+        <span>voice + sounds, mixed</span>
+    </div>
+    <div class="vf-node vf-you">
+        <span class="icon" data-icon="headset_mic" aria-hidden="true"></span>
+        <strong>Your headphones</strong>
+        <span>sounds only</span>
+    </div>
+
+    <div class="vf-links vf-links-bottom" aria-hidden="true">
+        <span class="vf-line vf-v vf-l"></span>
+        <span class="vf-label vf-label-out">CABLE Output</span>
+    </div>
+
+    <div class="vf-node vf-apps">
+        <span class="icon" data-icon="computer" aria-hidden="true"></span>
+        <strong>Discord, games, OBS</strong>
+        <span>microphone: CABLE Output</span>
+    </div>
+</div>

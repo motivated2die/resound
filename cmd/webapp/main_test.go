@@ -111,10 +111,11 @@ func TestWebIcons(t *testing.T) {
 	}
 }
 
-// The build fills in the service worker, which lists every page and script.
+// The build fills in the service worker, which lists every page and script
+// of the app, and adds the help center, which it must not list.
 func TestBuild(t *testing.T) {
 	out := t.TempDir()
-	if err := build(filepath.Join("..", "..", "webapp", "src"), out); err != nil {
+	if err := build(filepath.Join("..", "..", "webapp", "src"), filepath.Join("..", "..", "webapp", "help"), out); err != nil {
 		t.Fatal(err)
 	}
 	sw, err := os.ReadFile(filepath.Join(out, "sw.js"))
@@ -128,5 +129,16 @@ func TestBuild(t *testing.T) {
 	}
 	if strings.Contains(string(sw), "__FILES__") || strings.Contains(string(sw), "__VERSION__") || strings.Contains(string(sw), "README") {
 		t.Errorf("sw.js not filled in properly")
+	}
+	if strings.Contains(string(sw), `"/help`) {
+		t.Errorf("sw.js caches the help center")
+	}
+	if !strings.Contains(string(sw), `url.pathname.startsWith('/help/')`) {
+		t.Errorf("sw.js doesn't leave /help/ to the network")
+	}
+	for _, page := range []string{"help/index.html", "help/voice-chat.html", "help/help.css", "help/help.js", "help/search.json"} {
+		if _, err := os.Stat(filepath.Join(out, filepath.FromSlash(page))); err != nil {
+			t.Errorf("help center: %v", err)
+		}
 	}
 }
