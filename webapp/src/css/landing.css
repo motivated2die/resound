@@ -433,7 +433,8 @@ h1 { font-size: clamp(32px, 5vw, 52px); line-height: 1.1; font-weight: 700; lett
     from { box-shadow: 0 0 0 4px rgba(var(--accent-rgb), 0.35), 0 0 34px rgba(var(--accent-rgb), 0.7); }
     to { box-shadow: 0 10px 26px rgba(0, 0, 0, 0.45); }
 }
-.rc-apps { position: absolute; z-index: 2; left: 311px; top: 182px; list-style: none; display: grid; gap: 26px; }
+/* Under the PC's right half, right-aligned with its screen (288 + 84 = 372). */
+.rc-apps { position: absolute; z-index: 2; left: 334px; top: 100px; list-style: none; display: grid; gap: 26px; }
 .rc-app {
     position: relative;
     width: 38px;
@@ -452,8 +453,8 @@ h1 { font-size: clamp(32px, 5vw, 52px); line-height: 1.1; font-weight: 700; lett
 /* The sound's emoji, popping up beside the app. */
 .rc-pop {
     position: absolute;
-    left: -21px;
-    top: -9px;
+    left: -14px;
+    top: -10px;
     width: 26px;
     height: 26px;
     border-radius: 50%;
