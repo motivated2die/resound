@@ -71,6 +71,7 @@ code { font-family: Consolas, "Cascadia Mono", monospace; background: var(--rais
 .icon[data-icon="favorite-fill"] { --icon: url("../assets/icons/favorite-fill.svg"); }
 .icon[data-icon="folder_open"] { --icon: url("../assets/icons/folder_open.svg"); }
 .icon[data-icon="graphic_eq"] { --icon: url("../assets/icons/graphic_eq.svg"); }
+.icon[data-icon="help"] { --icon: url("../assets/icons/help.svg"); }
 .icon[data-icon="headset_mic"] { --icon: url("../assets/icons/headset_mic.svg"); }
 .icon[data-icon="install_mobile"] { --icon: url("../assets/icons/install_mobile.svg"); }
 .icon[data-icon="keyboard"] { --icon: url("../assets/icons/keyboard.svg"); }
@@ -78,6 +79,8 @@ code { font-family: Consolas, "Cascadia Mono", monospace; background: var(--rais
 .icon[data-icon="mic"] { --icon: url("../assets/icons/mic.svg"); }
 .icon[data-icon="newspaper"] { --icon: url("../assets/icons/newspaper.svg"); }
 .icon[data-icon="qr_code_scanner"] { --icon: url("../assets/icons/qr_code_scanner.svg"); }
+.icon[data-icon="discord"] { --icon: url("../assets/icons/discord.svg"); }
+.icon[data-icon="sports_esports"] { --icon: url("../assets/icons/sports_esports.svg"); }
 .icon[data-icon="search"] { --icon: url("../assets/icons/search.svg"); }
 .icon[data-icon="settings"] { --icon: url("../assets/icons/settings.svg"); }
 .icon[data-icon="smartphone"] { --icon: url("../assets/icons/smartphone.svg"); }
@@ -126,6 +129,23 @@ code { font-family: Consolas, "Cascadia Mono", monospace; background: var(--rais
     white-space: nowrap;
 }
 .header-cta:hover { color: var(--on-accent); background: var(--accent-light); }
+/* Help: a pill like the soundboard button, outlined so the soundboard stays first. */
+.header-help {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin-right: -10px; /* closer to its neighbour than the header's gap */
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--accent);
+    padding: 6px 14px 6px 10px;
+    border-radius: 999px;
+    border: 1px solid rgba(var(--accent-rgb), 0.5);
+    background: rgba(var(--accent-rgb), 0.08);
+    white-space: nowrap;
+}
+.header-help .icon { font-size: 18px; }
+.header-help:hover { color: var(--accent-light); background: rgba(var(--accent-rgb), 0.16); border-color: var(--accent); }
 
 /* --- Buttons --- */
 .btn {
@@ -172,25 +192,32 @@ h1 { font-size: clamp(32px, 5vw, 52px); line-height: 1.1; font-weight: 700; lett
     display: flex;
     justify-content: center;
     position: relative;
+    min-width: 0; /* the stage zooms to the column, the column doesn't grow to it */
     -webkit-user-select: none;
     user-select: none;
     -webkit-touch-callout: none;
 }
 .hero-visual img { -webkit-user-drag: none; }
 .phone {
-    width: min(300px, 78vw);
-    aspect-ratio: 9 / 18;
-    border-radius: 38px;
-    padding: 10px;
+    position: absolute;
+    z-index: 1;
+    left: 52px;
+    top: 26px;
+    width: 216px;
+    height: 448px;
+    border-radius: 34px;
+    padding: 8px;
     background: linear-gradient(160deg, #30323a, #18191d);
-    box-shadow: 0 30px 80px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(255, 255, 255, 0.06), 0 0 90px rgba(var(--accent-rgb), 0.12);
-    transform: rotate(-3deg);
+    /* A close, dark shadow all round as well: the waves spread from beneath it. */
+    box-shadow: 0 30px 80px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(255, 255, 255, 0.06), 0 0 90px rgba(var(--accent-rgb), 0.12),
+        0 2px 6px rgba(0, 0, 0, 0.55), 0 0 22px 6px rgba(0, 0, 0, 0.4);
+    transform: rotate(-6deg);
 }
 /* The screen follows the remote's layout (app.html): a slim top bar, the
    sound grid, the tabs, and the bottom bar with logo, mic and STOP. */
 .phone-screen {
     height: 100%;
-    border-radius: 30px;
+    border-radius: 27px;
     background: var(--background);
     overflow: hidden;
     display: flex;
@@ -200,27 +227,27 @@ h1 { font-size: clamp(32px, 5vw, 52px); line-height: 1.1; font-weight: 700; lett
     display: flex;
     justify-content: flex-end;
     gap: 14px;
-    padding: 16px 16px 8px;
+    padding: 13px 15px 7px;
     background: var(--raised);
     border-bottom: 1px solid var(--divider);
     color: var(--muted);
 }
-.mock-top .icon { font-size: 15px; }
+.mock-top .icon { font-size: 13px; }
 .mock-grid {
     flex: 1;
     display: grid;
     grid-template-columns: repeat(3, 1fr);
     grid-auto-rows: 1fr;
-    gap: 6px;
-    padding: 8px;
+    gap: 5px;
+    padding: 7px;
     min-height: 0;
 }
 .tile {
     position: relative;
     overflow: hidden;
-    border-radius: 8px;
+    border-radius: 7px;
     background: var(--surface);
-    font-size: 10px;
+    font-size: 9px;
     line-height: 1.2;
     display: flex;
     align-items: center;
@@ -229,6 +256,10 @@ h1 { font-size: clamp(32px, 5vw, 52px); line-height: 1.1; font-weight: 700; lett
     padding: 4px;
     border: 1.5px solid transparent;
     z-index: 0;
+    /* As on the remote (css/styles.css): progress fill, play outline and glow */
+    --fill: #393c45;
+    --hl: rgb(180, 180, 180);
+    --glow: rgba(200, 200, 200, 0.6);
 }
 /* The emoji sits large behind the name, as on the remote's cards */
 .tile b {
@@ -237,7 +268,7 @@ h1 { font-size: clamp(32px, 5vw, 52px); line-height: 1.1; font-weight: 700; lett
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 26px;
+    font-size: 23px;
     font-weight: normal;
     opacity: 0.85;
     z-index: -1;
@@ -255,31 +286,42 @@ h1 { font-size: clamp(32px, 5vw, 52px); line-height: 1.1; font-weight: 700; lett
     mask: url("../assets/icons/favorite-fill.svg") center / contain no-repeat;
 }
 /* The remote's card colours (css/styles.css --sound-color-*) */
-.tile.red { background: #4a2a2a; }
-.tile.orange { background: #5a3c1f; }
-.tile.yellow { background: #5a502a; }
-.tile.green { background: #344a2a; }
-.tile.blue { background: #2a3a4a; }
-.tile.purple { background: #3a2a4a; }
-.tile.pink { background: #4a2a3a; }
-.tile.playing { border-color: rgba(255, 100, 100, 0.7); box-shadow: 0 0 12px rgba(255, 100, 100, 0.45); }
-.tile.playing::before {
+.tile.red { background: #4a2a2a; --fill: #6b3a3a; --hl: #ff8a80; --glow: rgba(255, 100, 100, 0.7); }
+.tile.orange { background: #5a3c1f; --fill: #80572a; --hl: #ffcc80; --glow: rgba(255, 170, 100, 0.7); }
+.tile.yellow { background: #5a502a; --fill: #80733a; --hl: #fff59d; --glow: rgba(255, 227, 100, 0.7); }
+.tile.green { background: #344a2a; --fill: #4b6b3a; --hl: #a5d6a7; --glow: rgba(165, 255, 100, 0.7); }
+.tile.blue { background: #2a3a4a; --fill: #3b5270; --hl: #90caf9; --glow: rgba(100, 154, 255, 0.7); }
+.tile.purple { background: #3a2a4a; --fill: #553b6d; --hl: #ce93d8; --glow: rgba(200, 100, 255, 0.7); }
+.tile.pink { background: #4a2a3a; --fill: #6b3b54; --hl: #f48fb1; --glow: rgba(255, 150, 208, 0.7); }
+/* The progress fill: the card's lighter shade, fading out when it ends. */
+.tile::before {
     content: "";
     position: absolute;
     inset: 0 auto 0 0;
-    width: 62%;
-    background: #6b3a3a;
+    width: 100%;
+    background: var(--fill);
+    opacity: 0;
+    transition: opacity 0.35s ease;
     z-index: -2;
 }
+.tile.playing { border-color: var(--hl); box-shadow: 0 0 6px var(--glow); }
+.tile.playing::before { width: 62%; opacity: 1; }
+/* Pads you can press (landing.js): each press plays once, like a sound. */
+.rc .tile { cursor: pointer; touch-action: manipulation; transition: transform 0.12s ease, filter 0.12s ease; }
+.rc .tile:active { transform: scale(0.93); }
+@media (hover: hover) { .rc .tile:hover { filter: brightness(1.18); } }
 @media (prefers-reduced-motion: no-preference) {
-    .tile.playing::before { animation: progress 3.2s linear infinite; }
+    /* The outline fades as on the remote (highlightFade, 2.5 s). */
+    .tile.playing { animation: tile-outline 2.5s ease-out forwards; }
+    .tile.playing::before { animation: progress var(--play, 2.6s) linear forwards; }
+    @keyframes tile-outline { from { border-color: var(--hl); box-shadow: 0 0 6px var(--glow); } to { border-color: transparent; box-shadow: none; } }
     @keyframes progress { from { width: 0; } to { width: 100%; } }
 }
 .mock-tabs {
     display: flex;
     background: var(--raised);
     border-top: 1px solid var(--divider);
-    font-size: 9.5px;
+    font-size: 8.5px;
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.02em;
@@ -290,12 +332,12 @@ h1 { font-size: clamp(32px, 5vw, 52px); line-height: 1.1; font-weight: 700; lett
 .mock-tab {
     display: flex;
     align-items: center;
-    padding: 0 11px;
-    height: 30px;
+    padding: 0 9px;
+    height: 26px;
     border-top: 2px solid transparent;
     margin-top: -1px;
 }
-.mock-tab .icon { font-size: 14px; }
+.mock-tab .icon { font-size: 12px; }
 /* The remote's sliding indicator (styles.css .tab-indicator): a line with a
    slight glow fading down inside the tab. */
 .mock-tab.on {
@@ -307,18 +349,18 @@ h1 { font-size: clamp(32px, 5vw, 52px); line-height: 1.1; font-weight: 700; lett
 .mock-bar {
     display: flex;
     align-items: center;
-    gap: 8px;
-    padding: 9px 12px 14px;
+    gap: 7px;
+    padding: 8px 10px 12px;
     background: #16171b;
 }
 .mock-title { display: flex; flex-direction: column; line-height: 1.25; }
-.mock-brand { font-size: 10px; font-weight: 600; letter-spacing: 0.16em; }
+.mock-brand { font-size: 9px; font-weight: 600; letter-spacing: 0.16em; }
 .mock-status { font-size: 8px; color: var(--muted); display: flex; align-items: center; gap: 4px; }
 .mock-status i { width: 5px; height: 5px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 6px var(--accent); }
 .mock-mic {
     margin-left: auto;
-    width: 28px;
-    height: 28px;
+    width: 24px;
+    height: 24px;
     border-radius: 50%;
     background: var(--control);
     border: 1px solid rgba(255, 255, 255, 0.08);
@@ -326,19 +368,111 @@ h1 { font-size: clamp(32px, 5vw, 52px); line-height: 1.1; font-weight: 700; lett
     align-items: center;
     justify-content: center;
 }
-.mock-mic .icon { font-size: 15px; }
+.mock-mic .icon { font-size: 13px; }
 .mock-stop {
     display: flex;
     align-items: center;
     gap: 4px;
-    font-size: 10px;
+    font-size: 9px;
     font-weight: 700;
     color: #fff;
     background: var(--berry);
-    padding: 6px 12px 6px 8px;
+    padding: 5px 10px 5px 7px;
     border-radius: 999px;
 }
-.mock-stop .icon { font-size: 14px; }
+.mock-stop .icon { font-size: 13px; }
+.mock-bar img { width: 21px; height: 21px; }
+
+/* --- The stage around the phone: the waves to the PC and its apps. A fixed
+   layout of 380 x 520 px, zoomed to the column by landing.js (--rc-zoom);
+   the waves in index.html are centred on the phone. --- */
+.rc { position: relative; flex-shrink: 0; width: 380px; height: 520px; zoom: var(--rc-zoom, 1); }
+/* The waves: the logo's rings around the phone, behind everything. The
+   resting rings are faint; a play lights each in turn (landing.js). */
+.rc-waves { position: absolute; left: 0; top: 0; width: 380px; height: 540px; z-index: 0; overflow: visible; pointer-events: none; }
+.rc-waves circle { fill: none; stroke: url(#rc-wave-tone); stroke-width: 4; }
+.rc-rings { opacity: 0.14; }
+.rc-ring { opacity: 0; } /* lit: the same line at full strength, with a glow (#rc-ring-glow) */
+.rc.still .rc-ring { opacity: 0.5; }
+/* The PC: a small monitor with Windows' logo, Resound's in the corner. */
+.rc-pc {
+    position: absolute; z-index: 2; left: 288px; top: 40px; width: 84px; display: flex; flex-direction: column; align-items: center;
+    /* The waves pass beneath the PC: a shadow around screen and stand sets them apart. */
+    filter: drop-shadow(0 3px 5px rgba(0, 0, 0, 0.6)) drop-shadow(0 0 12px rgba(0, 0, 0, 0.45));
+}
+.rc-screen {
+    position: relative;
+    width: 84px;
+    height: 58px;
+    border-radius: 9px;
+    border: 2px solid #2f3139;
+    background: radial-gradient(ellipse at 30% 20%, #23405f, #142235 75%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 10px 26px rgba(0, 0, 0, 0.45);
+    transition: border-color 0.25s ease;
+}
+.rc-win { fill: #63c6ff; filter: drop-shadow(0 0 6px rgba(99, 198, 255, 0.45)); }
+.rc-screen img { position: absolute; right: 5px; bottom: 5px; }
+.rc-stand {
+    width: 34px;
+    height: 12px;
+    background:
+        linear-gradient(#2f3139, #2f3139) center top / 10px 8px no-repeat,
+        linear-gradient(#2f3139, #2f3139) center bottom / 34px 4px no-repeat;
+}
+.rc-pc.hit .rc-screen { border-color: var(--accent); animation: rc-hit 0.35s ease-out; }
+@keyframes rc-hit {
+    from { box-shadow: 0 0 0 4px rgba(var(--accent-rgb), 0.35), 0 0 34px rgba(var(--accent-rgb), 0.7); }
+    to { box-shadow: 0 10px 26px rgba(0, 0, 0, 0.45); }
+}
+/* Under the PC's right half, right-aligned with its screen (288 + 84 = 372). */
+.rc-apps { position: absolute; z-index: 2; left: 334px; top: 124px; list-style: none; display: grid; gap: 16px; }
+.rc-app {
+    position: relative;
+    width: 38px;
+    height: 38px;
+    border-radius: 50%;
+    background: var(--surface);
+    border: 1px solid rgba(255, 255, 255, 0.09);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--muted);
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.55), 0 1px 3px rgba(0, 0, 0, 0.5);
+    transition: color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
+}
+.rc-app .icon { font-size: 20px; }
+.rc-app.on { color: var(--text); border-color: rgba(var(--accent-rgb), 0.6); box-shadow: 0 6px 16px rgba(0, 0, 0, 0.55), 0 1px 3px rgba(0, 0, 0, 0.5), 0 0 16px rgba(var(--accent-rgb), 0.3); }
+/* The sound's emoji, popping up at the app's top right. */
+.rc-pop {
+    position: absolute;
+    right: -12px;
+    top: -10px;
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    background: var(--raised);
+    border: 1px solid rgba(var(--accent-rgb), 0.55);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    font-weight: normal;
+    opacity: 0;
+    transform: scale(0.3);
+}
+.rc-app.on .rc-pop { animation: rc-pop 1s ease forwards; }
+@keyframes rc-pop {
+    0% { opacity: 0; transform: scale(0.3); }
+    14% { opacity: 1; transform: scale(1.18); }
+    24% { transform: scale(1); }
+    80% { opacity: 1; transform: scale(1); }
+    100% { opacity: 0; transform: scale(0.85); }
+}
+/* Without motion: one still picture, the emoji shown. */
+.rc.still .rc-pop { animation: none; opacity: 1; transform: none; }
 
 /* --- The desktop panel (internal/ui), drawn at its 125 % size: the same
    colours (canvas_windows.go), flow geometry and pixel-art jacks
@@ -355,6 +489,7 @@ h1 { font-size: clamp(32px, 5vw, 52px); line-height: 1.1; font-weight: 700; lett
 }
 .picon[data-picon="chevron-right"] { --picon: url("../assets/panel-icons/chevron-right.svg"); }
 .picon[data-picon="external-link"] { --picon: url("../assets/panel-icons/external-link.svg"); }
+.picon[data-picon="help-circle"] { --picon: url("../assets/panel-icons/help-circle.svg"); }
 .picon[data-picon="info-circle"] { --picon: url("../assets/panel-icons/info-circle.svg"); }
 .picon[data-picon="keyboard"] { --picon: url("../assets/panel-icons/keyboard.svg"); }
 .picon[data-picon="microphone"] { --picon: url("../assets/panel-icons/microphone.svg"); }
@@ -955,6 +1090,10 @@ h3 { font-size: 18px; line-height: 1.3; margin-bottom: 6px; }
 
 /* --- Smaller screens --- */
 @media (max-width: 960px) {
+    /* The section links need about 850px beside the logo, Help and the
+       soundboard button: below this they go, the two buttons stay. */
+    .site-nav { display: none; }
+    .header-help { margin-left: auto; }
     .hero-inner { grid-template-columns: 1fr; gap: 40px; }
     .hero { padding-top: 40px; }
     .features { grid-template-columns: repeat(2, 1fr); }
@@ -991,14 +1130,19 @@ h3 { font-size: 18px; line-height: 1.3; margin-bottom: 6px; }
     .ovl-action { align-self: center; }
     .ovl-callout { width: 100%; flex-direction: column; align-items: flex-start; gap: 12px; padding: 14px; font-size: 14px; }
     .ovl-status { font-size: 14px; }
-    .site-nav { display: none; }
-    .header-cta { margin-left: auto; }
     .steps, .features, .how-grid { grid-template-columns: 1fr; }
     .section { padding: 44px 0; }
     .lead { font-size: 17px; }
+    /* Phones: more air around the hero's text and buttons. */
+    .hero { padding-top: 60px; }
+    .hero-inner { gap: 56px; }
+    .hero .eyebrow { margin-bottom: 18px; }
+    .hero h1 { margin-bottom: 22px; }
+    .hero .lead { margin-bottom: 36px; line-height: 1.6; }
+    .hero .cta-row { gap: 14px; }
+    .hero .facts { margin-top: 34px; gap: 12px 22px; }
     .cta-row .btn, .cta-row .cta-stack { flex: 1 1 100%; }
     .cta-stack .btn { width: 100%; }
-    .phone { transform: none; }
 }
 /* The panel keeps its pixel layout and shrinks as a whole. */
 @media (max-width: 480px) { .dp, .dp-legend { zoom: 0.86; } }

@@ -38,6 +38,7 @@ The full license texts are in each module's source (`go mod download`, then the 
 | [jsQR](https://github.com/cozmo/jsQR) 1.4.0 | Apache-2.0 | `webapp/src/vendor/jsqr/` |
 | [Material Symbols](https://github.com/google/material-design-icons) (Outlined) SVG icons by Google | Apache-2.0 | `webapp/src/assets/icons/` |
 | [Tabler Icons](https://tabler.io/icons) (outline) SVG icons by Paweł Kuna, copies of the panel's | MIT | `webapp/src/assets/panel-icons/` |
+| [Font Awesome Free](https://fontawesome.com) 6.7.2 Discord icon by Fonticons, Inc. (license comment kept in the file) | CC BY 4.0 | `webapp/src/assets/icons/discord.svg` |
 
 Each folder contains the component's license file(s) and a README naming the exact source. The app loads nothing from other hosts.
 

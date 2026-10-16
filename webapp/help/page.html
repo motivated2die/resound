@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="theme-color" content="#1c1d22">
+    <meta name="description" content="{{if .Home}}Set up, use and troubleshoot Resound, the soundboard for Windows you control from your phone.{{else}}{{.Summary}}{{end}}">
+    <link rel="icon" href="/assets/favicon.ico" sizes="any">
+    <link rel="apple-touch-icon" href="/assets/resound-192.png">
+    <title>{{if .Home}}Resound Help{{else}}{{.Title}} · Resound Help{{end}}</title>
+    <!-- Not part of the installed app: no manifest, no rtc.js, no service
+         worker of its own (sw.js leaves /help/ to the network) -->
+    <link rel="stylesheet" href="/help/help.css">
+    <link rel="stylesheet" href="/css/scrollbar.css">
+    <script src="/help/help.js"></script>
+</head>
+<body>
+    <a class="skip-link" href="#content">Skip to the article</a>
+    <div class="page-glow" aria-hidden="true"></div>
+
+    <header class="hc-header">
+        <div class="hc-header-inner">
+            <button class="hc-menu" type="button" aria-label="Topics" aria-controls="hc-nav" aria-expanded="false" data-menu>
+                <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+            </button>
+            <a class="hc-brand" href="/help/">
+                <img src="/assets/resound-192.png" alt="" width="30" height="30">
+                <span>RESOUND</span>
+                <em>Help</em>
+            </a>
+            <div class="hc-search" role="search">
+                <span class="icon" data-icon="search" aria-hidden="true"></span>
+                <input id="hc-search" type="search" placeholder="Search help" aria-label="Search help"
+                       autocomplete="off" spellcheck="false" aria-controls="hc-results" aria-expanded="false">
+                <kbd class="hc-search-key" aria-hidden="true">/</kbd>
+                <div id="hc-results" class="hc-results" role="listbox" aria-label="Search results" hidden></div>
+            </div>
+            <a class="hc-site" href="/">getresound.app</a>
+        </div>
+    </header>
+
+    <div class="hc-layout">
+        <nav class="hc-nav" id="hc-nav" aria-label="Help topics">
+            <a class="hc-nav-home" href="/help/"{{if .Home}} aria-current="page"{{end}}>Overview</a>
+            {{- range .Sections}}
+            <div class="hc-nav-group">
+                <p class="hc-nav-title">{{.Title}}</p>
+                <ul>
+                    {{- range .Pages}}
+                    <li><a href="/help/{{.Slug}}"{{if eq .Slug $.Slug}} aria-current="page"{{end}}>{{.Label}}</a></li>
+                    {{- end}}
+                </ul>
+            </div>
+            {{- end}}
+        </nav>
+        <div class="hc-scrim" data-menu-close hidden></div>
+
+        <main id="content" class="hc-main">
+            <article class="hc-article">
+                {{- if .Section}}
+                <p class="hc-eyebrow">{{.Section}}</p>
+                {{- end}}
+                <h1>{{.Title}}</h1>
+                {{.Body}}
+                {{- if .Home}}
+                <div class="hc-sections">
+                    {{- range .Sections}}
+                    <section class="hc-card">
+                        <h2>{{.Title}}</h2>
+                        <ul>
+                            {{- range .Pages}}
+                            <li><a href="/help/{{.Slug}}">{{.Label}}</a></li>
+                            {{- end}}
+                        </ul>
+                    </section>
+                    {{- end}}
+                </div>
+                {{- end}}
+            </article>
+
+            {{- if or .Prev .Next}}
+            <nav class="hc-pager" aria-label="Previous and next">
+                {{- with .Prev}}
+                <a class="hc-prev" href="/help/{{.Slug}}"><span>Previous</span><strong>{{.Label}}</strong></a>
+                {{- end}}
+                {{- with .Next}}
+                <a class="hc-next" href="/help/{{.Slug}}"><span>Next</span><strong>{{.Label}}</strong></a>
+                {{- end}}
+            </nav>
+            {{- end}}
+
+            <footer class="hc-footer">
+                <p>Still stuck? <a href="https://github.com/motivated2die/resound/issues">Report a problem on GitHub</a>, with what you tried and the log from Settings → Diagnostics → <strong>Open log</strong>.</p>
+                <p class="hc-footer-links">
+                    <a href="/">Resound home</a>
+                    <a href="https://github.com/motivated2die/resound/releases/latest">Download</a>
+                    <a href="https://github.com/motivated2die/resound/blob/main/PRIVACY.md">Privacy</a>
+                </p>
+            </footer>
+        </main>
+
+        {{- if .TOC}}
+        <aside class="hc-toc" aria-label="On this page">
+            <p>On this page</p>
+            <ul>
+                {{- range .TOC}}
+                <li><a href="#{{.ID}}">{{.Text}}</a></li>
+                {{- end}}
+            </ul>
+        </aside>
+        {{- end}}
+    </div>
+</body>
+</html>

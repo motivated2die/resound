@@ -35,6 +35,9 @@ self.addEventListener('fetch', (event) => {
     if (req.method !== 'GET') return;
     const url = new URL(req.url);
     if (url.origin !== self.location.origin) return;
+    // The help center (/help/…) isn't part of the app: it always comes from
+    // the host, never from this cache or as the landing page.
+    if (url.pathname === '/help' || url.pathname.startsWith('/help/')) return;
     // Pages are cached under their short names ('/', '/app', '/connect'), as
     // the build lists them and Cloudflare Pages serves them, so /app.html
     // finds /app. The fragment (e.g. a pairing link) stays with the browser.

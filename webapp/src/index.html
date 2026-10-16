@@ -14,6 +14,7 @@
     <script src="js/landing.js"></script>
     <script src="js/overlay-demo.js" defer></script>
     <link rel="stylesheet" href="css/landing.css">
+    <link rel="stylesheet" href="css/scrollbar.css">
 </head>
 <body>
     <div class="page-glow" aria-hidden="true"></div>
@@ -31,6 +32,7 @@
                 <a href="#how">How it works</a>
                 <a href="#news">News</a>
             </nav>
+            <a class="header-help" href="/help/"><span class="icon" data-icon="help" aria-hidden="true"></span>Help</a>
             <a class="header-cta" href="/connect" data-open-app><span data-open-app-label>Open soundboard</span></a>
         </div>
     </header>
@@ -40,8 +42,8 @@
         <section class="hero">
             <div class="wrap hero-inner">
                 <div class="hero-copy">
-                    <p class="eyebrow">Free soundboard for Windows</p>
-                    <h1>Your sounds in every voice chat, played from your phone.</h1>
+                    <p class="eyebrow">Free wireless soundboard for Windows</p>
+                    <h1>Your sounds in every voice chat, sent remotely by your phone.</h1>
                     <p class="lead">
                         Resound plays sounds into Discord, games and any voice chat, and to your own speakers.
                         Your phone is the remote: scan a code, tap a button, done.
@@ -67,48 +69,107 @@
                     </ul>
                 </div>
 
-                <!-- A phone showing the remote (drawn in CSS, not a screenshot) -->
+                <!-- The remote and the PC it controls, drawn in CSS and SVG (not a
+                     screenshot). Every few seconds, or when tapped, a pad plays: 
+                     waves ring out from the phone to the PC, and the sound\'s emoji
+                     pops up at each app (landing.js, animateRemote). The stage has a fixed
+                     layout in px; landing.js zooms it to the column's width. -->
                 <div class="hero-visual" aria-hidden="true">
-                    <div class="phone">
-                        <div class="phone-screen">
-                            <div class="mock-top">
-                                <span class="icon" data-icon="search"></span>
-                                <span class="icon" data-icon="edit"></span>
-                                <span class="icon" data-icon="settings"></span>
-                            </div>
-                            <div class="mock-grid">
-                                <div class="tile red playing"><b>📯</b><span>Airhorn</span></div>
-                                <div class="tile"><b>🥁</b><span>Ba dum tss</span></div>
-                                <div class="tile blue"><b>👏</b><span>Applause</span></div>
-                                <div class="tile yellow fav"><b>😂</b><span>Laugh track</span></div>
-                                <div class="tile purple"><b>🎺</b><span>Sad trombone</span></div>
-                                <div class="tile"><b>🔔</b><span>Ding</span></div>
-                                <div class="tile green"><b>🦆</b><span>Quack</span></div>
-                                <div class="tile orange"><b>💥</b><span>Boom</span></div>
-                                <div class="tile pink fav"><b>🎉</b><span>Victory</span></div>
-                                <div class="tile"><b>🐐</b><span>Goat</span></div>
-                                <div class="tile blue"><b>🚨</b><span>Alarm</span></div>
-                                <div class="tile"><b>🎵</b><span>Intro</span></div>
-                                <div class="tile purple"><b>👻</b><span>Spooky</span></div>
-                                <div class="tile"><b>🤖</b><span>Robot</span></div>
-                                <div class="tile red"><b>😱</b><span>Scream</span></div>
-                            </div>
-                            <div class="mock-tabs">
-                                <span class="mock-tab"><span class="icon" data-icon="favorite-fill"></span></span>
-                                <span class="mock-tab">1 Music</span>
-                                <span class="mock-tab on">2 Sounds</span>
-                                <span class="mock-tab">3 Speech</span>
-                            </div>
-                            <div class="mock-bar">
-                                <img src="assets/resound-192.png" alt="" width="24" height="24">
-                                <div class="mock-title">
-                                    <span class="mock-brand">RESOUND</span>
-                                    <span class="mock-status"><i></i>Connected</span>
+                    <div class="rc" data-remote>
+<!-- Wireless waves, like the rings in the logo: fixed circles around
+                             the phone, behind it, the PC and the apps. A play lights them
+                             up from the inside out (landing.js); they are brightest
+                             towards the PC and fade out on the far side. -->
+                        <svg class="rc-waves" viewBox="0 -15 380 540" width="380" height="540">
+                            <defs>
+                                <linearGradient id="rc-wave-tone" gradientUnits="userSpaceOnUse" x1="-52" y1="476" x2="372" y2="24">
+                                    <stop offset="0.3" stop-color="#50dea8" stop-opacity="0"/>
+                                    <stop offset="0.6" stop-color="#50dea8" stop-opacity="0.3"/>
+                                    <stop offset="1" stop-color="#50dea8" stop-opacity="1"/>
+                                </linearGradient>
+                                <!-- A lit ring glows: its blurred copy under it -->
+                                <filter id="rc-ring-glow" x="-20%" y="-20%" width="140%" height="140%">
+                                    <feGaussianBlur stdDeviation="4" result="blur"/>
+                                    <feMerge><feMergeNode in="blur"/><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+                                </filter>
+                            </defs>
+                            <g class="rc-rings" transform="translate(160 250)">
+                                <circle r="130"/>
+                                <circle r="160"/>
+                                <circle r="190"/>
+                                <circle r="220"/>
+                                <circle r="250"/>
+                                <circle r="280"/>
+                                <circle r="310"/>
+                            </g>
+                            <g class="rc-rings-lit" transform="translate(160 250)" filter="url(#rc-ring-glow)">
+                                <circle class="rc-ring" r="130" data-ring/>
+                                <circle class="rc-ring" r="160" data-ring/>
+                                <circle class="rc-ring" r="190" data-ring/>
+                                <circle class="rc-ring" r="220" data-ring/>
+                                <circle class="rc-ring" r="250" data-ring/>
+                                <circle class="rc-ring" r="280" data-ring/>
+                                <circle class="rc-ring" r="310" data-ring/>
+                            </g>
+                        </svg>
+
+                        <div class="phone" data-phone>
+                            <div class="phone-screen">
+                                <div class="mock-top">
+                                    <span class="icon" data-icon="search"></span>
+                                    <span class="icon" data-icon="edit"></span>
+                                    <span class="icon" data-icon="settings"></span>
                                 </div>
-                                <span class="mock-mic"><span class="icon" data-icon="mic"></span></span>
-                                <span class="mock-stop"><span class="icon" data-icon="stop_circle"></span>STOP</span>
+                                <div class="mock-grid">
+                                    <div class="tile red playing"><b>📯</b><span>Airhorn</span></div>
+                                    <div class="tile"><b>🥁</b><span>Ba dum tss</span></div>
+                                    <div class="tile blue"><b>👏</b><span>Applause</span></div>
+                                    <div class="tile yellow fav"><b>😂</b><span>Laugh track</span></div>
+                                    <div class="tile purple"><b>🎺</b><span>Sad trombone</span></div>
+                                    <div class="tile"><b>🔔</b><span>Ding</span></div>
+                                    <div class="tile green"><b>🦆</b><span>Quack</span></div>
+                                    <div class="tile orange"><b>💥</b><span>Boom</span></div>
+                                    <div class="tile pink fav"><b>🎉</b><span>Victory</span></div>
+                                    <div class="tile"><b>🐐</b><span>Goat</span></div>
+                                    <div class="tile blue"><b>🚨</b><span>Alarm</span></div>
+                                    <div class="tile"><b>🎵</b><span>Intro</span></div>
+                                    <div class="tile purple"><b>👻</b><span>Spooky</span></div>
+                                    <div class="tile"><b>🤖</b><span>Robot</span></div>
+                                    <div class="tile red"><b>😱</b><span>Scream</span></div>
+                                </div>
+                                <div class="mock-tabs">
+                                    <span class="mock-tab"><span class="icon" data-icon="favorite-fill"></span></span>
+                                    <span class="mock-tab">1 Music</span>
+                                    <span class="mock-tab on">2 Sounds</span>
+                                    <span class="mock-tab">3 Speech</span>
+                                </div>
+                                <div class="mock-bar">
+                                    <img src="assets/resound-192.png" alt="" width="24" height="24">
+                                    <div class="mock-title">
+                                        <span class="mock-brand">RESOUND</span>
+                                        <span class="mock-status"><i></i>Connected</span>
+                                    </div>
+                                    <span class="mock-mic"><span class="icon" data-icon="mic"></span></span>
+                                    <span class="mock-stop"><span class="icon" data-icon="stop_circle"></span>STOP</span>
+                                </div>
                             </div>
                         </div>
+
+                        <!-- The PC: Windows with Resound running -->
+                        <div class="rc-pc" data-pc>
+                            <div class="rc-screen">
+                                <svg class="rc-win" viewBox="0 0 24 24" width="24" height="24"><path d="M2 2h9.6v9.6H2zM12.4 2H22v9.6h-9.6zM2 12.4h9.6V22H2zM12.4 12.4H22V22h-9.6z"/></svg>
+                                <img src="assets/resound-192.png" alt="" width="14" height="14">
+                            </div>
+                            <div class="rc-stand"></div>
+                        </div>
+
+                        <!-- What the PC plays into: a game, Discord, any voice app -->
+                        <ul class="rc-apps">
+                            <li class="rc-app"><span class="icon" data-icon="sports_esports"></span><b class="rc-pop"></b></li>
+                            <li class="rc-app"><span class="icon" data-icon="discord"></span><b class="rc-pop"></b></li>
+                            <li class="rc-app"><span class="icon" data-icon="headset_mic"></span><b class="rc-pop"></b></li>
+                        </ul>
                     </div>
                 </div>
             </div>
@@ -138,6 +199,9 @@
                         <p>Add it to your home screen, straight from the browser. It opens fullscreen, keeps the screen on and reconnects to your PC by itself.</p>
                     </li>
                 </ol>
+                <p class="how-links">
+                    <a href="/help/">Setup guides, features and troubleshooting in the help center</a>
+                </p>
             </div>
         </section>
 
@@ -351,6 +415,7 @@
                         </div>
 
                         <div class="dp-footer">
+                            <span class="dp-action"><span class="picon" data-picon="help-circle"></span>Help</span>
                             <span class="dp-action"><span class="picon" data-picon="settings"></span>Settings</span>
                             <span class="dp-action dp-quit"><span class="picon" data-picon="power"></span>Quit</span>
                         </div>
@@ -521,6 +586,7 @@
                 <span>RESOUND</span>
             </div>
             <nav class="footer-links" aria-label="Links">
+                <a href="/help/">Help</a>
                 <a href="https://github.com/motivated2die/resound">GitHub</a>
                 <a href="https://github.com/motivated2die/resound/releases">Releases</a>
                 <a href="https://github.com/motivated2die/resound/blob/main/PRIVACY.md">Privacy</a>

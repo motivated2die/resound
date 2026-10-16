@@ -56,6 +56,7 @@
         }
 
         animateDesktopPanel(document.querySelector('[data-desk-panel]'));
+        animateRemote(document.querySelector('[data-remote]'));
 
         document.querySelectorAll('[data-install]').forEach((b) => {
             b.hidden = !installPrompt;
@@ -68,6 +69,115 @@
             });
         });
     });
+
+    // The hero's picture of the remote and the PC it controls: its pads play
+    // like sounds. Every few seconds a random one plays by itself; a tap plays
+    // that one at once and pauses the others for a while. Each play sends
+    // waves from the phone, the logo's rings lit from the inside out; as they
+    // pass the PC it lights up and passes the sound on: its emoji pops up at
+    // each app. The stage is laid out in px and zoomed to its column.
+    function animateRemote(stage) {
+        if (!stage) return;
+        const WIDTH = 380;          // the stage's width in css/landing.css (.rc)
+        const PLAY = 2600;          // a pad's progress bar (--play in landing.css)
+        const RING_STEP = 55;       // between one ring lighting up and the next
+        const RING_FLASH = 520;     // each ring's flash
+        const ARRIVE = 300;         // until the waves reach the PC (rings at its distance peak then)
+        const EVERY = 3400;         // between plays by themselves
+        const RESUME = 7000;        // after a tap, before they start again
+        const host = stage.parentElement;
+        const tiles = [...stage.querySelectorAll('.tile')];
+        const rings = [...stage.querySelectorAll('[data-ring]')]; // inside out
+        const pc = stage.querySelector('[data-pc]');
+        const apps = [...stage.querySelectorAll('.rc-app')];
+        const still = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+        const fit = () => stage.style.setProperty('--rc-zoom', Math.min(1, host.clientWidth / WIDTH).toFixed(3));
+        fit();
+        if ('ResizeObserver' in window) new ResizeObserver(fit).observe(host);
+        else window.addEventListener('resize', fit);
+
+        const emojiOf = (tile) => tile.querySelector('b').textContent;
+        // restart plays a class's animation again, even while it runs.
+        const restart = (el, cls) => { el.classList.remove(cls); void el.offsetWidth; el.classList.add(cls); };
+        const showEmoji = (emoji) => apps.forEach((app) => { app.querySelector('.rc-pop').textContent = emoji; });
+
+        // Without motion: a still picture, the airhorn playing into every
+        // app. A tap swaps the pad and the emoji.
+        if (still) {
+            stage.classList.add('still');
+            showEmoji(emojiOf(tiles[0]));
+            tiles.forEach((tile) => tile.addEventListener('click', () => {
+                tiles.forEach((t) => t.classList.toggle('playing', t === tile));
+                showEmoji(emojiOf(tile));
+            }));
+            return;
+        }
+        tiles.forEach((t) => t.classList.remove('playing'));
+
+        const offTimers = new WeakMap();
+        const later = (el, ms, fn) => { clearTimeout(offTimers.get(el)); offTimers.set(el, setTimeout(fn, ms)); };
+
+        // The PC lights up and passes the sound on to each app in turn.
+        const arrive = (emoji) => {
+            restart(pc, 'hit');
+            later(pc, 450, () => pc.classList.remove('hit'));
+            apps.forEach((app, i) => setTimeout(() => {
+                app.querySelector('.rc-pop').textContent = emoji;
+                restart(app, 'on');
+                later(app, 1000, () => app.classList.remove('on'));
+            }, 60 + i * 65));
+        };
+
+        // The waves: each ring flashes in turn, from the phone outwards, so a
+        // wave runs past the PC, which lights up as it gets there. Plays
+        // overlap freely. The arrival has its own timer, so it comes on time
+        // even where animations are held back.
+        const send = (emoji) => {
+            rings.forEach((ring, i) => {
+                if (!ring.animate) return;
+                ring.animate([{ opacity: 0 }, { opacity: 1, offset: 0.25 }, { opacity: 0 }],
+                    { duration: RING_FLASH, delay: i * RING_STEP, easing: 'ease-out' });
+            });
+            setTimeout(() => arrive(emoji), ARRIVE);
+        };
+
+        const press = (tile) => {
+            restart(tile, 'playing');
+            later(tile, PLAY, () => tile.classList.remove('playing'));
+            send(emojiOf(tile));
+        };
+
+        // Plays by themselves, only while the picture is on screen and not
+        // right after a tap.
+        let last = null, userUntil = 0, timer = 0, visible = false;
+        const auto = () => {
+            timer = 0;
+            if (!visible) return;
+            const wait = userUntil - Date.now();
+            if (wait > 0) { timer = setTimeout(auto, wait); return; }
+            let tile;
+            do { tile = tiles[Math.floor(Math.random() * tiles.length)]; } while (tile === last && tiles.length > 1);
+            last = tile;
+            press(tile);
+            timer = setTimeout(auto, EVERY);
+        };
+        tiles.forEach((tile) => tile.addEventListener('click', () => {
+            userUntil = Date.now() + RESUME;
+            last = tile;
+            press(tile);
+        }));
+        const run = (on) => {
+            visible = on;
+            if (on && !timer) timer = setTimeout(auto, 700);
+            if (!on && timer) { clearTimeout(timer); timer = 0; }
+        };
+        if ('IntersectionObserver' in window) {
+            new IntersectionObserver((entries) => run(entries[0].isIntersecting), { threshold: 0.3 }).observe(stage);
+        } else {
+            run(true);
+        }
+    }
 
     // The picture of the desktop panel plays what the panel shows (internal/
     // app/flow.go): first someone talks, so the mic's pipe and "Others hear"

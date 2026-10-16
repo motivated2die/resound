@@ -149,12 +149,23 @@ func (a *App) homePage() []ui.Row {
 		ui.Flex(),
 		ui.Separator(),
 		ui.Buttons(
+			ui.Action{Label: "Help", Icon: ui.IconHelp, Closes: true, OnClick: a.openHelp},
 			ui.Action{Label: "Settings", Icon: ui.IconSettings, OnClick: func() { a.showPage(pageSettings) }},
 			ui.Action{Label: "Quit", Icon: ui.IconPower, Style: ui.ButtonDanger, Closes: true, OnClick: a.quit},
 		),
 		ui.Spacer(4),
 	)
 	return rows
+}
+
+// openHelp opens the help center (setup guides, features, troubleshooting)
+// in the browser: /help/ on the app's site (webapp/help, built by
+// cmd/webapp), which the installed app doesn't cache.
+func (a *App) openHelp() {
+	url := strings.TrimSuffix(a.appURL(), "/") + "/help/"
+	if err := ui.ShellOpen(url); err != nil {
+		logx.Printf("help: %v", err)
+	}
 }
 
 // testActions play the test tone on both outputs and stop everything.

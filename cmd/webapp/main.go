@@ -1,7 +1,8 @@
 // Command webapp builds the Resound app: the static website on HTTPS
 // (getresound.app, on Cloudflare Pages) that phones install and that connects
 // to the PC over WebRTC. It copies webapp/src and fills in the service
-// worker's version and file list.
+// worker's version and file list, then renders the help center
+// (webapp/help, see help.go) into /help/, which the app doesn't cache.
 //
 //	go run ./cmd/webapp                  build into webapp/dist
 //	go run ./cmd/webapp -serve :8095     build, then serve it on localhost
@@ -28,11 +29,12 @@ import (
 
 func main() {
 	src := flag.String("src", "webapp/src", "the app's files")
+	help := flag.String("help", "webapp/help", "the help center's articles")
 	out := flag.String("out", "webapp/dist", "output folder (replaced)")
 	serve := flag.String("serve", "", "serve the result on this address, e.g. :8095 (localhost is a secure context)")
 	flag.Parse()
 
-	if err := build(*src, *out); err != nil {
+	if err := build(*src, *help, *out); err != nil {
 		log.Fatal(err)
 	}
 	if *serve == "" {
@@ -50,7 +52,7 @@ func main() {
 	})))
 }
 
-func build(src, out string) error {
+func build(src, helpDir, out string) error {
 	files, err := readFiles(os.DirFS(src))
 	if err != nil {
 		return fmt.Errorf("%s: run from the repository root (%w)", src, err)
@@ -62,6 +64,19 @@ func build(src, out string) error {
 	version, list := precache(files)
 	text := strings.Replace(string(sw), "'__VERSION__'", "'"+version+"'", 1)
 	files["sw.js"] = []byte(strings.Replace(text, "__FILES__", list, 1))
+
+	// The help center comes after the file list: the installed app doesn't
+	// cache it, and a change to it doesn't make a new app version.
+	help, err := buildHelp(os.DirFS(helpDir))
+	if err != nil {
+		return fmt.Errorf("help center (%s): %w", helpDir, err)
+	}
+	for name, data := range help {
+		if _, ok := files[name]; ok {
+			return fmt.Errorf("help center: %s exists in %s too", name, src)
+		}
+		files[name] = data
+	}
 
 	if err := os.RemoveAll(out); err != nil {
 		return err

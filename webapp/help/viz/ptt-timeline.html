@@ -1,0 +1,48 @@
+<!-- One sound, start to end, with the pause key held in the middle: what
+     Resound does with push-to-talk and the microphone. Segments are placed
+     with --from/--to along the track; the playhead sweeps it (help.css). -->
+<div class="vt" role="img" aria-label="Timeline: when a sound starts, Resound holds your push-to-talk key and mutes your microphone. While you hold a pause key, the sound pauses, the key is let go and your microphone is live, so you can talk. Letting go resumes the sound and holds the key again. When the sound ends, everything is let go.">
+    <div class="vt-axis" aria-hidden="true">
+        <span></span>
+        <div class="vt-track">
+            <span class="vt-tick" style="left:8%">Play</span>
+            <span class="vt-tick" style="left:40%">Pause<span class="vt-wide"> key</span></span>
+            <span class="vt-tick" style="left:62%">Let go</span>
+            <span class="vt-tick" style="left:90%">End</span>
+        </div>
+    </div>
+    <div class="vt-tracks" aria-hidden="true">
+        <div class="vt-lane">
+            <span class="vt-name"><b>Sound</b><span>on the phone</span></span>
+            <div class="vt-track">
+                <span class="vt-seg vt-on" style="--from:8%;--to:40%">playing</span>
+                <span class="vt-seg vt-paused" style="--from:40%;--to:62%">paused</span>
+                <span class="vt-seg vt-on" style="--from:62%;--to:90%">playing</span>
+            </div>
+        </div>
+        <div class="vt-lane">
+            <span class="vt-name"><b>Push-to-talk</b><span>your game's key</span></span>
+            <div class="vt-track">
+                <span class="vt-seg vt-on" style="--from:8%;--to:40%">held</span>
+                <span class="vt-seg vt-on" style="--from:62%;--to:90%">held</span>
+            </div>
+        </div>
+        <div class="vt-lane">
+            <span class="vt-name"><b>Microphone</b><span>your voice</span></span>
+            <div class="vt-track">
+                <span class="vt-seg vt-live" style="--from:0%;--to:8%"></span>
+                <span class="vt-seg vt-muted" style="--from:8%;--to:40%">muted</span>
+                <span class="vt-seg vt-live" style="--from:40%;--to:62%"></span>
+                <span class="vt-seg vt-muted" style="--from:62%;--to:90%">muted</span>
+                <span class="vt-seg vt-live" style="--from:90%;--to:100%"></span>
+            </div>
+        </div>
+        <div class="vt-lane">
+            <span class="vt-name"><b>Pause key</b><span>held by you</span></span>
+            <div class="vt-track">
+                <span class="vt-seg vt-you" style="--from:40%;--to:62%"><span class="vt-hide-narrow">you talk</span></span>
+            </div>
+        </div>
+        <div class="vt-head"></div>
+    </div>
+</div>
