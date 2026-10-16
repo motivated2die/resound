@@ -11,7 +11,6 @@ import (
 
 var (
 	procSHCreateDataObject = shell32.NewProc("SHCreateDataObject")
-	procGlobalAlloc        = kernel32.NewProc("GlobalAlloc")
 	iidIDataObject         = windows.GUID{Data1: 0x0000010e, Data4: [8]byte{0xC0, 0, 0, 0, 0, 0, 0, 0x46}}
 )
 

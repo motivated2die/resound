@@ -35,8 +35,10 @@ type Icon string
 // Icons used by the app. Any file in icons/ also works as Icon("name").
 const (
 	IconAlert        Icon = "alert-triangle"
+	IconCheck        Icon = "check"
 	IconChevronLeft  Icon = "chevron-left"
 	IconClose        Icon = "x"
+	IconCopy         Icon = "copy"
 	IconChevronRight Icon = "chevron-right"
 	IconDownload     Icon = "download"
 	IconExternalLink Icon = "external-link"

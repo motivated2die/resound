@@ -109,6 +109,8 @@ type App struct {
 	srv              *server.Server
 	serverErr        error
 	addresses        []server.Address // in the pairing QR code
+	linkCopied       int              // > 0 while "Link copied" shows; counts copies
+	linkCopyErr      string           // why the last copy failed
 
 	portable bool   // development build: never installs itself
 	fwBusy   bool   // waiting for the elevated firewall helper
