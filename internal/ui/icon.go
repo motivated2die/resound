@@ -43,6 +43,7 @@ const (
 	IconFolder       Icon = "folder"
 	IconFolderPlus   Icon = "folder-plus"
 	IconHandGrab     Icon = "hand-grab"
+	IconHelp         Icon = "help-circle"
 	IconInfo         Icon = "info-circle"
 	IconKeyboard     Icon = "keyboard"
 	IconMic          Icon = "microphone"
