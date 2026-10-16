@@ -56,6 +56,7 @@
         }
 
         animateDesktopPanel(document.querySelector('[data-desk-panel]'));
+        animateRemote(document.querySelector('[data-remote]'));
 
         document.querySelectorAll('[data-install]').forEach((b) => {
             b.hidden = !installPrompt;
@@ -68,6 +69,130 @@
             });
         });
     });
+
+    // The hero's picture of the remote and the PC it controls: its pads play
+    // like sounds. Every few seconds a random one plays by itself; a tap plays
+    // that one at once and pauses the others for a while. Each play sends a
+    // pulse down the cable (hidden where the cable passes behind the phone)
+    // into the PC, which lights up and passes the sound on: its emoji pops up
+    // at each app. The stage is laid out in px and zoomed to its column.
+    function animateRemote(stage) {
+        if (!stage) return;
+        const WIDTH = 380;          // the stage's width in css/landing.css (.rc)
+        const PLAY = 2600;          // a pad's progress bar (--play in landing.css)
+        const TRAVEL = 1150;        // the pulse's way down the cable
+        const EVERY = 3400;         // between plays by themselves
+        const RESUME = 7000;        // after a tap, before they start again
+        const host = stage.parentElement;
+        const tiles = [...stage.querySelectorAll('.tile')];
+        const cable = stage.querySelector('[data-cable]');
+        const pulses = stage.querySelector('[data-pulses]');
+        const pc = stage.querySelector('[data-pc]');
+        const links = stage.querySelector('[data-links]');
+        const apps = [...stage.querySelectorAll('.rc-app')];
+        const still = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+        const fit = () => stage.style.setProperty('--rc-zoom', Math.min(1, host.clientWidth / WIDTH).toFixed(3));
+        fit();
+        if ('ResizeObserver' in window) new ResizeObserver(fit).observe(host);
+        else window.addEventListener('resize', fit);
+
+        const emojiOf = (tile) => tile.querySelector('b').textContent;
+        // restart plays a class's animation again, even while it runs.
+        const restart = (el, cls) => { el.classList.remove(cls); void el.offsetWidth; el.classList.add(cls); };
+        const showEmoji = (emoji) => apps.forEach((app) => { app.querySelector('.rc-pop').textContent = emoji; });
+
+        // Without motion: a still picture, the airhorn playing into every
+        // app. A tap swaps the pad and the emoji.
+        if (still) {
+            stage.classList.add('still');
+            showEmoji(emojiOf(tiles[0]));
+            tiles.forEach((tile) => tile.addEventListener('click', () => {
+                tiles.forEach((t) => t.classList.toggle('playing', t === tile));
+                showEmoji(emojiOf(tile));
+            }));
+            return;
+        }
+        tiles.forEach((t) => t.classList.remove('playing'));
+
+        const offTimers = new WeakMap();
+        const later = (el, ms, fn) => { clearTimeout(offTimers.get(el)); offTimers.set(el, setTimeout(fn, ms)); };
+
+        const arrive = (emoji) => {
+            restart(pc, 'hit');
+            later(pc, 900, () => pc.classList.remove('hit'));
+            setTimeout(() => restart(links, 'go'), 120);
+            apps.forEach((app, i) => setTimeout(() => {
+                app.querySelector('.rc-pop').textContent = emoji;
+                restart(app, 'on');
+                later(app, 2000, () => app.classList.remove('on'));
+            }, 260 + i * 130));
+        };
+
+        const NS = 'http://www.w3.org/2000/svg';
+        const length = cable.getTotalLength();
+        const send = (emoji) => {
+            const dot = document.createElementNS(NS, 'g');
+            for (const [r, cls] of [[9, 'rc-dot-halo'], [3.6, 'rc-dot']]) {
+                const c = document.createElementNS(NS, 'circle');
+                c.setAttribute('r', r);
+                c.setAttribute('class', cls);
+                dot.append(c);
+            }
+            pulses.append(dot);
+            // Frames only move the dot; the arrival has its own timer, so it
+            // comes on time even where frames are held back (a background
+            // tab), and no dot is left behind.
+            let done = false;
+            const start = performance.now();
+            const step = (now) => {
+                if (done) return;
+                const t = Math.min(1, Math.max(0, now - start) / TRAVEL);
+                const eased = t < 0.5 ? 2 * t * t : 1 - (2 - 2 * t) ** 2 / 2;
+                const p = cable.getPointAtLength(eased * length);
+                dot.setAttribute('transform', `translate(${p.x.toFixed(1)} ${p.y.toFixed(1)})`);
+                if (t < 1) requestAnimationFrame(step);
+            };
+            step(start);
+            setTimeout(() => { done = true; dot.remove(); arrive(emoji); }, TRAVEL);
+        };
+
+        const press = (tile) => {
+            restart(tile, 'playing');
+            later(tile, PLAY, () => tile.classList.remove('playing'));
+            send(emojiOf(tile));
+        };
+
+        // Plays by themselves, only while the picture is on screen and not
+        // right after a tap.
+        let last = null, userUntil = 0, timer = 0, visible = false;
+        const auto = () => {
+            timer = 0;
+            if (!visible) return;
+            const wait = userUntil - Date.now();
+            if (wait > 0) { timer = setTimeout(auto, wait); return; }
+            let tile;
+            do { tile = tiles[Math.floor(Math.random() * tiles.length)]; } while (tile === last && tiles.length > 1);
+            last = tile;
+            press(tile);
+            timer = setTimeout(auto, EVERY);
+        };
+        tiles.forEach((tile) => tile.addEventListener('click', () => {
+            userUntil = Date.now() + RESUME;
+            last = tile;
+            press(tile);
+        }));
+        const run = (on) => {
+            visible = on;
+            if (on && !timer) timer = setTimeout(auto, 700);
+            if (!on && timer) { clearTimeout(timer); timer = 0; }
+        };
+        if ('IntersectionObserver' in window) {
+            new IntersectionObserver((entries) => run(entries[0].isIntersecting), { threshold: 0.3 }).observe(stage);
+        } else {
+            run(true);
+        }
+    }
 
     // The picture of the desktop panel plays what the panel shows (internal/
     // app/flow.go): first someone talks, so the mic's pipe and "Others hear"

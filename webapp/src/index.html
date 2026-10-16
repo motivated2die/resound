@@ -69,48 +69,82 @@
                     </ul>
                 </div>
 
-                <!-- A phone showing the remote (drawn in CSS, not a screenshot) -->
+                <!-- The remote and the PC it controls, drawn in CSS and SVG (not a
+                     screenshot). Every few seconds, or when tapped, a pad plays: a
+                     pulse runs down the cable into the PC, and the sound's emoji pops
+                     up at each app (landing.js, animateRemote). The stage has a fixed
+                     layout in px; landing.js zooms it to the column's width. -->
                 <div class="hero-visual" aria-hidden="true">
-                    <div class="phone">
-                        <div class="phone-screen">
-                            <div class="mock-top">
-                                <span class="icon" data-icon="search"></span>
-                                <span class="icon" data-icon="edit"></span>
-                                <span class="icon" data-icon="settings"></span>
-                            </div>
-                            <div class="mock-grid">
-                                <div class="tile red playing"><b>📯</b><span>Airhorn</span></div>
-                                <div class="tile"><b>🥁</b><span>Ba dum tss</span></div>
-                                <div class="tile blue"><b>👏</b><span>Applause</span></div>
-                                <div class="tile yellow fav"><b>😂</b><span>Laugh track</span></div>
-                                <div class="tile purple"><b>🎺</b><span>Sad trombone</span></div>
-                                <div class="tile"><b>🔔</b><span>Ding</span></div>
-                                <div class="tile green"><b>🦆</b><span>Quack</span></div>
-                                <div class="tile orange"><b>💥</b><span>Boom</span></div>
-                                <div class="tile pink fav"><b>🎉</b><span>Victory</span></div>
-                                <div class="tile"><b>🐐</b><span>Goat</span></div>
-                                <div class="tile blue"><b>🚨</b><span>Alarm</span></div>
-                                <div class="tile"><b>🎵</b><span>Intro</span></div>
-                                <div class="tile purple"><b>👻</b><span>Spooky</span></div>
-                                <div class="tile"><b>🤖</b><span>Robot</span></div>
-                                <div class="tile red"><b>😱</b><span>Scream</span></div>
-                            </div>
-                            <div class="mock-tabs">
-                                <span class="mock-tab"><span class="icon" data-icon="favorite-fill"></span></span>
-                                <span class="mock-tab">1 Music</span>
-                                <span class="mock-tab on">2 Sounds</span>
-                                <span class="mock-tab">3 Speech</span>
-                            </div>
-                            <div class="mock-bar">
-                                <img src="assets/resound-192.png" alt="" width="24" height="24">
-                                <div class="mock-title">
-                                    <span class="mock-brand">RESOUND</span>
-                                    <span class="mock-status"><i></i>Connected</span>
+                    <div class="rc" data-remote>
+                        <!-- Behind the phone: it plugs into the phone's bottom edge,
+                             curls under it and up its left side, passes behind it
+                             and comes out at the top right, into the PC. -->
+                        <svg class="rc-cable" viewBox="0 0 380 540" width="380" height="540">
+                            <rect class="rc-plug" x="231" y="464" width="16" height="12" rx="2.5" transform="rotate(-6 239 467)"/>
+                            <rect class="rc-plug" x="276" y="28" width="13" height="12" rx="2.5"/>
+                            <path class="rc-wire-edge" d="M240 476C242 500 236 518 208 524C160 536 96 534 60 516C22 498 6 452 8 404C10 356 2 330 14 306C26 284 52 290 80 282C150 262 226 206 262 160C282 132 268 44 281 34"/>
+                            <path class="rc-wire" d="M240 476C242 500 236 518 208 524C160 536 96 534 60 516C22 498 6 452 8 404C10 356 2 330 14 306C26 284 52 290 80 282C150 262 226 206 262 160C282 132 268 44 281 34" data-cable/>
+                            <g data-pulses></g>
+                        </svg>
+
+                        <div class="phone" data-phone>
+                            <div class="phone-screen">
+                                <div class="mock-top">
+                                    <span class="icon" data-icon="search"></span>
+                                    <span class="icon" data-icon="edit"></span>
+                                    <span class="icon" data-icon="settings"></span>
                                 </div>
-                                <span class="mock-mic"><span class="icon" data-icon="mic"></span></span>
-                                <span class="mock-stop"><span class="icon" data-icon="stop_circle"></span>STOP</span>
+                                <div class="mock-grid">
+                                    <div class="tile red playing"><b>📯</b><span>Airhorn</span></div>
+                                    <div class="tile"><b>🥁</b><span>Ba dum tss</span></div>
+                                    <div class="tile blue"><b>👏</b><span>Applause</span></div>
+                                    <div class="tile yellow fav"><b>😂</b><span>Laugh track</span></div>
+                                    <div class="tile purple"><b>🎺</b><span>Sad trombone</span></div>
+                                    <div class="tile"><b>🔔</b><span>Ding</span></div>
+                                    <div class="tile green"><b>🦆</b><span>Quack</span></div>
+                                    <div class="tile orange"><b>💥</b><span>Boom</span></div>
+                                    <div class="tile pink fav"><b>🎉</b><span>Victory</span></div>
+                                    <div class="tile"><b>🐐</b><span>Goat</span></div>
+                                    <div class="tile blue"><b>🚨</b><span>Alarm</span></div>
+                                    <div class="tile"><b>🎵</b><span>Intro</span></div>
+                                    <div class="tile purple"><b>👻</b><span>Spooky</span></div>
+                                    <div class="tile"><b>🤖</b><span>Robot</span></div>
+                                    <div class="tile red"><b>😱</b><span>Scream</span></div>
+                                </div>
+                                <div class="mock-tabs">
+                                    <span class="mock-tab"><span class="icon" data-icon="favorite-fill"></span></span>
+                                    <span class="mock-tab">1 Music</span>
+                                    <span class="mock-tab on">2 Sounds</span>
+                                    <span class="mock-tab">3 Speech</span>
+                                </div>
+                                <div class="mock-bar">
+                                    <img src="assets/resound-192.png" alt="" width="24" height="24">
+                                    <div class="mock-title">
+                                        <span class="mock-brand">RESOUND</span>
+                                        <span class="mock-status"><i></i>Connected</span>
+                                    </div>
+                                    <span class="mock-mic"><span class="icon" data-icon="mic"></span></span>
+                                    <span class="mock-stop"><span class="icon" data-icon="stop_circle"></span>STOP</span>
+                                </div>
                             </div>
                         </div>
+
+                        <!-- The PC: Windows with Resound running -->
+                        <div class="rc-pc" data-pc>
+                            <div class="rc-screen">
+                                <svg class="rc-win" viewBox="0 0 24 24" width="24" height="24"><path d="M2 2h9.6v9.6H2zM12.4 2H22v9.6h-9.6zM2 12.4h9.6V22H2zM12.4 12.4H22V22h-9.6z"/></svg>
+                                <img src="assets/resound-192.png" alt="" width="14" height="14">
+                            </div>
+                            <div class="rc-stand"></div>
+                        </div>
+
+                        <!-- What the PC plays into: a game, Discord, any voice app -->
+                        <div class="rc-links" data-links></div>
+                        <ul class="rc-apps">
+                            <li class="rc-app"><span class="icon" data-icon="sports_esports"></span><b class="rc-pop"></b></li>
+                            <li class="rc-app"><span class="icon" data-icon="discord"></span><b class="rc-pop"></b></li>
+                            <li class="rc-app"><span class="icon" data-icon="headset_mic"></span><b class="rc-pop"></b></li>
+                        </ul>
                     </div>
                 </div>
             </div>
