@@ -12,6 +12,7 @@
     <!-- The installed app and pairing links go on to the app (rtc.js, landing.js) -->
     <script src="js/rtc.js"></script>
     <script src="js/landing.js"></script>
+    <script src="js/overlay-demo.js" defer></script>
     <link rel="stylesheet" href="css/landing.css">
 </head>
 <body>
@@ -25,6 +26,7 @@
             </a>
             <nav class="site-nav" aria-label="Sections">
                 <a href="#features">Features</a>
+                <a href="#overlay">In game</a>
                 <a href="#desktop">On your PC</a>
                 <a href="#how">How it works</a>
                 <a href="#news">News</a>
@@ -49,12 +51,15 @@
                             <span class="icon" data-icon="download" aria-hidden="true"></span>
                             Download for Windows
                         </a>
-                        <a class="btn btn-secondary" href="/connect" data-open-app>
-                            <span class="icon" data-icon="smartphone" aria-hidden="true"></span>
-                            <span data-open-app-label>Open soundboard</span>
-                        </a>
+                        <!-- The note goes with the button it is about -->
+                        <div class="cta-stack">
+                            <a class="btn btn-secondary" href="/connect" data-open-app>
+                                <span class="icon" data-icon="smartphone" aria-hidden="true"></span>
+                                <span data-open-app-label>Open soundboard</span>
+                            </a>
+                            <p class="cta-note" data-paired-note hidden>Paired with <strong data-pc-name>your PC</strong>.</p>
+                        </div>
                     </div>
-                    <p class="cta-note" data-paired-note hidden>Paired with <strong data-pc-name>your PC</strong>.</p>
                     <ul class="facts">
                         <li><span class="icon" data-icon="check_circle" aria-hidden="true"></span>Free and open source</li>
                         <li><span class="icon" data-icon="check_circle" aria-hidden="true"></span>No account, no cloud</li>
@@ -150,7 +155,7 @@
                     <article class="card feature">
                         <span class="icon feature-icon" data-icon="smartphone" aria-hidden="true"></span>
                         <h3>A remote in your pocket</h3>
-                        <p>Tabs you swipe through, favorites, colours and emoji for every sound, custom layouts, progress bars, stop and pause. Works on phones, tablets or a second screen.</p>
+                        <p>Tabs you swipe through and arrange, favorites, colours and emoji for every sound, custom layouts, progress bars, stop and pause. Works on phones, tablets or a second screen.</p>
                     </article>
                     <article class="card feature">
                         <span class="icon feature-icon" data-icon="search" aria-hidden="true"></span>
@@ -169,8 +174,8 @@
                     </article>
                     <article class="card feature">
                         <span class="icon feature-icon" data-icon="volume_up" aria-hidden="true"></span>
-                        <h3>See where your audio goes</h3>
-                        <p>A live diagram on your PC shows your mic and sounds flowing to what you hear and what others hear, with level meters. Anything missing is marked, with its fix.</p>
+                        <h3>Every sound equally loud</h3>
+                        <p>Resound measures each sound once and evens out its loudness, so a whisper and a blaring airhorn play at the same level. Your own volumes still apply on top.</p>
                     </article>
                     <article class="card feature">
                         <span class="icon feature-icon" data-icon="headset_mic" aria-hidden="true"></span>
@@ -179,14 +184,51 @@
                     </article>
                     <article class="card feature">
                         <span class="icon feature-icon" data-icon="keyboard" aria-hidden="true"></span>
-                        <h3>Hotkeys inside your game</h3>
-                        <p>Hold a key to pause the sounds and talk on another channel, or hit a stop key for when shit hits the fan.</p>
+                        <h3>Your favorites inside your game</h3>
+                        <p>One key slides your favorites in at the edge of the screen, without leaving the game. Pause and stop keys are there for when shit hits the fan.</p>
                     </article>
                     <article class="card feature">
                         <span class="icon feature-icon" data-icon="update" aria-hidden="true"></span>
                         <h3>Set up once, updated in a click</h3>
                         <p>A guided setup installs VB-Cable for you. Updates and backups take one click each.</p>
                     </article>
+                </div>
+            </div>
+        </section>
+
+        <!-- The in-game overlay, with a live demo (js/overlay-demo.js): a band on
+             phones, a framed card on wider screens -->
+        <section class="section ovl-section" id="overlay" aria-labelledby="overlay-title">
+            <div class="wrap">
+                <div class="ovl-card">
+                    <!-- A small picture of the overlay; its highlight moves up and
+                         down (js/overlay-demo.js), as the wheel moves it -->
+                    <div class="ovl-visual" aria-hidden="true">
+                        <div class="ovb ovb-mini" data-ovl-preview>
+                            <div class="ovb-bar">
+                                <span class="ovb-item red"><b>📯</b><span class="ovb-name">Airhorn</span></span>
+                                <span class="ovb-item orange"><b>🥁</b><span class="ovb-name">Drumroll</span></span>
+                                <span class="ovb-item purple on"><b>😑</b><span class="ovb-name">Bruh</span></span>
+                                <span class="ovb-item green"><b>👏</b><span class="ovb-name">Applause</span></span>
+                                <span class="ovb-item blue"><b>🎺</b><span class="ovb-name">Trombone</span></span>
+                                <span class="ovb-item pink"><b>💥</b><span class="ovb-name">Boom</span></span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="ovl-copy">
+                        <p class="eyebrow">In-game overlay</p>
+                        <h2 id="overlay-title" class="section-title">Never leave the action!</h2>
+                        <p class="section-lead">Press one key in any game and your favorites slide in. Scroll to a sound, press the key again, and it plays.</p>
+                    </div>
+
+                    <div class="ovl-action">
+                        <button class="ovl-callout" type="button" data-ovl-open>
+                            <kbd class="kbd-big" data-ovl-key>Alt</kbd>
+                            <span data-ovl-label><strong>Try it now:</strong> press <kbd>Alt</kbd> to bring up the overlay.</span>
+                        </button>
+                        <p class="ovl-status" data-ovl-status aria-live="polite"></p>
+                    </div>
                 </div>
             </div>
         </section>
@@ -409,6 +451,14 @@
                         <div class="news-meta">
                             <span class="icon" data-icon="newspaper" aria-hidden="true"></span>
                             <span class="badge">New</span>
+                            <span class="news-version">Version 0.14</span>
+                        </div>
+                        <h3>Your favorites inside your game, every sound equally loud</h3>
+                        <p>Press one key in any game and your favorites slide in at the edge of the screen. Scroll to a sound and press the key again to play it, or hold Esc to stop everything. Your game keeps the focus all along. Resound now also evens out the loudness of your sounds, so quiet clips and blaring airhorns play at the same level, and you can arrange your phone's tabs by dragging them.</p>
+                    </article>
+                    <article class="card news-item">
+                        <div class="news-meta">
+                            <span class="icon" data-icon="newspaper" aria-hidden="true"></span>
                             <span class="news-version">Version 0.13</span>
                         </div>
                         <h3>Import sounds from Myinstants and Sound Buttons World</h3>

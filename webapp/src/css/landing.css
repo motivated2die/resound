@@ -61,6 +61,7 @@ code { font-family: Consolas, "Cascadia Mono", monospace; background: var(--rais
     mask: var(--icon) center / contain no-repeat;
 }
 .icon[data-icon="bolt"] { --icon: url("../assets/icons/bolt.svg"); }
+.icon[data-icon="close"] { --icon: url("../assets/icons/close.svg"); }
 .icon[data-icon="check_circle"] { --icon: url("../assets/icons/check_circle.svg"); }
 .icon[data-icon="cloud_off"] { --icon: url("../assets/icons/cloud_off.svg"); }
 .icon[data-icon="code"] { --icon: url("../assets/icons/code.svg"); }
@@ -155,9 +156,12 @@ code { font-family: Consolas, "Cascadia Mono", monospace; background: var(--rais
 .eyebrow { color: var(--accent); font-weight: 600; font-size: 14px; letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 14px; }
 h1 { font-size: clamp(32px, 5vw, 52px); line-height: 1.1; font-weight: 700; letter-spacing: -0.02em; margin-bottom: 18px; text-wrap: balance; }
 .lead { color: var(--muted); font-size: 18px; max-width: 34em; margin-bottom: 28px; }
-.cta-row { display: flex; flex-wrap: wrap; gap: 12px; }
+.cta-row { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 12px; } /* buttons keep their height beside a note */
 .cta-note { color: var(--caption); font-size: 13px; margin-top: 12px; }
 .cta-note strong { color: var(--muted); }
+/* A button with its note below it, in a row of buttons. */
+.cta-stack { display: flex; flex-direction: column; align-items: center; }
+.cta-stack .cta-note { margin-top: 10px; }
 .facts { list-style: none; display: flex; flex-wrap: wrap; gap: 8px 20px; margin-top: 26px; color: var(--muted); font-size: 14px; }
 .facts li { display: flex; align-items: center; gap: 6px; }
 .facts .icon { font-size: 18px; color: var(--accent); }
@@ -576,6 +580,253 @@ h1 { font-size: clamp(32px, 5vw, 52px); line-height: 1.1; font-weight: 700; lett
 .dp-legend { display: flex; align-items: center; gap: 8px; margin-top: 18px; font-size: 14px; color: var(--muted); min-height: 1.5em; }
 .dp-legend i { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 8px var(--accent); }
 
+/* --- In-game overlay (index.html #overlay, js/overlay-demo.js) ---
+   One component in the app's sizes (internal/ui/overlay.go) times --u: the
+   small picture and the live demo. Colours as the app's: the phone's card
+   colours a little lighter. */
+.ovl-section { overflow-x: clip; }
+/* Set apart from the page: a framed card here, a band on phones (below).
+   The picture's column leaves room for its highlight, which reaches right
+   past the bar. */
+.ovl-card {
+    display: grid;
+    grid-template-columns: 220px minmax(0, 34em);
+    grid-template-areas: "visual copy" "visual action";
+    justify-content: center; /* picture and text together in the middle */
+    column-gap: 96px;
+    align-items: center;
+    padding: 44px 40px 40px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 22px;
+    background:
+        radial-gradient(ellipse 420px 300px at 27% 50%, rgba(var(--accent-rgb), 0.07), transparent 70%), /* behind the picture */
+        linear-gradient(180deg, rgba(255, 255, 255, 0.025), rgba(255, 255, 255, 0.01));
+}
+.ovl-visual { grid-area: visual; justify-self: end; width: 180px; -webkit-user-select: none; user-select: none; }
+.ovl-copy { grid-area: copy; align-self: end; }
+.ovl-action { grid-area: action; align-self: start; }
+.ovl-copy .section-lead { margin-bottom: 22px; max-width: 30em; }
+/* The invitation to press Alt: a box with the key drawn big. A button too,
+   for those without a keyboard. */
+.ovl-callout {
+    display: inline-flex;
+    align-items: center;
+    gap: 18px;
+    padding: 14px 20px 14px 14px;
+    border: 1px solid rgba(var(--accent-rgb), 0.35);
+    border-radius: 14px;
+    background: rgba(var(--accent-rgb), 0.07);
+    color: var(--muted);
+    font: inherit;
+    font-size: 15px;
+    text-align: left;
+    cursor: pointer;
+    transition: border-color 0.2s ease, background-color 0.2s ease;
+}
+.ovl-callout:hover { border-color: rgba(var(--accent-rgb), 0.6); background: rgba(var(--accent-rgb), 0.11); }
+.ovl-callout strong { color: var(--text); }
+.ovl-status { min-height: 1.6em; margin-top: 14px; color: var(--accent); font-size: 15px; font-weight: 600; }
+.ovl-status.bad { color: var(--berry); }
+kbd {
+    display: inline-block;
+    min-width: 1.9em;
+    padding: 0 6px;
+    border-radius: 6px;
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    border-bottom-width: 2px;
+    background: rgba(255, 255, 255, 0.06);
+    font: 600 0.85em/1.6 "Segoe UI", system-ui, sans-serif;
+    text-align: center;
+    color: var(--text);
+}
+/* A mechanical key cap: a darker skirt with a lighter, inset top face that
+   sits towards the back, so the front of the skirt shows. It goes down
+   while Alt is held (js/overlay-demo.js). */
+.kbd-big {
+    position: relative;
+    isolation: isolate;
+    flex: 0 0 auto;
+    display: inline-grid;
+    place-items: center;
+    min-width: 78px;
+    height: 60px;
+    padding: 0 18px 9px;
+    border: 0;
+    border-radius: 12px;
+    background: linear-gradient(180deg, #30323a, #22242a);
+    box-shadow:
+        inset 0 -1px 0 rgba(0, 0, 0, 0.5),
+        0 3px 0 #141519,
+        0 10px 18px rgba(0, 0, 0, 0.5),
+        0 0 26px rgba(var(--accent-rgb), 0.12);
+    color: var(--accent);
+    font-size: 19px;
+    font-weight: 700;
+    line-height: 1;
+    text-shadow: 0 0 10px rgba(var(--accent-rgb), 0.45);
+    transition: transform 0.07s ease, box-shadow 0.07s ease;
+}
+.kbd-big::before {
+    content: "";
+    position: absolute;
+    inset: 3px 6px 10px;
+    border-radius: 9px;
+    background: linear-gradient(180deg, #4b4f5a, #3a3d46);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.16), 0 2px 3px rgba(0, 0, 0, 0.35);
+    z-index: -1;
+}
+.kbd-big.down {
+    transform: translateY(2px);
+    box-shadow:
+        inset 0 -1px 0 rgba(0, 0, 0, 0.5),
+        0 1px 0 #141519,
+        0 4px 10px rgba(0, 0, 0, 0.45),
+        0 0 30px rgba(var(--accent-rgb), 0.28);
+}
+
+.ovb { --u: 1px; position: relative; }
+.ovb-mini { --u: 0.82px; }
+.ovb-bar {
+    display: flex;
+    flex-direction: column;
+    gap: calc(6 * var(--u));
+    width: calc(56 * var(--u));
+    padding: calc(6 * var(--u));
+    border-radius: calc(28 * var(--u));
+    background: rgba(34, 36, 42, 0.96);
+    transition: background-color 0.7s ease-in;
+    filter: drop-shadow(0 calc(6 * var(--u)) calc(30 * var(--u)) rgba(0, 0, 0, 0.55));
+}
+.ovb-item {
+    position: relative;
+    display: flex;
+    align-items: center;
+    width: calc(44 * var(--u));
+    height: calc(44 * var(--u));
+    border-radius: calc(26 * var(--u));
+    white-space: nowrap;
+    cursor: default;
+}
+.ovb-item b {
+    flex: 0 0 auto;
+    display: grid;
+    place-items: center;
+    width: calc(44 * var(--u));
+    height: calc(44 * var(--u));
+    border-radius: 50%;
+    background: #3e4049;
+    font-size: calc(22 * var(--u));
+    font-weight: 600;
+    line-height: 1;
+}
+.ovb-item.red b { background: #5c3434; }
+.ovb-item.orange b { background: #6c4a27; }
+.ovb-item.yellow b { background: #6a5f33; }
+.ovb-item.green b { background: #3f5a33; }
+.ovb-item.blue b { background: #33475a; }
+.ovb-item.purple b { background: #47335a; }
+.ovb-item.pink b { background: #5a3347; }
+.ovb-name { display: none; font-weight: 700; font-size: calc(17 * var(--u)); color: var(--text); }
+/* The highlight: a pill around the button reaching to the right, the name
+   beside the icon; 4 units larger than the button all round. */
+.ovb-item.on {
+    width: max-content; /* not the bar's width: the pill reaches past it */
+    align-self: flex-start;
+    z-index: 1;
+    gap: calc(10 * var(--u));
+    padding-right: calc(16 * var(--u));
+    background: #474a55;
+    box-shadow: 0 0 0 calc(4 * var(--u)) #474a55, 0 calc(6 * var(--u)) calc(24 * var(--u)) rgba(0, 0, 0, 0.45);
+}
+.ovb-item.on .ovb-name { display: block; }
+.ovb-item.on.ok { background: var(--accent); box-shadow: 0 0 0 calc(4 * var(--u)) var(--accent); }
+.ovb-item.on.ok .ovb-name { color: var(--on-accent); }
+.ovb-mini .ovb-name { font-size: calc(15 * var(--u)); }
+
+/* The live demo: at the left edge of the window, like the app's default. */
+.ovl-live {
+    position: fixed;
+    inset: 0;
+    z-index: 200;
+    pointer-events: none;
+}
+.ovl-live[hidden] { display: block !important; visibility: hidden; }
+.ovl-shade {
+    position: absolute;
+    inset: 0;
+    /* Darkest around the bar, and the rest of the page a little: the bar
+       draws the eye, like the app's wide shadow over a game. */
+    background: radial-gradient(ellipse 70vw 110vh at 0 50%, rgba(0, 0, 0, 0.72), rgba(0, 0, 0, 0.45) 45%, rgba(0, 0, 0, 0.25) 100%);
+    -webkit-backdrop-filter: blur(6px);
+    backdrop-filter: blur(6px); /* the page out of focus, the bar in */
+    opacity: 0;
+    transition: opacity 0.13s ease-out;
+    pointer-events: auto;
+}
+.ovl-live .ovb {
+    position: absolute;
+    left: max(20px, env(safe-area-inset-left));
+    top: 50%;
+    transform: translate(-20px, -50%);
+    opacity: 0;
+    transition: transform 0.13s cubic-bezier(0.2, 0.8, 0.2, 1), opacity 0.13s ease-out;
+    pointer-events: auto;
+}
+.ovl-live.open .ovl-shade { opacity: 1; }
+.ovl-live.open .ovb { transform: translate(0, -50%); opacity: 1; }
+.ovl-live.closing .ovl-shade, .ovl-live.closing .ovb { transition-duration: 0.1s; }
+.ovl-live.holding .ovb-bar { background: rgba(122, 31, 54, 0.97); }
+.ovl-live .ovb-item { cursor: pointer; }
+.ovl-close {
+    position: absolute;
+    left: 50%;
+    top: calc(100% + 22px);
+    transform: translateX(-50%);
+    display: grid;
+    place-items: center;
+    width: 52px;
+    height: 52px;
+    border-radius: 50%;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    background: var(--control);
+    color: var(--text);
+    cursor: pointer;
+    box-shadow: 0 6px 24px rgba(0, 0, 0, 0.45);
+}
+.ovl-close:hover { background: #454955; }
+/* A "played" sound: its emoji flies out of the bar with confetti, above
+   the overlay (js/overlay-demo.js burst). */
+.ovl-burst { position: fixed; inset: 0; z-index: 210; pointer-events: none; overflow: hidden; }
+.ovl-burst-icon { position: absolute; font-size: 26px; line-height: 1; filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.5)); }
+.ovl-confetti { position: absolute; width: 6px; height: 10px; border-radius: 1px; }
+/* What to do while it is open, at the bottom of the window. */
+.ovl-tip {
+    position: absolute;
+    left: 50%;
+    bottom: max(28px, env(safe-area-inset-bottom));
+    transform: translate(-50%, 12px);
+    width: max-content;
+    max-width: calc(100vw - 2 * var(--gutter));
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 18px 10px 10px;
+    border: 1px solid rgba(var(--accent-rgb), 0.35);
+    border-radius: 14px;
+    background: rgba(28, 29, 34, 0.92);
+    color: var(--muted);
+    font-size: 15px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+    opacity: 0;
+    transition: transform 0.13s ease-out, opacity 0.13s ease-out;
+}
+.ovl-tip strong { color: var(--text); }
+.ovl-live.open .ovl-tip { opacity: 1; transform: translate(-50%, 0); }
+.ovl-close .icon { font-size: 28px; }
+@media (prefers-reduced-motion: reduce) {
+    .ovl-shade, .ovl-live .ovb, .ovb-bar { transition: none; }
+}
+
 /* --- Sections --- */
 .section { padding: 56px 0; }
 .section-band { background: linear-gradient(180deg, rgba(255, 255, 255, 0.02), rgba(255, 255, 255, 0)); border-top: 1px solid rgba(255, 255, 255, 0.04); border-bottom: 1px solid rgba(255, 255, 255, 0.04); }
@@ -653,7 +904,19 @@ h3 { font-size: 18px; line-height: 1.3; margin-bottom: 6px; }
 .flow-node-accent { border-color: rgba(var(--accent-rgb), 0.45); box-shadow: 0 0 40px rgba(var(--accent-rgb), 0.12); }
 .flow-node-accent .icon { color: var(--accent); }
 .flow-link { flex: 1; min-width: 90px; display: flex; flex-direction: column; justify-content: center; align-items: center; position: relative; padding: 0 8px; }
-.flow-line { width: 100%; height: 2px; background: linear-gradient(90deg, rgba(var(--accent-rgb), 0.15), var(--accent), rgba(var(--accent-rgb), 0.15)); border-radius: 2px; }
+.flow-line { position: relative; width: 100%; height: 2px; background: linear-gradient(90deg, rgba(var(--accent-rgb), 0.15), var(--accent), rgba(var(--accent-rgb), 0.15)); border-radius: 2px; }
+/* Dashes travelling along each line, from one card to the next. */
+.flow-line::after {
+    content: "";
+    position: absolute;
+    inset: 0; /* exactly the line's thickness */
+    background: repeating-linear-gradient(90deg, var(--accent) 0 8px, transparent 8px 18px);
+    opacity: 0.5;
+    animation: flow-dash 0.9s linear infinite;
+}
+@keyframes flow-dash { to { background-position: 18px 0; } }
+@keyframes flow-dash-down { to { background-position: 0 18px; } }
+@media (prefers-reduced-motion: reduce) { .flow-line::after { animation: none; } }
 .flow-label { display: flex; align-items: center; gap: 6px; margin-top: 10px; font-size: 13px; color: var(--accent); text-align: center; }
 .flow-label .icon { font-size: 16px; }
 .how-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; }
@@ -699,19 +962,42 @@ h3 { font-size: 18px; line-height: 1.3; margin-bottom: 6px; }
     .feature:last-child:nth-child(odd) { grid-column: 1 / -1; }
     .usps { grid-template-columns: repeat(2, 1fr); }
     .desktop-inner { grid-template-columns: minmax(0, 1fr); gap: 48px; }
+    /* Tablets: narrower, with room kept for the picture's highlight. */
+    .ovl-card { grid-template-columns: 190px minmax(0, 1fr); column-gap: 48px; padding: 40px 40px 36px 28px; }
+    .ovl-visual { width: 170px; }
     .flow { flex-direction: column; align-items: center; }
     .flow-node { width: 100%; max-width: 320px; }
     .flow-link { min-height: 70px; width: 100%; max-width: 320px; flex-direction: row; gap: 12px; }
     .flow-line { width: 2px; height: 100%; min-height: 70px; background: linear-gradient(180deg, rgba(var(--accent-rgb), 0.15), var(--accent), rgba(var(--accent-rgb), 0.15)); }
+    .flow-line::after { background: repeating-linear-gradient(180deg, var(--accent) 0 8px, transparent 8px 18px); animation-name: flow-dash-down; }
     .flow-label { margin-top: 0; }
 }
 @media (max-width: 720px) {
+    /* On phones a lighter band, like "Why Resound", instead of the frame. */
+    .ovl-section { background: linear-gradient(180deg, rgba(255, 255, 255, 0.035), rgba(255, 255, 255, 0.015)); border-top: 1px solid rgba(255, 255, 255, 0.05); border-bottom: 1px solid rgba(255, 255, 255, 0.05); }
+    /* The text above; below it, the picture with the box beside it. */
+    .ovl-card {
+        grid-template-columns: auto minmax(0, 1fr);
+        grid-template-areas: "copy copy" "visual action";
+        column-gap: 16px;
+        row-gap: 8px;
+        padding: 0;
+        border: 0;
+        border-radius: 0;
+        background: none;
+    }
+    .ovl-visual { justify-self: start; width: 124px; } /* the widest highlight, "Applause" */
+    .ovl-visual .ovb-mini { --u: 0.74px; }
+    .ovl-action { align-self: center; }
+    .ovl-callout { width: 100%; flex-direction: column; align-items: flex-start; gap: 12px; padding: 14px; font-size: 14px; }
+    .ovl-status { font-size: 14px; }
     .site-nav { display: none; }
     .header-cta { margin-left: auto; }
     .steps, .features, .how-grid { grid-template-columns: 1fr; }
     .section { padding: 44px 0; }
     .lead { font-size: 17px; }
-    .cta-row .btn { flex: 1 1 100%; }
+    .cta-row .btn, .cta-row .cta-stack { flex: 1 1 100%; }
+    .cta-stack .btn { width: 100%; }
     .phone { transform: none; }
 }
 /* The panel keeps its pixel layout and shrinks as a whole. */
