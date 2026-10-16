@@ -70,35 +70,42 @@
                 </div>
 
                 <!-- The remote and the PC it controls, drawn in CSS and SVG (not a
-                     screenshot). Every few seconds, or when tapped, a pad plays: a
-                     pulse runs down the cable into the PC, and the sound's emoji pops
-                     up at each app (landing.js, animateRemote). The stage has a fixed
+                     screenshot). Every few seconds, or when tapped, a pad plays: 
+                     waves ring out from the phone to the PC, and the sound\'s emoji
+                     pops up at each app (landing.js, animateRemote). The stage has a fixed
                      layout in px; landing.js zooms it to the column's width. -->
                 <div class="hero-visual" aria-hidden="true">
                     <div class="rc" data-remote>
-                        <!-- Behind the phone: it plugs into the phone's bottom edge,
-                             curls under it and up its left side, passes behind it,
-                             comes out low at its right edge, makes one round loop (its
-                             left side behind the phone), crosses itself and plugs
-                             into the left of the PC's screen. The path is a cubic B-spline (smooth
-                             curvature, no bumps), drawn for the phone's size and
-                             tilt. -->
-                        <svg class="rc-cable" viewBox="0 0 380 540" width="380" height="540">
-                            <defs><filter id="rc-glow" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="2.4"/></filter></defs>
-                            <!-- In two parts, split at the loop's left (behind the phone): the
-                                 second is drawn over the first, outline and all, where
-                                 the loop crosses the cable. Each part has its own layer
-                                 for the pulse, so it passes under the crossing too. -->
-                            <path class="rc-wire-edge" d="M241.5 491C241.5 491 241.5 491 241.8 493.7C242.1 496.3 242.6 501.6 242.4 507.8C242.1 513.9 241.1 521 234.7 527.5C228.3 534 216.7 540 199.7 543.8C182.7 547.7 160.3 549.3 137.8 548.2C115.3 547 92.7 543 73.7 534.8C54.7 526.7 39.3 514.3 29 497.8C18.7 481.3 13.3 460.7 11.3 439C9.3 417.3 10.7 394.7 15.7 375.7C20.7 356.7 29.3 341.3 42 329C54.7 316.7 71.3 307.3 92.7 299.7C114 292 140 286 163.7 280C187.3 274 208.7 268 227 261C245.3 254 260.7 246 271 234.7C281.3 223.3 286.7 208.7 291.2 193.9C295.8 179.2 299.7 164.3 303.3 152.7C307 141 310.5 132.5 310.5 124C310.5 115.5 307 107 301 101C295 95 286.5 91.5 278 91.5C269.5 91.5 261 95 255 101C249 107 245.5 115.5 245.5 124"/>
-                            <path class="rc-wire" d="M241.5 491C241.5 491 241.5 491 241.8 493.7C242.1 496.3 242.6 501.6 242.4 507.8C242.1 513.9 241.1 521 234.7 527.5C228.3 534 216.7 540 199.7 543.8C182.7 547.7 160.3 549.3 137.8 548.2C115.3 547 92.7 543 73.7 534.8C54.7 526.7 39.3 514.3 29 497.8C18.7 481.3 13.3 460.7 11.3 439C9.3 417.3 10.7 394.7 15.7 375.7C20.7 356.7 29.3 341.3 42 329C54.7 316.7 71.3 307.3 92.7 299.7C114 292 140 286 163.7 280C187.3 274 208.7 268 227 261C245.3 254 260.7 246 271 234.7C281.3 223.3 286.7 208.7 291.2 193.9C295.8 179.2 299.7 164.3 303.3 152.7C307 141 310.5 132.5 310.5 124C310.5 115.5 307 107 301 101C295 95 286.5 91.5 278 91.5C269.5 91.5 261 95 255 101C249 107 245.5 115.5 245.5 124" data-cable="a"/>
-                            <g data-pulses="a"></g>
-                            <path class="rc-wire-edge" d="M245.5 124C245.5 132.5 249 141 255 147C261 153 269.5 156.5 278.4 159.2C287.3 162 296.7 164 304.7 161.7C312.7 159.3 319.3 152.7 322 145.3C324.7 138 323.3 130 320.7 123.3C318 116.7 314 111.3 312 105.7C310 100 310 94 310 91C310 88 310 88 310 88"/>
-                            <path class="rc-wire" d="M245.5 124C245.5 132.5 249 141 255 147C261 153 269.5 156.5 278.4 159.2C287.3 162 296.7 164 304.7 161.7C312.7 159.3 319.3 152.7 322 145.3C324.7 138 323.3 130 320.7 123.3C318 116.7 314 111.3 312 105.7C310 100 310 94 310 91C310 88 310 88 310 88" data-cable="b"/>
-                            <g data-pulses="b"></g>
-                            <!-- Jacks: into the phone's bottom edge, along its tilt, and
-                                 into the bottom of the PC's screen, left of the stand -->
-                            <g class="rc-jack" transform="translate(239 467) rotate(-6)"><rect class="rc-jack-metal" x="-2.4" y="-3" width="4.8" height="5" rx="0.8"/><path class="rc-jack-body" d="M-5 1.5h10v13.5a2 2 0 0 1-2 2h-6a2 2 0 0 1-2-2z"/><path class="rc-jack-grip" d="M-5 6h10M-5 9h10M-5 12h10"/><path class="rc-jack-relief" d="M-3.4 17h6.8l-1.3 8h-4.2z"/></g>
-                            <g class="rc-jack" transform="translate(310 64)"><rect class="rc-jack-metal" x="-2.4" y="-3" width="4.8" height="5" rx="0.8"/><path class="rc-jack-body" d="M-5 1.5h10v13.5a2 2 0 0 1-2 2h-6a2 2 0 0 1-2-2z"/><path class="rc-jack-grip" d="M-5 6h10M-5 9h10M-5 12h10"/><path class="rc-jack-relief" d="M-3.4 17h6.8l-1.3 8h-4.2z"/></g>
+<!-- Wireless waves, like the rings in the logo: fixed circles around
+                             the phone, behind it, the PC and the apps. A play lights them
+                             up from the inside out (landing.js); they are brightest
+                             towards the PC and fade out on the far side. -->
+                        <svg class="rc-waves" viewBox="0 0 380 540" width="380" height="540">
+                            <defs>
+                                <linearGradient id="rc-wave-tone" gradientUnits="userSpaceOnUse" x1="-35" y1="491" x2="355" y2="9">
+                                    <stop offset="0.3" stop-color="#50dea8" stop-opacity="0"/>
+                                    <stop offset="0.6" stop-color="#50dea8" stop-opacity="0.3"/>
+                                    <stop offset="1" stop-color="#50dea8" stop-opacity="1"/>
+                                </linearGradient>
+                            </defs>
+                            <g class="rc-rings" transform="translate(160 250)">
+                                <circle r="130"/>
+                                <circle r="160"/>
+                                <circle r="190"/>
+                                <circle r="220"/>
+                                <circle r="250"/>
+                                <circle r="280"/>
+                                <circle r="310"/>
+                            </g>
+                            <g class="rc-rings-lit" transform="translate(160 250)">
+                                <g class="rc-ring" data-ring><circle class="rc-ring-glow" r="130"/><circle r="130"/></g>
+                                <g class="rc-ring" data-ring><circle class="rc-ring-glow" r="160"/><circle r="160"/></g>
+                                <g class="rc-ring" data-ring><circle class="rc-ring-glow" r="190"/><circle r="190"/></g>
+                                <g class="rc-ring" data-ring><circle class="rc-ring-glow" r="220"/><circle r="220"/></g>
+                                <g class="rc-ring" data-ring><circle class="rc-ring-glow" r="250"/><circle r="250"/></g>
+                                <g class="rc-ring" data-ring><circle class="rc-ring-glow" r="280"/><circle r="280"/></g>
+                                <g class="rc-ring" data-ring><circle class="rc-ring-glow" r="310"/><circle r="310"/></g>
+                            </g>
                         </svg>
 
                         <div class="phone" data-phone>
@@ -142,9 +149,6 @@
                                 </div>
                             </div>
                         </div>
-
-                        <!-- In the cable's lower loop: the real thing needs no cable -->
-                        <p class="rc-note">*wireless, no cable needed ;)</p>
 
                         <!-- The PC: Windows with Resound running -->
                         <div class="rc-pc" data-pc>

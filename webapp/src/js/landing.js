@@ -72,25 +72,22 @@
 
     // The hero's picture of the remote and the PC it controls: its pads play
     // like sounds. Every few seconds a random one plays by itself; a tap plays
-    // that one at once and pauses the others for a while. Each play sends a
-    // pulse down the cable (hidden where the cable passes behind the phone)
-    // into the PC, which lights up and passes the sound on: its emoji pops up
-    // at each app. The stage is laid out in px and zoomed to its column.
+    // that one at once and pauses the others for a while. Each play sends
+    // waves from the phone, the logo's rings lit from the inside out; as they
+    // pass the PC it lights up and passes the sound on: its emoji pops up at
+    // each app. The stage is laid out in px and zoomed to its column.
     function animateRemote(stage) {
         if (!stage) return;
         const WIDTH = 380;          // the stage's width in css/landing.css (.rc)
         const PLAY = 2600;          // a pad's progress bar (--play in landing.css)
-        const TRAVEL = 380;         // the pulse's way down the cable: snappy
-        const PULSE = 34;           // the pulse's length along the cable
+        const RING_STEP = 55;       // between one ring lighting up and the next
+        const RING_FLASH = 520;     // each ring's flash
+        const ARRIVE = 260;         // until the waves reach the PC
         const EVERY = 3400;         // between plays by themselves
         const RESUME = 7000;        // after a tap, before they start again
         const host = stage.parentElement;
         const tiles = [...stage.querySelectorAll('.tile')];
-        // The cable in its two parts (index.html), each with its pulse layer.
-        const parts = ['a', 'b'].map((k) => ({
-            path: stage.querySelector(`[data-cable="${k}"]`),
-            layer: stage.querySelector(`[data-pulses="${k}"]`),
-        }));
+        const rings = [...stage.querySelectorAll('[data-ring]')]; // inside out
         const pc = stage.querySelector('[data-pc]');
         const apps = [...stage.querySelectorAll('.rc-app')];
         const still = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -132,38 +129,17 @@
             }, 60 + i * 65));
         };
 
-        // The pulse is a short glowing stretch of the cable itself (a dash
-        // of a copy of its path), so it follows every curve, and the phone
-        // and the PC hide it where the cable passes behind them. It runs on
-        // both parts of the cable at once, offset by where each part starts,
-        // so it is one pill passing under the crossing like the cable. The
-        // arrival has its own timer, so it comes on time even where
-        // animations are held back.
-        let start = 0;
-        parts.forEach((part) => { part.start = start; part.length = part.path.getTotalLength(); start += part.length; });
-        const length = start;
+        // The waves: each ring flashes in turn, from the phone outwards, so a
+        // wave runs past the PC, which lights up as it gets there. Plays
+        // overlap freely. The arrival has its own timer, so it comes on time
+        // even where animations are held back.
         const send = (emoji) => {
-            const made = [];
-            for (const part of parts) {
-                for (const cls of ['rc-pulse-glow', 'rc-pulse']) {
-                    const path = part.path.cloneNode(false);
-                    path.removeAttribute('data-cable');
-                    path.setAttribute('class', cls);
-                    if (cls === 'rc-pulse-glow') path.setAttribute('filter', 'url(#rc-glow)');
-                    // The dash covers [s - PULSE, s] of the whole cable as s
-                    // goes from 0 to its end; the gap outlasts the cable.
-                    path.style.strokeDasharray = `${PULSE} ${length + PULSE}`;
-                    const from = PULSE + part.start, to = part.start - length;
-                    path.style.strokeDashoffset = String(from);
-                    part.layer.append(path);
-                    if (path.animate) {
-                        path.animate([{ strokeDashoffset: from }, { strokeDashoffset: to }],
-                            { duration: TRAVEL, easing: 'cubic-bezier(0.5, 0, 0.3, 1)', fill: 'forwards' });
-                    }
-                    made.push(path);
-                }
-            }
-            setTimeout(() => { made.forEach((p) => p.remove()); arrive(emoji); }, TRAVEL);
+            rings.forEach((ring, i) => {
+                if (!ring.animate) return;
+                ring.animate([{ opacity: 0 }, { opacity: 1, offset: 0.25 }, { opacity: 0 }],
+                    { duration: RING_FLASH, delay: i * RING_STEP, easing: 'ease-out' });
+            });
+            setTimeout(() => arrive(emoji), ARRIVE);
         };
 
         const press = (tile) => {

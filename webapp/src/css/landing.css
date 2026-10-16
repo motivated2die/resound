@@ -208,10 +208,10 @@ h1 { font-size: clamp(32px, 5vw, 52px); line-height: 1.1; font-weight: 700; lett
     border-radius: 34px;
     padding: 8px;
     background: linear-gradient(160deg, #30323a, #18191d);
-    /* A close, dark shadow all round as well: the cable runs beneath it. */
+    /* A close, dark shadow all round as well: the waves spread from beneath it. */
     box-shadow: 0 30px 80px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(255, 255, 255, 0.06), 0 0 90px rgba(var(--accent-rgb), 0.12),
         0 2px 6px rgba(0, 0, 0, 0.55), 0 0 22px 6px rgba(0, 0, 0, 0.4);
-    transform: rotate(-6deg); /* the cable's ends in index.html are placed for this */
+    transform: rotate(-6deg);
 }
 /* The screen follows the remote's layout (app.html): a slim top bar, the
    sound grid, the tabs, and the bottom bar with logo, mic and STOP. */
@@ -383,46 +383,22 @@ h1 { font-size: clamp(32px, 5vw, 52px); line-height: 1.1; font-weight: 700; lett
 .mock-stop .icon { font-size: 13px; }
 .mock-bar img { width: 21px; height: 21px; }
 
-/* --- The stage around the phone: the cable to the PC and its apps. A fixed
-   layout of 380 x 540 px, zoomed to the column by landing.js (--rc-zoom);
-   the cable's path in index.html is drawn for these positions. --- */
-.rc { position: relative; flex-shrink: 0; width: 380px; height: 552px; zoom: var(--rc-zoom, 1); } /* the cable's lowest curve needs the last 12 px */
-.rc-cable { position: absolute; left: 0; top: 0; width: 380px; height: 540px; z-index: 0; overflow: visible; }
-.rc-wire-edge, .rc-wire { fill: none; stroke-linecap: round; stroke-linejoin: round; }
-.rc-wire-edge { stroke: #121317; stroke-width: 7; }
-.rc-wire { stroke: #454852; stroke-width: 4; }
-.rc-jack-metal { fill: #b9bec8; stroke: #6c717c; stroke-width: 0.6; }
-.rc-jack-body { fill: #2a2c33; stroke: #121317; stroke-width: 1.2; }
-.rc-jack-grip { stroke: #3d4049; stroke-width: 1; }
-.rc-jack-relief { fill: #22242a; stroke: #121317; stroke-width: 1; }
-/* The pulse: a short glowing stretch of the cable (stroke-dasharray, moved
-   along by landing.js), so it bends with the curves. */
-.rc-pulse, .rc-pulse-glow { fill: none; stroke-linecap: round; }
-.rc-pulse { stroke: #e6fff5; stroke-width: 3.2; }
-.rc-pulse-glow { stroke: var(--accent); stroke-width: 9; opacity: 0.75; }
-/* Inside the cable's lower loop, under the phone and tilted with it: the
-   cable is only a picture of the connection, which is wireless. */
-.rc-note {
-    position: absolute;
-    z-index: 2;
-    left: 154px;
-    top: 516px;
-    transform: translate(-50%, -50%) rotate(-6deg);
-    padding: 3px 10px;
-    border-radius: 999px;
-    border: 1px solid rgba(var(--accent-rgb), 0.4);
-    background: rgba(28, 29, 34, 0.85);
-    color: var(--accent);
-    font-size: 10.5px;
-    font-style: italic;
-    font-weight: 600;
-    white-space: nowrap;
-    pointer-events: none;
-}
+/* --- The stage around the phone: the waves to the PC and its apps. A fixed
+   layout of 380 x 520 px, zoomed to the column by landing.js (--rc-zoom);
+   the waves in index.html are centred on the phone. --- */
+.rc { position: relative; flex-shrink: 0; width: 380px; height: 520px; zoom: var(--rc-zoom, 1); }
+/* The waves: the logo's rings around the phone, behind everything. The
+   resting rings are faint; a play lights each in turn (landing.js). */
+.rc-waves { position: absolute; left: 0; top: 0; width: 380px; height: 540px; z-index: 0; overflow: visible; pointer-events: none; }
+.rc-waves circle { fill: none; stroke: url(#rc-wave-tone); stroke-width: 4; }
+.rc-rings { opacity: 0.14; }
+.rc-ring { opacity: 0; }
+.rc-waves .rc-ring-glow { stroke-width: 12; opacity: 0.25; }
+.rc.still .rc-ring { opacity: 0.5; }
 /* The PC: a small monitor with Windows' logo, Resound's in the corner. */
 .rc-pc {
     position: absolute; z-index: 2; left: 288px; top: 6px; width: 84px; display: flex; flex-direction: column; align-items: center;
-    /* The cable loops beneath the PC: a shadow around screen and stand sets them apart. */
+    /* The waves pass beneath the PC: a shadow around screen and stand sets them apart. */
     filter: drop-shadow(0 3px 5px rgba(0, 0, 0, 0.6)) drop-shadow(0 0 12px rgba(0, 0, 0, 0.45));
 }
 .rc-screen {
@@ -469,8 +445,7 @@ h1 { font-size: clamp(32px, 5vw, 52px); line-height: 1.1; font-weight: 700; lett
 }
 .rc-app .icon { font-size: 20px; }
 .rc-app.on { color: var(--text); border-color: rgba(var(--accent-rgb), 0.6); box-shadow: 0 0 16px rgba(var(--accent-rgb), 0.3); }
-/* The sound's emoji, popping up at the app's top right (the cable runs
-   past their left). */
+/* The sound's emoji, popping up at the app's top right. */
 .rc-pop {
     position: absolute;
     right: -12px;
