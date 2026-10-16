@@ -194,3 +194,29 @@ func TestFilterEscHold(t *testing.T) {
 		t.Fatalf("timeout after a tap: %v", ev)
 	}
 }
+
+func TestHandsOver(t *testing.T) {
+	b := &Bindings{Pause: []Combo{{vkLCtrl, vkF}}, Stop: []Combo{{vkX}}}
+	var f Filter
+	steps := []struct {
+		vk         uint16
+		down, want bool
+	}{
+		{vkLCtrl, true, false}, // not a hotkey yet
+		{vkF, true, true},      // completes the pause
+		{vkF, true, false},     // auto-repeat
+		{vkX, true, true},      // a stop while paused
+		{vkX, false, false},
+		{vkF, false, false}, // the pause ends
+		{vkLCtrl, false, false},
+	}
+	for i, s := range steps {
+		events, swallow := f.Key(b, s.vk, s.down)
+		if swallow {
+			t.Fatalf("step %d: the filter swallowed a hotkey", i)
+		}
+		if got := handsOver(events); got != s.want {
+			t.Fatalf("step %d (vk %#x down=%v): handsOver %v, want %v (events %v)", i, s.vk, s.down, got, s.want, events)
+		}
+	}
+}

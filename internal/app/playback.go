@@ -41,6 +41,10 @@ type playbackState struct {
 	paused, talk, hold               []uint64
 	pausedActive, talkLive, holdLive bool
 	wasHolding                       bool
+	// holdResuming: the pause key was let go and the sounds resume after
+	// holdResumeDelay, unless holdGen changed meanwhile.
+	holdResuming bool
+	holdGen      int
 
 	vmu    sync.Mutex
 	voices map[uint64]voiceMeta
@@ -130,6 +134,9 @@ func (a *App) playTest(tone bool) {
 func (a *App) stopAll() {
 	pb := &a.playback
 	pb.paused, pb.pausedActive = nil, false
+	if _, ok := a.takeHold(); ok {
+		pb.wasHolding = false // nothing is left to resume
+	}
 	a.engine.StopAll() // emits EventFinished per voice, which releases the mic
 }
 
@@ -137,6 +144,11 @@ func (a *App) stopAll() {
 // It returns true when playback is now paused.
 func (a *App) togglePause() bool {
 	pb := &a.playback
+	if ids, ok := a.takeHold(); ok { // the phone keeps the pause the key was ending
+		pb.paused, pb.pausedActive = ids, true
+		logx.Printf("paused %d voice(s), taken over from the pause key", len(ids))
+		return true
+	}
 	if pb.talkLive || pb.holdLive {
 		return pb.pausedActive // talk-through or a pause key owns the pause right now
 	}
@@ -162,6 +174,11 @@ func (a *App) setTalkThrough(on bool) {
 		pb.talk = a.pauseActive()
 		pb.talkLive = true
 		logx.Printf("talk-through on, paused %d voice(s)", len(pb.talk))
+	case on && !pb.talkLive && pb.holdResuming:
+		a.setPTT(pttTalk, true)
+		pb.talk, _ = a.takeHold() // talk-through keeps the pause the key was ending
+		pb.talkLive = true
+		logx.Printf("talk-through on, taken over from the pause key")
 	case !on && pb.talkLive:
 		a.resume(pb.talk)
 		a.setPTT(pttTalk, false)
@@ -170,12 +187,25 @@ func (a *App) setTalkThrough(on bool) {
 	}
 }
 
+// holdResumeDelay is how long sounds stay paused after a pause key is let
+// go, before they resume and push-to-talk goes down again. Pressed right
+// after the game saw the pause key (often its own push-to-talk for another
+// channel) go up, Resound's push-to-talk was sometimes missed by games.
+const holdResumeDelay = 150 * time.Millisecond
+
 // setHoldPause pauses playback and lets go of the mic and push-to-talk
 // while a pause hotkey is held, so the user can talk on another channel
-// (often the game's other push-to-talk key). Releasing it resumes both.
+// (often the game's other push-to-talk key). on false ends the pause at
+// once; letting go of the key ends it after a moment (releaseHoldPause).
 func (a *App) setHoldPause(on bool) {
 	pb := &a.playback
 	switch {
+	case on && pb.holdResuming: // pressed again before resuming: stay paused
+		pb.holdResuming = false
+		pb.holdGen++
+		was := pb.wasHolding
+		pb.hold = append(pb.hold, a.pauseActive()...) // and sounds started meanwhile
+		pb.wasHolding = pb.wasHolding || was
 	case on && !pb.holdLive && !pb.talkLive && !pb.pausedActive:
 		pb.hold = a.pauseActive()
 		pb.holdLive = true
@@ -183,12 +213,59 @@ func (a *App) setHoldPause(on bool) {
 			logx.Printf("hotkey: paused %d voice(s) while the pause key is held", len(pb.hold))
 		}
 	case !on && pb.holdLive:
-		if len(pb.hold) > 0 {
-			logx.Printf("hotkey: pause key released, resuming")
-		}
-		a.resume(pb.hold)
-		pb.hold, pb.holdLive = nil, false
+		a.endHoldPause()
 	}
+}
+
+// releaseHoldPause resumes the sounds holdResumeDelay after the pause key
+// was let go, unless it is pressed again or another pause takes over
+// meanwhile. With nothing to resume, the pause ends at once.
+func (a *App) releaseHoldPause() {
+	pb := &a.playback
+	if !pb.holdLive || pb.holdResuming {
+		return
+	}
+	if len(pb.hold) == 0 {
+		a.endHoldPause()
+		return
+	}
+	pb.holdResuming = true
+	pb.holdGen++
+	gen := pb.holdGen
+	time.AfterFunc(holdResumeDelay, func() {
+		a.tray.Post(func() {
+			if pb.holdResuming && pb.holdGen == gen {
+				a.endHoldPause()
+				a.render()
+			}
+		})
+	})
+}
+
+// endHoldPause resumes the sounds a pause key paused, now.
+func (a *App) endHoldPause() {
+	pb := &a.playback
+	if len(pb.hold) > 0 {
+		logx.Printf("hotkey: pause key released, resuming")
+	}
+	pb.holdResuming = false
+	pb.holdGen++
+	a.resume(pb.hold)
+	pb.hold, pb.holdLive = nil, false
+}
+
+// takeHold ends a pause key's pause that is about to resume without
+// resuming it, and returns its voices for another pause to carry on
+// (wasHolding stays). ok is false when no such pause is pending.
+func (a *App) takeHold() (ids []uint64, ok bool) {
+	pb := &a.playback
+	if !pb.holdResuming {
+		return nil, false
+	}
+	ids = pb.hold
+	pb.hold, pb.holdLive, pb.holdResuming = nil, false, false
+	pb.holdGen++
+	return ids, true
 }
 
 // pauseActive pauses all running voices, lets go of the mic and the

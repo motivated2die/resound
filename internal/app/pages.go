@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/skip2/go-qrcode"
 
@@ -324,7 +325,21 @@ func (a *App) keysPage() []ui.Row {
 	rows = append(rows, a.pttRows()...)
 	rows = append(rows, a.hotkeyRows(capturePause)...)
 	rows = append(rows, a.hotkeyRows(captureStop)...)
+	rows = append(rows, a.handOverRows()...)
 	return append(rows, ui.Spacer(4))
+}
+
+// handOverRows is the switch for letting go of push-to-talk before a pause
+// or stop key reaches the game, shown while it can matter.
+func (a *App) handOverRows() []ui.Row {
+	if len(a.cfg.PushToTalkKeys) == 0 || len(a.cfg.PauseHotkeys) == 0 && len(a.cfg.StopHotkeys) == 0 {
+		return nil
+	}
+	return []ui.Row{
+		ui.Toggle("Let go of push-to-talk first", !a.cfg.NoPushToTalkHandOver, a.togglePTTHandOver),
+		ui.Paragraph("While sounds hold push-to-talk, a pause or stop key waits a moment for Resound to let go of it, "+
+			"so the game doesn't end your own push-to-talk too. Turn this off if a game ignores your key while sounds play.", ui.ToneMuted),
+	}
 }
 
 func (a *App) pttIntro() ui.Row {
@@ -621,8 +636,51 @@ func (a *App) pairRows() (rows []ui.Row, ok bool) {
 	if qr, err := qrcode.New(link, qrcode.Medium); err == nil {
 		rows = append(rows, ui.QRCode(qr.Bitmap()))
 	}
+	copyAction := ui.Action{Label: "Copy link", Icon: ui.IconCopy, OnClick: a.copyPairLink}
+	if a.linkCopied > 0 {
+		copyAction.Label, copyAction.Icon = "Link copied", ui.IconCheck
+	}
+	rows = append(rows, ui.Buttons(copyAction))
+	if a.linkCopyErr != "" {
+		rows = append(rows, ui.Paragraph(a.linkCopyErr, ui.ToneBad))
+	}
 	return append(rows, ui.Paragraph("The Resound app opens; install it from there. "+
-		"Your phone must be on the same Wi-Fi as this PC. Each code works once.", ui.ToneMuted)), true
+		"Your phone must be on the same Wi-Fi as this PC. Each code or copied link works once.", ui.ToneMuted)), true
+}
+
+// linkCopiedTime is how long the copy button says "Link copied".
+const linkCopiedTime = 2 * time.Second
+
+// copyPairLink puts the pairing link, the one in the QR code, on the
+// clipboard, to open on another device or in a development build of the
+// app. It holds a pairing code, so it is never logged.
+func (a *App) copyPairLink() {
+	if a.srv == nil || a.serverErr != nil {
+		return
+	}
+	link, ok := a.srv.PairURL(a.appURL(), a.appAddresses())
+	if !ok {
+		return
+	}
+	if err := ui.SetClipboardText(a.tray.Hwnd(), link); err != nil {
+		logx.Printf("copying the pairing link: %v", err)
+		a.linkCopyErr = "Couldn't copy the link: " + err.Error()
+		a.render()
+		return
+	}
+	logx.Printf("pairing link copied")
+	a.linkCopyErr = ""
+	a.linkCopied++
+	n := a.linkCopied
+	time.AfterFunc(linkCopiedTime, func() {
+		a.tray.Post(func() {
+			if a.linkCopied == n { // not copied again meanwhile
+				a.linkCopied = 0
+				a.render()
+			}
+		})
+	})
+	a.render()
 }
 
 // appAddresses are this PC's addresses in the QR code, most likely first.

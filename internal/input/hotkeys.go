@@ -26,6 +26,11 @@ const (
 	ActionOverlayScroll
 	ActionOverlayEscDown
 	ActionOverlayStop
+
+	// ActionHandOver reports that a pause or stop key let go of the
+	// push-to-talk keys lent to the hook (Watcher.LendPTT) before passing
+	// the key on. Down is false if SendInput failed.
+	ActionHandOver
 )
 
 // EscHoldTime is how long Esc is held in the open overlay to stop all
@@ -33,7 +38,7 @@ const (
 const EscHoldTime = 700 * time.Millisecond
 
 func (a Action) String() string {
-	return [...]string{"pause", "stop", "overlay open", "overlay select", "overlay close", "overlay scroll", "overlay Esc down", "overlay stop"}[a]
+	return [...]string{"pause", "stop", "overlay open", "overlay select", "overlay close", "overlay scroll", "overlay Esc down", "overlay stop", "push-to-talk hand-over"}[a]
 }
 
 // HotkeyEvent is a hotkey becoming active (Down) or inactive. Stop keys and
@@ -147,6 +152,18 @@ func (m *Matcher) held(c Combo) bool {
 		}
 	}
 	return true
+}
+
+// handsOver reports whether events start a pause or a stop: the moment the
+// push-to-talk keys Resound holds must go up, before the key that caused it
+// reaches the game (Watcher.LendPTT).
+func handsOver(events []HotkeyEvent) bool {
+	for _, ev := range events {
+		if ev.Down && (ev.Action == ActionPause || ev.Action == ActionStop) {
+			return true
+		}
+	}
+	return false
 }
 
 // SameCombo reports whether two combinations trigger the same way: the same

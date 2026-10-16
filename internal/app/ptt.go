@@ -21,6 +21,7 @@ const (
 type pttState struct {
 	reasons map[string]bool
 	pressed input.Combo // keys currently held down by Resound
+	lent    bool        // pressed is lent to the hotkey watcher (lendPTT)
 
 	capturing bool
 	target    captureTarget // what the recorded key is for
@@ -41,6 +42,8 @@ func (p *pttState) init() {
 // setPTT adds or removes a reason and presses/releases the keys when the
 // first reason appears or the last one goes away.
 func (a *App) setPTT(reason string, on bool) {
+	a.reclaimPTT()
+	defer a.lendPTT()
 	p := &a.ptt
 	if on {
 		p.reasons[reason] = true
@@ -60,8 +63,45 @@ func (a *App) setPTT(reason string, on bool) {
 	}
 }
 
+// lendPTT lends the held keys to the hotkey watcher while only playback
+// holds them: a pause or stop key then lets go of them in the hook, before
+// the game sees that key (input.Watcher.LendPTT). Talk-through keeps them,
+// as the user talks on Resound's channel then.
+func (a *App) lendPTT() {
+	p := &a.ptt
+	if p.lent || p.pressed == nil || a.hotkeys == nil || p.capturing || a.cfg.NoPushToTalkHandOver ||
+		len(p.reasons) != 1 || !p.reasons[pttPlayback] ||
+		len(a.cfg.PauseHotkeys) == 0 && len(a.cfg.StopHotkeys) == 0 {
+		return
+	}
+	a.hotkeys.LendPTT(slices.Clone(p.pressed))
+	p.lent = true
+}
+
+// reclaimPTT ends the loan. If a pause or stop key used the keys
+// meanwhile, the hook let go of them already.
+func (a *App) reclaimPTT() {
+	p := &a.ptt
+	if !p.lent {
+		return
+	}
+	p.lent = false
+	if a.hotkeys == nil || a.hotkeys.TakePTT() != nil {
+		return // still held
+	}
+	logx.Printf("push-to-talk up (%s) before a hotkey", p.pressed)
+	p.pressed = nil
+}
+
+// syncPTTLoan lends or takes back the keys after a setting changed.
+func (a *App) syncPTTLoan() {
+	a.reclaimPTT()
+	a.lendPTT()
+}
+
 // releaseAllPTT lets go of the keys, whatever the reasons say.
 func (a *App) releaseAllPTT() {
+	a.reclaimPTT()
 	p := &a.ptt
 	if p.pressed == nil {
 		return
@@ -101,9 +141,18 @@ func (a *App) startCapture(t captureTarget) {
 	p.capturing, p.target, p.hotkeyNote = true, t, ""
 	p.captured = nil
 	clear(p.down)
+	a.reclaimPTT() // the keys recorded aren't held back
 	if a.hotkeys != nil {
 		a.hotkeys.SetBindings(a.hotkeyBindings()) // without the overlay key
 	}
+	a.render()
+}
+
+func (a *App) togglePTTHandOver() {
+	a.cfg.NoPushToTalkHandOver = !a.cfg.NoPushToTalkHandOver
+	a.syncPTTLoan()
+	a.save()
+	logx.Printf("push-to-talk hand-over: %v", !a.cfg.NoPushToTalkHandOver)
 	a.render()
 }
 

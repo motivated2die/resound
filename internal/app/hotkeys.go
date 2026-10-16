@@ -64,6 +64,7 @@ func (a *App) applyHotkeys() {
 		}
 		a.hotkeys, a.hotkeyErr = w, ""
 	}
+	a.syncPTTLoan() // the watcher or its keys may have changed
 	if a.hotkeys != nil {
 		logx.Printf("hotkeys: watching %d pause and %d stop key(s), overlay key %q", len(b.Pause), len(b.Stop), b.Overlay.String())
 	}
@@ -71,6 +72,7 @@ func (a *App) applyHotkeys() {
 
 func (a *App) closeHotkeys() {
 	if a.hotkeys != nil {
+		a.reclaimPTT()
 		a.hotkeys.Close()
 		a.hotkeys = nil
 		logx.Printf("hotkeys: off")
@@ -82,6 +84,12 @@ func (a *App) onHotkey(ev input.HotkeyEvent) {
 	if a.onOverlayEvent(ev) {
 		return
 	}
+	if ev.Action == input.ActionHandOver {
+		if !ev.Down {
+			logx.Printf("hotkey: letting go of push-to-talk before the key failed")
+		}
+		return
+	}
 	if ev.Down && a.ptt.capturing {
 		return // the user is recording a key in the panel
 	}
@@ -90,7 +98,11 @@ func (a *App) onHotkey(ev input.HotkeyEvent) {
 		logx.Printf("hotkey: stop")
 		a.stopAll()
 	case input.ActionPause:
-		a.setHoldPause(ev.Down)
+		if ev.Down {
+			a.setHoldPause(true)
+		} else {
+			a.releaseHoldPause()
+		}
 	}
 	a.render()
 }

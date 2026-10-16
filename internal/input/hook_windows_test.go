@@ -72,14 +72,29 @@ func TestWatcherLive(t *testing.T) {
 // never reaches them, as it never reaches a game.
 type observer struct {
 	keys, wheels chan uint32
+	all          chan seenKey // F21–F24 events, presses and releases
 	threadID     uint32
+}
+
+type seenKey struct {
+	vk   uint32
+	up   bool
+	ours bool // carries sendMarker
 }
 
 var obs *observer
 
 var obsKeyCallback = windows.NewCallback(func(code, wparam uintptr, k *kbdLLHookStruct) uintptr {
-	if int32(code) >= 0 && obs != nil && (wparam == wmKeyDown || wparam == wmSysKeyDown) {
-		obs.keys <- k.VKCode
+	if int32(code) >= 0 && obs != nil {
+		if wparam == wmKeyDown || wparam == wmSysKeyDown {
+			obs.keys <- k.VKCode
+		}
+		if k.VKCode >= 0x84 && k.VKCode <= 0x87 { // F21–F24: real keyboards have none
+			select {
+			case obs.all <- seenKey{k.VKCode, k.Flags&llkhfUp != 0, k.ExtraInfo == sendMarker}:
+			default:
+			}
+		}
 	}
 	r, _, _ := procCallNextHookEx.Call(0, code, wparam, uintptr(unsafe.Pointer(k)))
 	return r
@@ -94,7 +109,7 @@ var obsMouseCallback = windows.NewCallback(func(code, wparam uintptr, m *msLLHoo
 })
 
 func startObserver(t *testing.T) {
-	obs = &observer{keys: make(chan uint32, 16), wheels: make(chan uint32, 16)}
+	obs = &observer{keys: make(chan uint32, 16), wheels: make(chan uint32, 16), all: make(chan seenKey, 32)}
 	ready := make(chan struct{})
 	go func() {
 		runtime.LockOSThread()
@@ -218,5 +233,122 @@ func TestOverlayHookLive(t *testing.T) {
 	case ev := <-events:
 		t.Fatalf("event after the release: %v", ev)
 	case <-time.After(200 * time.Millisecond):
+	}
+}
+
+// TestHandOverLive checks with real input that a pause or stop key, while
+// push-to-talk keys are lent to the hook, reaches other programs only after
+// the push-to-talk release, and as it was pressed otherwise. F23 stands in
+// for push-to-talk, F24 for a pause key and F21 for a stop key (some
+// keyboard tools take F22 for themselves):
+//
+//	$env:RESOUND_HOOK_TEST="1"; go test -run HandOverLive -v ./internal/input
+func TestHandOverLive(t *testing.T) {
+	if os.Getenv("RESOUND_HOOK_TEST") != "1" {
+		t.Skip("set RESOUND_HOOK_TEST=1 to inject input into the desktop")
+	}
+	const ptt, pause, stop = 0x86, 0x87, 0x84
+	startObserver(t)
+	events := make(chan HotkeyEvent, 16)
+	w, err := StartWatcher(Bindings{Pause: []Combo{{pause}}, Stop: []Combo{{stop}}}, func(ev HotkeyEvent) { events <- ev })
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer w.Close()
+	user := func(vk uint16, down bool) { // a key as the user presses it
+		in := keyboardInput{Type: inputKeyboard, VK: vk}
+		if !down {
+			in.Flags = keyeventfKeyUp
+		}
+		if err := sendInput(unsafe.Pointer(&in), unsafe.Sizeof(in)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	expectSeen := func(want ...seenKey) {
+		t.Helper()
+		for _, k := range want {
+			select {
+			case got := <-obs.all:
+				if got != k {
+					t.Fatalf("other programs got %+v, want %+v", got, k)
+				}
+			case <-time.After(time.Second):
+				t.Fatalf("other programs didn't get %+v", k)
+			}
+		}
+		select {
+		case got := <-obs.all:
+			t.Fatalf("other programs got %+v as well", got)
+		case <-time.After(150 * time.Millisecond):
+		}
+	}
+	expectEvents := func(want ...HotkeyEvent) {
+		t.Helper()
+		for _, ev := range want {
+			select {
+			case got := <-events:
+				if got != ev {
+					t.Fatalf("event %v, want %v", got, ev)
+				}
+			case <-time.After(time.Second):
+				t.Fatalf("no %v event", ev)
+			}
+		}
+	}
+
+	for _, key := range []uint16{pause, stop} {
+		start := HotkeyEvent{Action: ActionPause, Down: true}
+		if key == stop {
+			start.Action = ActionStop
+		}
+		if err := Press(Combo{ptt}); err != nil {
+			t.Fatal(err)
+		}
+		expectSeen(seenKey{ptt, false, true})
+		w.LendPTT(Combo{ptt})
+
+		user(key, true) // the release first, then the key
+		expectSeen(seenKey{ptt, true, true}, seenKey{uint32(key), false, true})
+		expectEvents(start, HotkeyEvent{Action: ActionHandOver, Down: true})
+		if c := w.TakePTT(); c != nil {
+			t.Fatalf("the keys are still lent after the hand-over: %v", c)
+		}
+		user(key, true) // a repeat passes
+		user(key, false)
+		expectSeen(seenKey{uint32(key), false, false}, seenKey{uint32(key), true, false})
+		if key == pause {
+			expectEvents(HotkeyEvent{Action: ActionPause})
+		}
+
+		user(key, true) // nothing lent: the key passes as it is
+		user(key, false)
+		expectSeen(seenKey{uint32(key), false, false}, seenKey{uint32(key), true, false})
+		expectEvents(start)
+		if key == pause {
+			expectEvents(HotkeyEvent{Action: ActionPause})
+		}
+	}
+
+	// A tap sent in one go: its release reaches the hook before the press
+	// is passed on, and must still come after it.
+	if err := Press(Combo{ptt}); err != nil {
+		t.Fatal(err)
+	}
+	expectSeen(seenKey{ptt, false, true})
+	w.LendPTT(Combo{ptt})
+	tap := []inputRecord{
+		asRecord(keyboardInput{Type: inputKeyboard, VK: pause}),
+		asRecord(keyboardInput{Type: inputKeyboard, VK: pause, Flags: keyeventfKeyUp}),
+	}
+	if _, err := sendRecordsN(tap); err != nil {
+		t.Fatal(err)
+	}
+	expectSeen(seenKey{ptt, true, true}, seenKey{pause, false, true}, seenKey{pause, true, true})
+	expectEvents(HotkeyEvent{Action: ActionPause, Down: true}, HotkeyEvent{Action: ActionPause}, HotkeyEvent{Action: ActionHandOver, Down: true})
+
+	select {
+	case ev := <-events:
+		t.Fatalf("unexpected event %v", ev)
+	case <-time.After(100 * time.Millisecond):
 	}
 }

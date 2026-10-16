@@ -87,27 +87,43 @@ func (c Combo) String() string {
 }
 
 // Press presses every key of the combination, in order.
-func Press(c Combo) error {
-	for _, vk := range c {
-		if err := send(vk, true); err != nil {
-			return err
-		}
-	}
-	return nil
-}
+func Press(c Combo) error { return sendRecords(pressRecords(c)) }
 
 // Release releases the combination, in reverse order.
-func Release(c Combo) error {
-	var firstErr error
-	for i := len(c) - 1; i >= 0; i-- {
-		if err := send(c[i], false); err != nil && firstErr == nil {
-			firstErr = err
-		}
+func Release(c Combo) error { return sendRecords(releaseRecords(c)) }
+
+func pressRecords(c Combo) []inputRecord {
+	in := make([]inputRecord, len(c))
+	for i, vk := range c {
+		in[i] = record(vk, true)
 	}
-	return firstErr
+	return in
 }
 
-func send(vk uint16, down bool) error {
+func releaseRecords(c Combo) []inputRecord {
+	in := make([]inputRecord, 0, len(c))
+	for i := len(c) - 1; i >= 0; i-- {
+		in = append(in, record(c[i], false))
+	}
+	return in
+}
+
+// inputRecord is one INPUT of either kind. keyboardInput and mouseInput
+// have the same size, so presses of both go into one SendInput call, which
+// Windows inserts without other input in between.
+type inputRecord struct{ _ [5]uint64 }
+
+// Compile-time checks that both kinds fill an inputRecord exactly.
+var (
+	_ = [1]struct{}{}[unsafe.Sizeof(keyboardInput{})-unsafe.Sizeof(inputRecord{})]
+	_ = [1]struct{}{}[unsafe.Sizeof(mouseInput{})-unsafe.Sizeof(inputRecord{})]
+)
+
+func asRecord[T keyboardInput | mouseInput](in T) inputRecord {
+	return *(*inputRecord)(unsafe.Pointer(&in))
+}
+
+func record(vk uint16, down bool) inputRecord {
 	switch vk {
 	case VKMiddle, VKXButton1, VKXButton2:
 		in := mouseInput{Type: inputMouse, ExtraInfo: sendMarker}
@@ -123,14 +139,14 @@ func send(vk uint16, down bool) error {
 				in.Flags = mouseeventfXDown
 			}
 		}
-		return sendInput(unsafe.Pointer(&in), unsafe.Sizeof(in))
+		return asRecord(in)
 	}
 
 	in := keyInput(vk)
 	if !down {
 		in.Flags |= keyeventfKeyUp
 	}
-	return sendInput(unsafe.Pointer(&in), unsafe.Sizeof(in))
+	return asRecord(in)
 }
 
 // keyInput describes a press of vk. Games read either the virtual key
@@ -144,9 +160,12 @@ func send(vk uint16, down bool) error {
 //   - Pause has an E1-prefixed scan code that SendInput cannot send; sent as
 //     a scan code it was Right Ctrl. A real Pause arrives as VK_PAUSE with
 //     scan code 0x45, so it is sent that way.
-func keyInput(vk uint16) keyboardInput {
+func keyInput(vk uint16) keyboardInput { return keyInputScan(vk, scanCodeEx(vk)) }
+
+// keyInputScan is keyInput with the scan code given (with its 0xE0 or
+// 0xE1 prefix), e.g. the one a real key press arrived with.
+func keyInputScan(vk, sc uint16) keyboardInput {
 	in := keyboardInput{Type: inputKeyboard, VK: vk, ExtraInfo: sendMarker}
-	sc := scanCodeEx(vk)
 	switch prefix := sc & 0xFF00; {
 	case sc == 0:
 	case prefix == 0xE100:
@@ -161,6 +180,24 @@ func keyInput(vk uint16) keyboardInput {
 		}
 	}
 	return in
+}
+
+// sendRecords sends all of in with one SendInput call.
+func sendRecords(in []inputRecord) error {
+	_, err := sendRecordsN(in)
+	return err
+}
+
+// sendRecordsN sends in and returns how many Windows inserted (the first n).
+func sendRecordsN(in []inputRecord) (int, error) {
+	if len(in) == 0 {
+		return 0, nil
+	}
+	n, _, err := procSendInput.Call(uintptr(len(in)), uintptr(unsafe.Pointer(&in[0])), unsafe.Sizeof(in[0]))
+	if int(n) != len(in) {
+		return int(n), fmt.Errorf("SendInput: %d of %d sent: %w", n, len(in), err)
+	}
+	return int(n), nil
 }
 
 func sendInput(in unsafe.Pointer, size uintptr) error {
