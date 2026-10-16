@@ -80,7 +80,8 @@
         if (!stage) return;
         const WIDTH = 380;          // the stage's width in css/landing.css (.rc)
         const PLAY = 2600;          // a pad's progress bar (--play in landing.css)
-        const TRAVEL = 1150;        // the pulse's way down the cable
+        const TRAVEL = 380;         // the pulse's way down the cable: snappy
+        const PULSE = 34;           // the pulse's length along the cable
         const EVERY = 3400;         // between plays by themselves
         const RESUME = 7000;        // after a tap, before they start again
         const host = stage.parentElement;
@@ -88,7 +89,6 @@
         const cable = stage.querySelector('[data-cable]');
         const pulses = stage.querySelector('[data-pulses]');
         const pc = stage.querySelector('[data-pc]');
-        const links = stage.querySelector('[data-links]');
         const apps = [...stage.querySelectorAll('.rc-app')];
         const still = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
@@ -118,43 +118,38 @@
         const offTimers = new WeakMap();
         const later = (el, ms, fn) => { clearTimeout(offTimers.get(el)); offTimers.set(el, setTimeout(fn, ms)); };
 
+        // The PC lights up and passes the sound on to each app in turn.
         const arrive = (emoji) => {
             restart(pc, 'hit');
-            later(pc, 900, () => pc.classList.remove('hit'));
-            setTimeout(() => restart(links, 'go'), 120);
+            later(pc, 450, () => pc.classList.remove('hit'));
             apps.forEach((app, i) => setTimeout(() => {
                 app.querySelector('.rc-pop').textContent = emoji;
                 restart(app, 'on');
-                later(app, 2000, () => app.classList.remove('on'));
-            }, 260 + i * 130));
+                later(app, 1000, () => app.classList.remove('on'));
+            }, 60 + i * 65));
         };
 
-        const NS = 'http://www.w3.org/2000/svg';
+        // The pulse is a short glowing stretch of the cable itself (a dash
+        // of a copy of its path), so it follows every curve, and the phone
+        // hides it where the cable passes behind. The arrival has its own
+        // timer, so it comes on time even where animations are held back.
         const length = cable.getTotalLength();
         const send = (emoji) => {
-            const dot = document.createElementNS(NS, 'g');
-            for (const [r, cls] of [[9, 'rc-dot-halo'], [3.6, 'rc-dot']]) {
-                const c = document.createElementNS(NS, 'circle');
-                c.setAttribute('r', r);
-                c.setAttribute('class', cls);
-                dot.append(c);
-            }
-            pulses.append(dot);
-            // Frames only move the dot; the arrival has its own timer, so it
-            // comes on time even where frames are held back (a background
-            // tab), and no dot is left behind.
-            let done = false;
-            const start = performance.now();
-            const step = (now) => {
-                if (done) return;
-                const t = Math.min(1, Math.max(0, now - start) / TRAVEL);
-                const eased = t < 0.5 ? 2 * t * t : 1 - (2 - 2 * t) ** 2 / 2;
-                const p = cable.getPointAtLength(eased * length);
-                dot.setAttribute('transform', `translate(${p.x.toFixed(1)} ${p.y.toFixed(1)})`);
-                if (t < 1) requestAnimationFrame(step);
-            };
-            step(start);
-            setTimeout(() => { done = true; dot.remove(); arrive(emoji); }, TRAVEL);
+            const parts = ['rc-pulse-glow', 'rc-pulse'].map((cls) => {
+                const path = cable.cloneNode(false);
+                path.removeAttribute('data-cable');
+                path.setAttribute('class', cls);
+                if (cls === 'rc-pulse-glow') path.setAttribute('filter', 'url(#rc-glow)');
+                path.style.strokeDasharray = `${PULSE} ${length + PULSE}`;
+                path.style.strokeDashoffset = String(PULSE);
+                pulses.append(path);
+                if (path.animate) {
+                    path.animate([{ strokeDashoffset: PULSE }, { strokeDashoffset: -length }],
+                        { duration: TRAVEL, easing: 'cubic-bezier(0.5, 0, 0.3, 1)', fill: 'forwards' });
+                }
+                return path;
+            });
+            setTimeout(() => { parts.forEach((p) => p.remove()); arrive(emoji); }, TRAVEL);
         };
 
         const press = (tile) => {

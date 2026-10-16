@@ -77,13 +77,18 @@
                 <div class="hero-visual" aria-hidden="true">
                     <div class="rc" data-remote>
                         <!-- Behind the phone: it plugs into the phone's bottom edge,
-                             curls under it and up its left side, passes behind it
-                             and comes out at the top right, into the PC. -->
+                             curls under it and up its left side, passes behind it,
+                             comes out at the top right, loops over itself and plugs
+                             into the PC. The path is a smooth spline through
+                             waypoints, drawn for the phone's size and tilt. -->
                         <svg class="rc-cable" viewBox="0 0 380 540" width="380" height="540">
-                            <rect class="rc-plug" x="231" y="464" width="16" height="12" rx="2.5" transform="rotate(-6 239 467)"/>
-                            <rect class="rc-plug" x="276" y="28" width="13" height="12" rx="2.5"/>
-                            <path class="rc-wire-edge" d="M240 476C242 500 236 518 208 524C160 536 96 534 60 516C22 498 6 452 8 404C10 356 2 330 14 306C26 284 52 290 80 282C150 262 226 206 262 160C282 132 268 44 281 34"/>
-                            <path class="rc-wire" d="M240 476C242 500 236 518 208 524C160 536 96 534 60 516C22 498 6 452 8 404C10 356 2 330 14 306C26 284 52 290 80 282C150 262 226 206 262 160C282 132 268 44 281 34" data-cable/>
+                            <defs><filter id="rc-glow" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="2.4"/></filter></defs>
+                            <path class="rc-wire-edge" d="M241.5 491C241.6 497.9 242.8 505.6 240 512C236.9 519.1 229.9 526.3 222 531C212.3 536.8 197.8 539.2 184 541C168.1 543.1 148.9 542.9 132 541C115.6 539.1 98.8 536.3 84 530C69.5 523.8 54.6 515.3 44 504C33.3 492.6 25.2 477.1 20 462C14.7 446.5 13.3 428.7 13 412C12.7 395.4 13.8 377.2 18 362C21.9 348.1 27.1 334.3 36 324C45 313.6 57.2 307.9 72 300C92.6 289 124.7 281 150 268C176.1 254.5 205.2 235.7 226 220C242.1 207.8 254.9 195 266 184C274.7 175.4 280.7 168.2 288 160C295.4 151.6 305.4 141.8 310.1 134.1C313.3 129 316 124.7 316 120C316 115.3 313.4 109.2 310.1 105.9C306.8 102.6 300.7 100 296 100C291.3 100 285.2 102.6 281.9 105.9C278.6 109.2 276 115.3 276 120C276 124.7 278.6 130.8 281.9 134.1C285.2 137.4 290.7 138.9 296 140C302.4 141.3 311 141.6 318 140C325 138.3 332.4 134.8 338 130C343.8 125 348.7 117.1 352 110C355.2 103.1 357 95.2 358 88"/>
+                            <path class="rc-wire" d="M241.5 491C241.6 497.9 242.8 505.6 240 512C236.9 519.1 229.9 526.3 222 531C212.3 536.8 197.8 539.2 184 541C168.1 543.1 148.9 542.9 132 541C115.6 539.1 98.8 536.3 84 530C69.5 523.8 54.6 515.3 44 504C33.3 492.6 25.2 477.1 20 462C14.7 446.5 13.3 428.7 13 412C12.7 395.4 13.8 377.2 18 362C21.9 348.1 27.1 334.3 36 324C45 313.6 57.2 307.9 72 300C92.6 289 124.7 281 150 268C176.1 254.5 205.2 235.7 226 220C242.1 207.8 254.9 195 266 184C274.7 175.4 280.7 168.2 288 160C295.4 151.6 305.4 141.8 310.1 134.1C313.3 129 316 124.7 316 120C316 115.3 313.4 109.2 310.1 105.9C306.8 102.6 300.7 100 296 100C291.3 100 285.2 102.6 281.9 105.9C278.6 109.2 276 115.3 276 120C276 124.7 278.6 130.8 281.9 134.1C285.2 137.4 290.7 138.9 296 140C302.4 141.3 311 141.6 318 140C325 138.3 332.4 134.8 338 130C343.8 125 348.7 117.1 352 110C355.2 103.1 357 95.2 358 88" data-cable/>
+                            <!-- Jacks: into the phone's bottom edge, along its tilt, and
+                                 into the bottom of the PC's screen, beside the stand -->
+                            <g class="rc-jack" transform="translate(239 467) rotate(-6)"><rect class="rc-jack-metal" x="-2.4" y="-3" width="4.8" height="5" rx="0.8"/><path class="rc-jack-body" d="M-5 1.5h10v13.5a2 2 0 0 1-2 2h-6a2 2 0 0 1-2-2z"/><path class="rc-jack-grip" d="M-5 6h10M-5 9h10M-5 12h10"/><path class="rc-jack-relief" d="M-3.4 17h6.8l-1.3 8h-4.2z"/></g>
+                            <g class="rc-jack" transform="translate(358 64)"><rect class="rc-jack-metal" x="-2.4" y="-3" width="4.8" height="5" rx="0.8"/><path class="rc-jack-body" d="M-5 1.5h10v13.5a2 2 0 0 1-2 2h-6a2 2 0 0 1-2-2z"/><path class="rc-jack-grip" d="M-5 6h10M-5 9h10M-5 12h10"/><path class="rc-jack-relief" d="M-3.4 17h6.8l-1.3 8h-4.2z"/></g>
                             <g data-pulses></g>
                         </svg>
 
@@ -139,7 +144,6 @@
                         </div>
 
                         <!-- What the PC plays into: a game, Discord, any voice app -->
-                        <div class="rc-links" data-links></div>
                         <ul class="rc-apps">
                             <li class="rc-app"><span class="icon" data-icon="sports_esports"></span><b class="rc-pop"></b></li>
                             <li class="rc-app"><span class="icon" data-icon="discord"></span><b class="rc-pop"></b></li>

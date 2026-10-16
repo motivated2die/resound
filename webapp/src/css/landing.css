@@ -254,6 +254,10 @@ h1 { font-size: clamp(32px, 5vw, 52px); line-height: 1.1; font-weight: 700; lett
     padding: 4px;
     border: 1.5px solid transparent;
     z-index: 0;
+    /* As on the remote (css/styles.css): progress fill, play outline and glow */
+    --fill: #393c45;
+    --hl: rgb(180, 180, 180);
+    --glow: rgba(200, 200, 200, 0.6);
 }
 /* The emoji sits large behind the name, as on the remote's cards */
 .tile b {
@@ -280,28 +284,35 @@ h1 { font-size: clamp(32px, 5vw, 52px); line-height: 1.1; font-weight: 700; lett
     mask: url("../assets/icons/favorite-fill.svg") center / contain no-repeat;
 }
 /* The remote's card colours (css/styles.css --sound-color-*) */
-.tile.red { background: #4a2a2a; }
-.tile.orange { background: #5a3c1f; }
-.tile.yellow { background: #5a502a; }
-.tile.green { background: #344a2a; }
-.tile.blue { background: #2a3a4a; }
-.tile.purple { background: #3a2a4a; }
-.tile.pink { background: #4a2a3a; }
-.tile.playing { border-color: rgba(255, 100, 100, 0.7); box-shadow: 0 0 12px rgba(255, 100, 100, 0.45); }
-.tile.playing::before {
+.tile.red { background: #4a2a2a; --fill: #6b3a3a; --hl: #ff8a80; --glow: rgba(255, 100, 100, 0.7); }
+.tile.orange { background: #5a3c1f; --fill: #80572a; --hl: #ffcc80; --glow: rgba(255, 170, 100, 0.7); }
+.tile.yellow { background: #5a502a; --fill: #80733a; --hl: #fff59d; --glow: rgba(255, 227, 100, 0.7); }
+.tile.green { background: #344a2a; --fill: #4b6b3a; --hl: #a5d6a7; --glow: rgba(165, 255, 100, 0.7); }
+.tile.blue { background: #2a3a4a; --fill: #3b5270; --hl: #90caf9; --glow: rgba(100, 154, 255, 0.7); }
+.tile.purple { background: #3a2a4a; --fill: #553b6d; --hl: #ce93d8; --glow: rgba(200, 100, 255, 0.7); }
+.tile.pink { background: #4a2a3a; --fill: #6b3b54; --hl: #f48fb1; --glow: rgba(255, 150, 208, 0.7); }
+/* The progress fill: the card's lighter shade, fading out when it ends. */
+.tile::before {
     content: "";
     position: absolute;
     inset: 0 auto 0 0;
-    width: 62%;
-    background: #6b3a3a;
+    width: 100%;
+    background: var(--fill);
+    opacity: 0;
+    transition: opacity 0.35s ease;
     z-index: -2;
 }
+.tile.playing { border-color: var(--hl); box-shadow: 0 0 6px var(--glow); }
+.tile.playing::before { width: 62%; opacity: 1; }
 /* Pads you can press (landing.js): each press plays once, like a sound. */
 .rc .tile { cursor: pointer; touch-action: manipulation; transition: transform 0.12s ease, filter 0.12s ease; }
 .rc .tile:active { transform: scale(0.93); }
 @media (hover: hover) { .rc .tile:hover { filter: brightness(1.18); } }
 @media (prefers-reduced-motion: no-preference) {
+    /* The outline fades as on the remote (highlightFade, 2.5 s). */
+    .tile.playing { animation: tile-outline 2.5s ease-out forwards; }
     .tile.playing::before { animation: progress var(--play, 2.6s) linear forwards; }
+    @keyframes tile-outline { from { border-color: var(--hl); box-shadow: 0 0 6px var(--glow); } to { border-color: transparent; box-shadow: none; } }
     @keyframes progress { from { width: 0; } to { width: 100%; } }
 }
 .mock-tabs {
@@ -373,14 +384,20 @@ h1 { font-size: clamp(32px, 5vw, 52px); line-height: 1.1; font-weight: 700; lett
 /* --- The stage around the phone: the cable to the PC and its apps. A fixed
    layout of 380 x 540 px, zoomed to the column by landing.js (--rc-zoom);
    the cable's path in index.html is drawn for these positions. --- */
-.rc { position: relative; flex-shrink: 0; width: 380px; height: 540px; zoom: var(--rc-zoom, 1); }
-.rc-cable { position: absolute; inset: 0; z-index: 0; overflow: visible; }
+.rc { position: relative; flex-shrink: 0; width: 380px; height: 552px; zoom: var(--rc-zoom, 1); } /* the cable's lowest curve needs the last 12 px */
+.rc-cable { position: absolute; left: 0; top: 0; width: 380px; height: 540px; z-index: 0; overflow: visible; }
 .rc-wire-edge, .rc-wire { fill: none; stroke-linecap: round; stroke-linejoin: round; }
 .rc-wire-edge { stroke: #121317; stroke-width: 7; }
 .rc-wire { stroke: #454852; stroke-width: 4; }
-.rc-plug { fill: #2b2d34; stroke: #121317; stroke-width: 1.5; }
-.rc-dot-halo { fill: rgba(var(--accent-rgb), 0.28); }
-.rc-dot { fill: #d8fff0; }
+.rc-jack-metal { fill: #b9bec8; stroke: #6c717c; stroke-width: 0.6; }
+.rc-jack-body { fill: #2a2c33; stroke: #121317; stroke-width: 1.2; }
+.rc-jack-grip { stroke: #3d4049; stroke-width: 1; }
+.rc-jack-relief { fill: #22242a; stroke: #121317; stroke-width: 1; }
+/* The pulse: a short glowing stretch of the cable (stroke-dasharray, moved
+   along by landing.js), so it bends with the curves. */
+.rc-pulse, .rc-pulse-glow { fill: none; stroke-linecap: round; }
+.rc-pulse { stroke: #e6fff5; stroke-width: 3.2; }
+.rc-pulse-glow { stroke: var(--accent); stroke-width: 9; opacity: 0.75; }
 /* The PC: a small monitor with Windows' logo, Resound's in the corner. */
 .rc-pc { position: absolute; z-index: 2; left: 288px; top: 6px; width: 84px; display: flex; flex-direction: column; align-items: center; }
 .rc-screen {
@@ -405,17 +422,12 @@ h1 { font-size: clamp(32px, 5vw, 52px); line-height: 1.1; font-weight: 700; lett
         linear-gradient(#2f3139, #2f3139) center top / 10px 8px no-repeat,
         linear-gradient(#2f3139, #2f3139) center bottom / 34px 4px no-repeat;
 }
-.rc-pc.hit .rc-screen { border-color: var(--accent); animation: rc-hit 0.7s ease-out; }
+.rc-pc.hit .rc-screen { border-color: var(--accent); animation: rc-hit 0.35s ease-out; }
 @keyframes rc-hit {
     from { box-shadow: 0 0 0 4px rgba(var(--accent-rgb), 0.35), 0 0 34px rgba(var(--accent-rgb), 0.7); }
     to { box-shadow: 0 10px 26px rgba(0, 0, 0, 0.45); }
 }
-/* From the PC down to the apps; a pulse runs down it after each hit. */
-.rc-links { position: absolute; z-index: 1; left: 329px; top: 84px; width: 2px; height: 166px; border-radius: 1px; background: rgba(255, 255, 255, 0.08); overflow: hidden; }
-.rc-links::after { content: ""; position: absolute; left: 0; right: 0; top: -40px; height: 40px; background: linear-gradient(transparent, var(--accent)); opacity: 0; }
-.rc-links.go::after { animation: rc-link 0.55s ease-in forwards; }
-@keyframes rc-link { from { top: -40px; opacity: 1; } to { top: 100%; opacity: 1; } }
-.rc-apps { position: absolute; z-index: 2; left: 311px; top: 112px; list-style: none; display: grid; gap: 26px; }
+.rc-apps { position: absolute; z-index: 2; left: 311px; top: 168px; list-style: none; display: grid; gap: 26px; }
 .rc-app {
     position: relative;
     width: 38px;
@@ -449,7 +461,7 @@ h1 { font-size: clamp(32px, 5vw, 52px); line-height: 1.1; font-weight: 700; lett
     opacity: 0;
     transform: scale(0.3);
 }
-.rc-app.on .rc-pop { animation: rc-pop 2s ease forwards; }
+.rc-app.on .rc-pop { animation: rc-pop 1s ease forwards; }
 @keyframes rc-pop {
     0% { opacity: 0; transform: scale(0.3); }
     14% { opacity: 1; transform: scale(1.18); }
