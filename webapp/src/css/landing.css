@@ -355,6 +355,7 @@ h1 { font-size: clamp(32px, 5vw, 52px); line-height: 1.1; font-weight: 700; lett
 }
 .picon[data-picon="chevron-right"] { --picon: url("../assets/panel-icons/chevron-right.svg"); }
 .picon[data-picon="external-link"] { --picon: url("../assets/panel-icons/external-link.svg"); }
+.picon[data-picon="help-circle"] { --picon: url("../assets/panel-icons/help-circle.svg"); }
 .picon[data-picon="info-circle"] { --picon: url("../assets/panel-icons/info-circle.svg"); }
 .picon[data-picon="keyboard"] { --picon: url("../assets/panel-icons/keyboard.svg"); }
 .picon[data-picon="microphone"] { --picon: url("../assets/panel-icons/microphone.svg"); }
