@@ -98,7 +98,11 @@ func (a *App) onHotkey(ev input.HotkeyEvent) {
 		logx.Printf("hotkey: stop")
 		a.stopAll()
 	case input.ActionPause:
-		a.setHoldPause(ev.Down)
+		if ev.Down {
+			a.setHoldPause(true)
+		} else {
+			a.releaseHoldPause()
+		}
 	}
 	a.render()
 }
