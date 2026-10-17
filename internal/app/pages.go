@@ -129,7 +129,7 @@ func (a *App) homePage() []ui.Row {
 		refresh = a.refreshLibrary
 	}
 	rows = append(rows,
-		ui.SectionLink("Sound library", "Import buttons",
+		ui.SectionLink("Sound library", "import sounds",
 			"Import sound buttons from websites into your folders, on the Sound library page",
 			func() { a.openPage(pageLibrary) }),
 		ui.NavTool(ui.IconRefresh, "Refresh the library: picks up new, renamed and edited files", refresh,
@@ -689,12 +689,10 @@ func (a *App) remotePage() []ui.Row {
 		)
 	}
 	if a.srv != nil {
-		n := a.srv.Auth().DeviceCount()
-		rows = append(rows,
-			ui.Separator(),
-			ui.Text("Paired devices", fmt.Sprint(n), ui.ToneNormal),
-			ui.Button("Sign out all devices", ui.ButtonDanger, n == 0, a.resetRemote),
-		)
+		devices := a.pairedDeviceRows()
+		rows = append(rows, ui.Separator(), ui.Section("Paired devices"))
+		rows = append(rows, devices...)
+		rows = append(rows, ui.Button("Sign out all devices", ui.ButtonDanger, len(devices) == 0, a.resetRemote))
 	}
 	rows = append(rows, a.firewallRows()...)
 	return append(rows, ui.Spacer(4))

@@ -51,7 +51,7 @@ type playbackState struct {
 
 	last      *audio.PlayInfo
 	delays    map[string]time.Duration
-	lastError string
+	lastError string // why the last test play failed; output failures come from the engine (outputErrorRows)
 }
 
 func (p *playbackState) init() {
@@ -322,8 +322,7 @@ func (a *App) onEngineEvent(ev audio.Event) {
 			a.render() // the flow's mic and push-to-talk badges go
 		}
 	case audio.EventOutputFailed:
-		logx.Printf("%s output failed: %v", ev.Output, ev.Err)
-		pb.lastError = fmt.Sprintf("%s output stopped: %v", ev.Output, ev.Err)
+		logx.Printf("%s output failed: %v", ev.Output, ev.Err) // shown under the flow from the engine's state
 		// Voices on a dead output never finish; don't keep the mic muted.
 		clear(pb.remaining)
 		pb.vmu.Lock()

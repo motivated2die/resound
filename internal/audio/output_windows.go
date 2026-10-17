@@ -1,6 +1,7 @@
 package audio
 
 import (
+	"errors"
 	"fmt"
 	"math"
 	"runtime"
@@ -81,7 +82,6 @@ func (o *Output) Close() {
 }
 
 func (o *Output) fail(err error) {
-	err = describeHRESULT(err)
 	o.failErr.Store(err)
 	o.failed.Store(true)
 	select {
@@ -98,8 +98,14 @@ func (o *Output) run(ready chan<- error, bufferDur time.Duration) {
 	defer o.Mixer.Drain() // stop the voices' producers and close their files
 
 	started := false
+	// Errors name the device (once found) and the step, e.g. `"Speakers
+	// (Realtek)": Initialize: another app is using this device exclusively
+	// (AUDCLNT_E_DEVICE_IN_USE)`; Problem shortens them for the panel.
 	fail := func(step string, err error) {
 		err = fmt.Errorf("%s: %w", step, describeHRESULT(err))
+		if o.info.DeviceName != "" {
+			err = fmt.Errorf("%q: %w", o.info.DeviceName, err)
+		}
 		if !started {
 			ready <- err
 			return
@@ -123,6 +129,9 @@ func (o *Output) run(ready chan<- error, bufferDur time.Duration) {
 
 	dev, err := wincom.Find(enum, wincom.Render, o.info.DeviceID)
 	if err != nil {
+		if errors.Is(err, wincom.ErrNotFound) {
+			err = ErrDeviceGone
+		}
 		fail("finding device", err)
 		return
 	}

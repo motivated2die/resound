@@ -148,6 +148,35 @@ func paintTrack(c *canvas, track rect, radius, x0, x1 int32, pos, maxValue int, 
 	c.hGradient(rect{kx - kw/2, track.Top, kx - kw/2 + kw, track.Bottom}, knobCol, knobCol, track, radius)
 }
 
+// A volume track carries a small speaker icon at its right end, so it reads
+// as a volume. Above trackIconFlip percent the knob would reach it there, so
+// the icon moves to the left end (into the fill).
+const (
+	trackIconL    = 10 // logical size
+	trackIconPadL = 3  // from the track's rounded end
+	trackIconFlip = 90 // percent of the range
+)
+
+// trackIconBox is where paintTrackIcon draws the icon in track for pos of max.
+func trackIconBox(c *canvas, track rect, pos, maxValue int) rect {
+	size, pad := c.px(trackIconL), c.px(trackIconPadL)
+	top := track.Top + (track.h()-size)/2
+	if pos*100 > trackIconFlip*max(1, maxValue) {
+		return rect{track.Left + pad, top, track.Left + pad + size, top + size}
+	}
+	return rect{track.Right - pad - size, top, track.Right - pad, top + size}
+}
+
+// paintTrackIcon draws the speaker icon of a volume track painted by
+// paintTrack; hover brightens it with the knob.
+func paintTrackIcon(c *canvas, track rect, pos, maxValue int, hover bool) {
+	col := colMuted
+	if hover {
+		col = colText
+	}
+	c.icon(IconVolume, trackIconBox(c, track, pos, maxValue), trackIconL, col)
+}
+
 // mix blends two COLORREFs: t = 0 gives a, 1 gives b.
 func mix(a, b uint32, t float64) uint32 {
 	ch := func(shift uint) uint32 {

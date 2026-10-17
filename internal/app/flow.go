@@ -276,11 +276,26 @@ func (a *App) heldKey() string {
 
 // --- building the flow -------------------------------------------------------------
 
+// outputErrorRows say why an output isn't playing, e.g. "You hear: another
+// app is using this device exclusively." They follow the engine's current
+// state, so choosing a device that works (or a restart that succeeds)
+// clears them.
+func (a *App) outputErrorRows() []ui.Row {
+	var rows []ui.Row
+	for _, s := range a.engine.Status() {
+		if !s.Running && s.Err != nil {
+			rows = append(rows, ui.Paragraph(roleLabel(s.Role)+": "+audio.Problem(s.Err)+".", ui.ToneBad))
+		}
+	}
+	return rows
+}
+
 // flowRows returns the audio flow's rows and marks the page as showing it,
 // which keeps the meters running while the panel is open.
 func (a *App) flowRows() []ui.Row {
 	a.flowOnPage = true
 	rows := a.audioFlow().Rows()
+	rows = append(rows, a.outputErrorRows()...)
 	if a.playback.lastError != "" {
 		rows = append(rows, ui.Paragraph(a.playback.lastError, ui.ToneBad))
 	}
@@ -353,7 +368,7 @@ func (a *App) audioFlow() ui.AudioFlow {
 	if s, ok := a.outputStatus(audio.RoleMonitor); ok && !s.Running && s.Err != nil {
 		f.YouPipe = ui.Pipe{State: ui.PipeBroken, Badge: &ui.Badge{
 			Icon: ui.IconAlert, Label: "Output failed", Tone: ui.ToneBad,
-			Tip:     "You hear nothing: " + s.Err.Error() + ". Click to restart the outputs, e.g. after plugging the device back in.",
+			Tip:     "You hear nothing: " + audio.Problem(s.Err) + ". Click to restart the outputs, e.g. after plugging the device back in.",
 			OnClick: a.restartOutputs,
 		}}
 	}
@@ -619,7 +634,7 @@ func (a *App) cablePipe() ui.Pipe {
 		return ui.Pipe{State: ui.PipeOff} // no VB-Cable: the cable explains
 	case cable.Err != nil && !cable.Running:
 		return ui.Pipe{State: ui.PipeBroken, Badge: &ui.Badge{Icon: ui.IconAlert, Label: "Output failed", Tone: ui.ToneBad,
-			Tip:     "Others don't hear your sounds: " + cable.Err.Error() + ". Click to restart the outputs.",
+			Tip:     "Others don't hear your sounds: " + audio.Problem(cable.Err) + ". Click to restart the outputs.",
 			OnClick: a.restartOutputs}}
 	case a.ownRouting():
 		return ui.Pipe{State: ui.PipeOn, Level: a.flowLevel(&a.levels.cableSend), Badge: &ui.Badge{Icon: ui.IconInfo,

@@ -238,6 +238,7 @@ func (a *App) skipCableRestart() {
 // prepareForShutdown leaves nothing behind when the process is about to end
 // without Run returning (Windows restarting or signing out).
 func (a *App) prepareForShutdown() {
+	a.stopSoundsZip() // removes its unfinished file
 	a.releasePlayback()
 	a.releaseAllPTT()
 	a.save()

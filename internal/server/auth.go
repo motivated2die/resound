@@ -12,6 +12,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"sync"
 	"time"
 )
@@ -25,9 +26,9 @@ const (
 // ErrBadCode means the pairing code was wrong, used or expired.
 var ErrBadCode = errors.New("invalid pairing code")
 
-// device is a phone paired with the app. Its key is derived from
+// Device is a phone (or browser) paired with the app. Its key is derived from
 // DeviceSecret, never stored.
-type device struct {
+type Device struct {
 	ID       string    `json:"id"`
 	Agent    string    `json:"agent,omitempty"`
 	Created  time.Time `json:"created"`
@@ -39,7 +40,7 @@ type device struct {
 type authState struct {
 	// DeviceSecret derives the devices' keys; replacing it signs them all out.
 	DeviceSecret string   `json:"deviceSecret,omitempty"`
-	Devices      []device `json:"devices,omitempty"`
+	Devices      []Device `json:"devices,omitempty"`
 	// RTCCert is the app connection's certificate and key (PEM).
 	// Its fingerprint is in the pairing QR code, so it is kept across starts.
 	RTCCert string `json:"rtcCert,omitempty"`
@@ -87,6 +88,17 @@ func (a *Auth) DeviceCount() int {
 	defer a.mu.Unlock()
 	a.dropExpiredLocked()
 	return len(a.state.Devices)
+}
+
+// Devices returns the paired devices, the most recently used first.
+// LastSeen is renewed at most hourly while a device connects.
+func (a *Auth) Devices() []Device {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	a.dropExpiredLocked()
+	out := slices.Clone(a.state.Devices)
+	slices.SortStableFunc(out, func(x, y Device) int { return y.LastSeen.Compare(x.LastSeen) })
+	return out
 }
 
 // ResetAll signs out every device: their keys no longer work.
@@ -186,7 +198,7 @@ func (a *Auth) PairDevice(code, agent string) (id, key string, err error) {
 	}
 	id = randomHex(6)
 	now := a.now()
-	a.state.Devices = append(a.state.Devices, device{ID: id, Agent: agent, Created: now, LastSeen: now})
+	a.state.Devices = append(a.state.Devices, Device{ID: id, Agent: agent, Created: now, LastSeen: now})
 	key = a.deviceKeyLocked(id)
 	err = a.saveLocked()
 	a.mu.Unlock()

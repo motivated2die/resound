@@ -3,7 +3,8 @@
 // A backup holds the files in Files (devices, volumes, folders, push-to-talk,
 // the sound index with favorites, volumes, colors and phone layouts, and
 // the phone PIN and pairings) plus manifest.json, which identifies it. Sounds
-// themselves are not included; they stay in the user's folders.
+// themselves are not included; they stay in the user's folders. A separate
+// zip of the sound folders can be made with ZipSounds (sounds.go).
 //
 // Backups made by the app are listed in <dataDir>/backups/index.json, also
 // when saved elsewhere. Zips found in the backups folder are listed too, so

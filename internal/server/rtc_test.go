@@ -222,6 +222,48 @@ func TestRTCPairAndReconnect(t *testing.T) {
 	}
 }
 
+// TestRTCSignOutClosesConnection signs out one of two connected devices:
+// its open connection ends and it can't connect again; the other stays.
+func TestRTCSignOutClosesConnection(t *testing.T) {
+	s, _, _ := newTestServer(t)
+	r := startTestRTC(t, s)
+	connect := func(agent string) (device, key string, c *rtcClient, closed chan struct{}) {
+		code := s.auth.PairCode()
+		c = dialRTC(t, r, "pabcdefgh"+agent, pairPassword(code))
+		closed = make(chan struct{})
+		c.dc.OnClose(func() { close(closed) })
+		if !c.waitOpen(10 * time.Second) {
+			t.Fatal("data channel did not open")
+		}
+		c.send(t, map[string]any{"t": "pair", "code": code, "agent": agent})
+		w := c.recv(t)
+		return w["device"].(string), w["key"].(string), c, closed
+	}
+	gone, goneKey, _, goneClosed := connect("12345678")
+	kept, _, _, keptClosed := connect("87654321")
+	if got := s.Connected(); !got[gone] || !got[kept] {
+		t.Fatalf("connected = %v", got)
+	}
+
+	s.SignOut(gone)
+	select {
+	case <-goneClosed:
+	case <-time.After(10 * time.Second):
+		t.Fatal("the signed-out device's connection stayed open")
+	}
+	if got := s.Connected(); got[gone] || !got[kept] {
+		t.Fatalf("connected after sign-out = %v", got)
+	}
+	select {
+	case <-keptClosed:
+		t.Fatal("the other device was disconnected too")
+	default:
+	}
+	if c := dialRTC(t, r, "d"+gone+"nonce789", goneKey); c.waitOpen(3 * time.Second) {
+		t.Fatal("the signed-out device connected again")
+	}
+}
+
 func TestRTCRejectsWrongKey(t *testing.T) {
 	s, _, _ := newTestServer(t)
 	r := startTestRTC(t, s)

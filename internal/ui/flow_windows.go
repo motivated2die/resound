@@ -707,16 +707,47 @@ func (o flowOutputsRow) columns(c *canvas, r rect) [2]flowColumn {
 // cardPadL is the cable card's inner padding.
 const cardPadL = 10
 
-// infoBox is the cable card's info icon, right after its mic icon.
-func (o flowOutputsRow) infoBox(c *canvas, card rect) rect {
-	left := card.Left + c.px(cardPadL) + c.px(16) + c.px(1)
-	return rect{left, card.Top + c.px(6), left + c.px(15), card.Bottom - c.px(6)}
+// cardLayout is the cable card's content: the mic icon, the info icon right
+// after it (when there is info), and the name. hover is where the info's
+// tooltip shows: across all three and the card's height, not just the small
+// info icon. It is empty without info.
+type cardLayout struct {
+	mic, info, name, hover rect
+}
+
+func (o flowOutputsRow) cardLayout(c *canvas, card rect) cardLayout {
+	pad := c.px(cardPadL)
+	var l cardLayout
+	l.mic = rect{card.Left + pad, card.Top, card.Left + pad + c.px(16), card.Bottom}
+	textLeft := l.mic.Right + c.px(7)
+	if o.cable.Info != "" {
+		left := l.mic.Right + c.px(1)
+		l.info = rect{left, card.Top + c.px(6), left + c.px(15), card.Bottom - c.px(6)}
+		textLeft = l.info.Right + c.px(6)
+	}
+	l.name = rect{textLeft, card.Top, card.Right - pad, card.Bottom}
+	if o.cable.Info != "" {
+		name, _ := o.cardName()
+		right := min(l.name.Right, textLeft+c.textWidth(name, fontBold)+c.px(2))
+		l.hover = rect{l.mic.Left - c.px(4), card.Top, max(right, l.info.Right) + c.px(4), card.Bottom}
+	}
+	return l
+}
+
+// cardName is the cable card's text and its colour.
+func (o flowOutputsRow) cardName() (string, uint32) {
+	if o.cable.Name == "" {
+		return o.cable.Placeholder, colMuted
+	}
+	return o.cable.Name, colText
 }
 
 func (o flowOutputsRow) volumes() [2]*FlowVolume { return [2]*FlowVolume{o.cable.Volume, o.you.Volume} }
 
-// Segments: the cable card, its info icon, the you field, then the two
-// volume tracks.
+// Segments: the cable card, its info area (mic icon, info icon and name),
+// the you field, then the two volume tracks. The info area comes after the
+// card, which wins where both hit; they are never both set (a card with
+// info isn't clickable).
 const (
 	segCableCard = iota
 	segCableInfo
@@ -727,12 +758,9 @@ const (
 
 func (o flowOutputsRow) segments(c *canvas, r rect) []rect {
 	cols := o.columns(c, r)
-	segs := []rect{cols[0].field, o.infoBox(c, cols[0].field), cols[1].field, cols[0].track, cols[1].track}
+	segs := []rect{cols[0].field, o.cardLayout(c, cols[0].field).hover, cols[1].field, cols[0].track, cols[1].track}
 	if o.cable.OnClick == nil && o.cable.Tip == "" {
 		segs[segCableCard] = rect{}
-	}
-	if o.cable.Info == "" {
-		segs[segCableInfo] = rect{}
 	}
 	for i, v := range o.volumes() {
 		if v == nil {
@@ -814,24 +842,17 @@ func (o flowOutputsRow) paint(c *canvas, r rect, st rowState) {
 	paintCaption(c, col.caption, o.cable.Caption, o.cable.Value)
 	bg := fieldBg(false, o.cable.OnClick != nil && st.hover == segCableCard, o.cable.OnClick != nil && st.press == segCableCard)
 	paintDocked(c, col.field, bg, readLevel(o.cable.Level))
-	card := col.field
-	pad := c.px(cardPadL)
-	name, fg := o.cable.Name, colText
-	if name == "" {
-		name, fg = o.cable.Placeholder, colMuted
-	}
-	c.icon(IconMic, rect{card.Left + pad, card.Top, card.Left + pad + c.px(16), card.Bottom}, 16, fg)
-	textLeft := card.Left + pad + c.px(16) + c.px(7)
+	l := o.cardLayout(c, col.field)
+	name, fg := o.cardName()
+	c.icon(IconMic, l.mic, 16, fg)
 	if o.cable.Info != "" {
-		info := o.infoBox(c, card)
 		infoCol := colMuted
-		if st.hover == segCableInfo {
+		if st.hover == segCableInfo { // anywhere on the info area
 			infoCol = colText
 		}
-		c.icon(IconInfo, info, 12, infoCol)
-		textLeft = info.Right + c.px(6)
+		c.icon(IconInfo, l.info, 12, infoCol)
 	}
-	c.text(name, rect{textLeft, card.Top, card.Right - pad, card.Bottom}, fontBold, fg, dtLeft)
+	c.text(name, l.name, fontBold, fg, dtLeft)
 
 	// The user's own output: a choice.
 	col = cols[1]
@@ -842,7 +863,9 @@ func (o flowOutputsRow) paint(c *canvas, r rect, st rowState) {
 	for i, v := range o.volumes() {
 		if v != nil {
 			track, x0, x1 := trackRange(c, cols[i].track)
-			paintTrack(c, track, track.h(), x0, x1, v.Value, 100, st.hover == segCableVolume+i, st.press == segCableVolume+i)
+			hover, press := st.hover == segCableVolume+i, st.press == segCableVolume+i
+			paintTrack(c, track, track.h(), x0, x1, v.Value, 100, hover, press)
+			paintTrackIcon(c, track, v.Value, 100, hover || press)
 		}
 	}
 }

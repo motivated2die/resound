@@ -244,6 +244,34 @@ func TestFlowRender(t *testing.T) {
 	}
 }
 
+// TestTrackIconClearsKnob checks that the volume tracks' speaker icon sits
+// at the right end up to trackIconFlip percent and at the left end above it,
+// and that the knob (hovered, so at its widest) never covers it.
+func TestTrackIconClearsKnob(t *testing.T) {
+	o := flowOutputsRow{testFlow().Cable, testFlow().You}
+	for _, scale := range []float64{1, 1.25, 1.5, 1.75, 2} {
+		c := &canvas{scale: scale}
+		r := rect{0, 0, c.px(popupWidthL), c.px(o.height())}
+		for i, col := range o.columns(c, r) {
+			track, x0, x1 := trackRange(c, col.track)
+			for v := 0; v <= 100; v++ {
+				icon := trackIconBox(c, track, v, 100)
+				if right := icon.Right > track.Left+track.w()/2; right != (v <= trackIconFlip) {
+					t.Fatalf("scale %v, track %d, %d%%: icon at the right end = %v", scale, i, v, right)
+				}
+				if icon.Left < track.Left || icon.Right > track.Right || icon.Top < track.Top || icon.Bottom > track.Bottom {
+					t.Fatalf("scale %v, track %d, %d%%: icon %v outside the track %v", scale, i, v, icon, track)
+				}
+				kx := x0 + int32(int64(x1-x0)*int64(v)/100)
+				kw := c.px(sliderKnobWL + 1)
+				if kx-kw/2 < icon.Right && kx-kw/2+kw > icon.Left {
+					t.Errorf("scale %v, track %d, %d%%: knob at %d..%d covers the icon %d..%d", scale, i, v, kx-kw/2, kx-kw/2+kw, icon.Left, icon.Right)
+				}
+			}
+		}
+	}
+}
+
 // TestWarningRender saves the Warning row and checks that the app's texts
 // (the Advanced section's in pages.go, the setup's in wizard.go: keep them
 // in sync) fit beside the icon and the chevron.
@@ -318,6 +346,42 @@ func TestFlowSegments(t *testing.T) {
 	out.dragTo(c, r, "flow-volume:cable", x0, false)  // the other track: not this callback
 	if len(got) != 2 || got[0] != 0 || got[1] != 100 {
 		t.Errorf("volume drags = %v, want [0 100]", got)
+	}
+}
+
+// TestCableInfoHitArea checks that the cable card's info tooltip shows over
+// its mic icon, info icon and name, not only over the small info icon, and
+// not without info.
+func TestCableInfoHitArea(t *testing.T) {
+	dc, _, _ := procCreateCompatibleDC.Call(0)
+	if dc == 0 {
+		t.Skip("no device context")
+	}
+	defer procDeleteDC.Call(dc)
+	for _, scale := range []float64{1, 1.5} {
+		f := newFonts(scale)
+		c := &canvas{dc: dc, scale: scale, fonts: f}
+		o := flowOutputsRow{testFlow().Cable, testFlow().You}
+		r := rect{0, 0, c.px(popupWidthL), c.px(o.height())}
+		card := o.columns(c, r)[0].field
+		l := o.cardLayout(c, card)
+		area := o.segments(c, r)[segCableInfo]
+		nameEnd := l.name.Left + c.textWidth(o.cable.Name, fontBold)
+		cy := card.Top + card.h()/2
+		for what, x := range map[string]int32{"mic icon": l.mic.Left + 1, "info icon": l.info.Left + l.info.w()/2,
+			"name": (l.name.Left + nameEnd) / 2, "name's end": nameEnd - 1} {
+			if x < area.Left || x >= area.Right || cy < area.Top || cy >= area.Bottom {
+				t.Errorf("scale %v: %s at x=%d is outside the info area %v", scale, what, x, area)
+			}
+		}
+		if area.Right > card.Right || area.Left < card.Left {
+			t.Errorf("scale %v: info area %v leaves the card %v", scale, area, card)
+		}
+		o.cable.Info = ""
+		if s := o.segments(c, r)[segCableInfo]; s.w() != 0 {
+			t.Errorf("scale %v: info area %v without info", scale, s)
+		}
+		f.destroy()
 	}
 }
 

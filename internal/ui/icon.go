@@ -60,6 +60,7 @@ const (
 	IconSettings     Icon = "settings"
 	IconStop         Icon = "player-stop"
 	IconTrash        Icon = "trash"
+	IconVolume       Icon = "fa-solid-volume-high"
 )
 
 // rasterIcon renders an icon as an alpha mask of size×size pixels. The

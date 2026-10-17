@@ -37,6 +37,6 @@ iOS keeps the installed app separate from Safari. Open Resound from your home sc
 
 ## Sign out devices
 
-To remove every paired device, click **Sign out all devices** on the PC's Phone remote page. Each device has to scan a code again.
+The PC's Phone remote page lists every paired device, such as “Chrome on Android”, with when it was last used. **Remove** signs out just that device; **Sign out all devices** signs out every one. A signed-out device is disconnected at once and has to scan a code again.
 
 Not connecting? See [The phone can't connect](phone-cant-connect.md).

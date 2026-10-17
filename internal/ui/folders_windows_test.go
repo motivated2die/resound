@@ -11,7 +11,7 @@ func TestLibraryRowsRender(t *testing.T) {
 	dropped := false
 	rows := []Row{
 		HeaderTool("Sound library", func() {}, IconRefresh, "Refresh", func() {}),
-		SectionLink("Sound library", "Import buttons", "Download sounds", func() {}),
+		SectionLink("Sound library", "import sounds", "Download sounds", func() {}),
 		Section("Import sounds"),
 		ImportGuide("Find a sound on Myinstants and drag its name onto a folder below. Resound downloads it there. Sound files from Explorer work too.", "drag its name"),
 		Section("Folders"),

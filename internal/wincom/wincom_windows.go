@@ -87,6 +87,10 @@ func Enumerate(e *wca.IMMDeviceEnumerator, flow uint32) ([]Endpoint, error) {
 	return out, err
 }
 
+// ErrNotFound means no active endpoint has the ID: the device is unplugged,
+// disabled or removed.
+var ErrNotFound = errors.New("device not found or not active")
+
 // Find returns the active endpoint with the given ID, or the default console
 // endpoint of that direction when id is "". The caller releases it.
 // (go-wca's IMMDeviceEnumerator.GetDevice is an unimplemented stub.)
@@ -111,7 +115,7 @@ func Find(e *wca.IMMDeviceEnumerator, flow uint32, id string) (*wca.IMMDevice, e
 		return nil, err
 	}
 	if found == nil {
-		return nil, errors.New("device not found or not active")
+		return nil, ErrNotFound
 	}
 	return found, nil
 }
