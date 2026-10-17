@@ -25,10 +25,27 @@ func TestPickMicSkipsCable(t *testing.T) {
 		{ID: "cable", Name: "CABLE Output (VB-Audio Virtual Cable)", Default: true},
 		{ID: "mic", Name: "Mikrofon (Yealink BT51)"},
 	}
-	if got := pickMic(inputs, ""); got == nil || got.ID != "mic" {
+	if got := pickMic(inputs, "", ""); got == nil || got.ID != "mic" {
 		t.Fatalf("auto pick = %+v, want the real mic", got)
 	}
-	if got := pickMic(inputs, "gone"); got != nil {
+	if got := pickMic(inputs, "gone", ""); got != nil {
 		t.Fatalf("missing chosen mic should give nil, got %+v", got)
+	}
+}
+
+func TestPickMicSkipsMixerOutputs(t *testing.T) {
+	inputs := []Input{
+		{ID: "b1", Name: "Voicemeeter Out B1 (VB-Audio Voicemeeter VAIO)", Default: true},
+		{ID: "sonar", Name: "SteelSeries Sonar - Microphone (SteelSeries Sonar Virtual Audio Device)"},
+		{ID: "mic", Name: "Mikrofon (BlackShark V3 Pro XBOX - Chat)"},
+	}
+	if got := pickMic(inputs, "", ""); got == nil || got.ID != "sonar" {
+		t.Fatalf("auto pick = %+v, want the first device that isn't Voicemeeter's", got)
+	}
+	if got := pickMic(inputs, "", "sonar"); got == nil || got.ID != "mic" {
+		t.Fatalf("auto pick = %+v, want to skip the apps' microphone", got)
+	}
+	if got := pickMic(inputs, "b1", "sonar"); got == nil || got.ID != "b1" {
+		t.Fatalf("a chosen mic is kept, got %+v", got)
 	}
 }

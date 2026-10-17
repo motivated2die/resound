@@ -3,6 +3,7 @@ package app
 import (
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/motivated2die/resound/internal/audio"
@@ -80,7 +81,10 @@ func (a *App) syncLevels() {
 		}
 	}
 	cableID := ""
-	if a.route.CableOutput != nil && a.cableSelected() {
+	switch m := a.appsMic(); {
+	case a.ownRouting() && m != nil:
+		cableID = m.ID // what the user's mixer sends to others' apps
+	case a.route.CableOutput != nil && a.cableSelected():
 		cableID = a.route.CableOutput.ID
 	}
 	if cableID != l.cableID {
@@ -149,7 +153,7 @@ func (a *App) takeLevels() {
 		}
 		fall(&l.others, peak)
 	} else {
-		fall(&l.others, lv.Cable) // another output than VB-Cable: Resound's part
+		fall(&l.others, lv.Cable) // own routing without the apps' mic chosen: Resound's part
 	}
 }
 
@@ -163,12 +167,12 @@ func (a *App) recheckRouting() {
 		return
 	}
 	l.checking = true
-	micID, gen := a.cfg.MicDeviceID, a.playback.muteGen
+	micID, appsMicID, gen := a.cfg.MicDeviceID, a.cfg.AppsMicDeviceID, a.playback.muteGen
 	go func() {
-		st, err := routing.Check(micID)
+		st, err := routing.Check(micID, appsMicID)
 		a.tray.Post(func() {
 			l.checking, l.lastCheck = false, time.Now()
-			if a.cfg.MicDeviceID != micID || a.busy != "" {
+			if a.cfg.MicDeviceID != micID || a.cfg.AppsMicDeviceID != appsMicID || a.busy != "" {
 				return // changed meanwhile; that refreshed the routing itself
 			}
 			if a.playback.muteGen != gen {
@@ -198,7 +202,8 @@ func (a *App) routeKey() string {
 	if st.Mic != nil {
 		mic = fmt.Sprintf("%s/%v", st.Mic.ID, st.Mic.Muted)
 	}
-	return fmt.Sprintf("%v|%v|%s|%d|%v", st.CableInstalled(), st.MicRouted, mic, len(st.Inputs), a.routeErr != nil)
+	return fmt.Sprintf("%v|%v|%s|%d|%v|%v|%v", st.CableInstalled(), st.MicRouted, mic, len(st.Inputs), a.routeErr != nil,
+		st.Voicemeeter, a.appsMic() != nil)
 }
 
 // --- the animation ticker ------------------------------------------------------------
@@ -367,8 +372,8 @@ func (a *App) micDevice() ui.FlowDevice {
 	ids := []string{""}
 	sel := 0
 	for _, in := range st.Inputs {
-		if in.IsCableOutput() {
-			continue
+		if in.IsCableOutput() || (a.cfg.AppsMicDeviceID != "" && in.ID == a.cfg.AppsMicDeviceID) {
+			continue // what others hear, not a microphone
 		}
 		o := ui.Option{Label: in.Name}
 		switch {
@@ -438,13 +443,19 @@ func (a *App) cableEnd() ui.FlowCable {
 			OnChange: func(v int, done bool) { a.setVolume(audio.RoleCable, v, done) }},
 	}
 	switch out := a.route.CableOutput; {
+	case a.ownRouting():
+		if m := a.appsMic(); m != nil {
+			c.Name = cardDeviceName(m.Name)
+			c.Info = "Your own routing mixes your voice and sounds into “" + m.Name + "”. Choose it as your microphone in games, Discord or OBS. " +
+				"The bar shows what arrives there; it stays empty while your mixer isn't running."
+		} else {
+			c.Placeholder = "Choose one"
+			c.Tip = "Choose the device your mixer sends your voice and sounds to, under Advanced in Settings → Audio & voice chat."
+			c.OnClick = a.flowFix(func() {})
+		}
 	case out != nil && a.cableSelected():
 		c.Name = "CABLE Output"
 		c.Info = "Others hear you and your sounds through CABLE Output. In Games, Discord or OBS, choose “" + out.Name + "” as your microphone."
-	case out != nil:
-		c.Name = a.cableTargetName()
-		c.Info = "Your sounds for others go to “" + c.Name + "” (chosen in Settings → Audio & voice chat), not to VB-Cable, where your voice goes."
-		c.OnClick = a.flowFix(func() {})
 	default:
 		c.Placeholder = "Not installed"
 		c.Tip = "To combine mic and sound effects you need VB-Cable, a free virtual audio driver by VB-Audio. Click to install it."
@@ -455,6 +466,29 @@ func (a *App) cableEnd() ui.FlowCable {
 		}
 	}
 	return c
+}
+
+// shortDeviceName drops the adapter in parentheses Windows appends to a
+// device's name ("Voicemeeter Out B1 (VB-Audio Voicemeeter VAIO)" →
+// "Voicemeeter Out B1"), for the flow's small card.
+func shortDeviceName(name string) string {
+	if strings.HasSuffix(name, ")") {
+		if i := strings.LastIndex(name, " ("); i > 0 {
+			return name[:i]
+		}
+	}
+	return name
+}
+
+// cardDeviceName fits a device's name on the flow's small "Others hear"
+// card: Voicemeeter's outputs keep the part that tells them apart ("Out
+// B1"); the card's info tooltip has the full name.
+func cardDeviceName(name string) string {
+	short := shortDeviceName(name)
+	if rest, ok := strings.CutPrefix(short, "Voicemeeter "); ok && routing.IsVoicemeeterName(name) {
+		return rest
+	}
+	return short
 }
 
 // cableTargetName is the name of the device "others hear" plays into.
@@ -513,7 +547,11 @@ func (a *App) cableOutputDropdown() ui.Row {
 		if dev.ID == a.cfg.CableDeviceID {
 			sel = len(opts)
 		}
-		opts = append(opts, ui.Option{Label: dev.Name})
+		o := ui.Option{Label: dev.Name}
+		if routing.IsVoicemeeterName(dev.Name) {
+			o.Detail = "Voicemeeter"
+		}
+		opts = append(opts, o)
 		ids = append(ids, dev.ID)
 	}
 	return ui.Dropdown("cable-target", "Sounds for others play into", "", opts, sel, func(i int) { a.selectCable(ids[i]) })
@@ -530,6 +568,8 @@ func (a *App) micPipe() ui.Pipe {
 	case st.Mic == nil:
 		return ui.Pipe{State: ui.PipeOff, Badge: &ui.Badge{Icon: ui.IconUnplugged, Label: "No microphone",
 			Tip: "Windows has no recording device. Connect a microphone to talk in voice chat."}}
+	case a.ownRouting():
+		return a.ownMicPipe()
 	case !st.CableInstalled():
 		return ui.Pipe{State: ui.PipeOff} // the cable side explains
 	case a.busy != "":
@@ -553,6 +593,23 @@ func (a *App) micPipe() ui.Pipe {
 	return ui.Pipe{State: ui.PipeOn, Level: a.flowLevel(&a.levels.micLvl)}
 }
 
+// ownMicPipe is the microphone's way into the user's own mixer, which
+// Resound neither sets up nor checks: it only shows the mute states.
+func (a *App) ownMicPipe() ui.Pipe {
+	switch {
+	case a.playback.mutedMic != "":
+		return ui.Pipe{State: ui.PipeHeld, Badge: &ui.Badge{Icon: ui.IconMicOff, Label: "Muted for sounds",
+			Tip:     "Resound mutes your microphone while sounds play, so others hear them clearly. It unmutes when they end. Click to change this.",
+			OnClick: a.flowFix(func() {})}}
+	case a.route.Mic.Muted:
+		return ui.Pipe{State: ui.PipeHeld, Badge: &ui.Badge{Icon: ui.IconMicOff, Label: "Muted", Tone: ui.ToneWarning,
+			Tip: "Your microphone is muted in Windows, so others don't hear you. Unmute it in Windows or in your headset."}}
+	}
+	return ui.Pipe{State: ui.PipeOn, Level: a.flowLevel(&a.levels.micLvl), Badge: &ui.Badge{Icon: ui.IconInfo, Label: "Via your mixer",
+		Tip:     "Your own routing (e.g. Voicemeeter) mixes this microphone with the sounds; Resound doesn't route it. Choose the microphone your mixer records, so muting while sounds play reaches it.",
+		OnClick: a.flowFix(func() {})}}
+}
+
 // cablePipe is the soundboard's stream into the cable: Resound's "others
 // hear" output, automatically VB-Cable's CABLE Input.
 func (a *App) cablePipe() ui.Pipe {
@@ -564,9 +621,9 @@ func (a *App) cablePipe() ui.Pipe {
 		return ui.Pipe{State: ui.PipeBroken, Badge: &ui.Badge{Icon: ui.IconAlert, Label: "Output failed", Tone: ui.ToneBad,
 			Tip:     "Others don't hear your sounds: " + cable.Err.Error() + ". Click to restart the outputs.",
 			OnClick: a.restartOutputs}}
-	case !a.cableSelected():
-		return ui.Pipe{State: ui.PipeOff, Badge: &ui.Badge{Icon: ui.IconUnplugged, Label: "Elsewhere",
-			Tip:     "Your sounds for others play into “" + a.cableTargetName() + "”, not into VB-Cable (chosen in Settings → Audio & voice chat).",
+	case a.ownRouting():
+		return ui.Pipe{State: ui.PipeOn, Level: a.flowLevel(&a.levels.cableSend), Badge: &ui.Badge{Icon: ui.IconInfo,
+			Tip:     "Your sounds for others play into “" + a.cableTargetName() + "”, an input of your own routing (chosen under Advanced in Settings → Audio & voice chat).",
 			OnClick: a.flowFix(func() {})}}
 	}
 	return ui.Pipe{State: ui.PipeOn, Level: a.flowLevel(&a.levels.cableSend)}
@@ -583,15 +640,24 @@ func (a *App) cableLine() ui.Pipe {
 	case a.cable.state == cableRestart:
 		return ui.Pipe{State: ui.PipeBroken, Badge: &ui.Badge{Icon: ui.IconAlert, Label: "Restart needed", Tone: ui.ToneWarning,
 			Tip: "VB-Cable is installed. Restart your PC to finish; Resound reopens afterwards.", OnClick: a.flowFix(func() {})}}
-	case !a.route.CableInstalled():
-		return ui.Pipe{State: ui.PipeBroken, Badge: &ui.Badge{Icon: ui.IconAlert, Label: "VB-Cable missing", Tone: ui.ToneWarning,
-			Tip:     "To combine mic and sound effects you need VB-Cable, a free virtual audio driver by VB-Audio. Click to install it.",
-			OnClick: a.flowFix(a.installCable)}}
+	case a.ownRouting() && a.appsMic() == nil:
+		return ui.Pipe{State: ui.PipeBroken, Badge: &ui.Badge{Icon: ui.IconAlert, Label: "Choose output", Tone: ui.ToneWarning,
+			Tip:     "Choose the device your mixer sends your voice and sounds to (e.g. Voicemeeter Out B1), under Advanced in Settings → Audio & voice chat.",
+			OnClick: a.flowFix(func() {})}}
 	case a.ptt.pressed != nil:
 		return ui.Pipe{State: ui.PipeOn, Level: a.flowLevel(&a.levels.others), Badge: &ui.Badge{
 			Icon: ui.IconKeyboard, Label: "Holding " + a.ptt.pressed.String(), Tone: ui.ToneGood,
 			Tip:     "Resound holds your game's push-to-talk key, so the game sends what plays. Click for push-to-talk settings.",
 			OnClick: func() { a.openPage(pageKeys) }}}
+	case a.ownRouting():
+		return ui.Pipe{State: ui.PipeOn, Level: a.flowLevel(&a.levels.others), Badge: &ui.Badge{Icon: ui.IconInfo, Label: "Your mixer",
+			Tip: "Your own routing combines your voice and the sounds; others' apps get them from “" + a.appsMic().Name + "”. " +
+				"If the bar stays empty while you talk or play the test sound, check your mixer runs and sends both there.",
+			OnClick: a.flowFix(func() {})}}
+	case !a.route.CableInstalled():
+		return ui.Pipe{State: ui.PipeBroken, Badge: &ui.Badge{Icon: ui.IconAlert, Label: "VB-Cable missing", Tone: ui.ToneWarning,
+			Tip:     "To combine mic and sound effects you need VB-Cable, a free virtual audio driver by VB-Audio. Click to install it.",
+			OnClick: a.flowFix(a.installCable)}}
 	}
 	return ui.Pipe{State: ui.PipeOn, Level: a.flowLevel(&a.levels.others)}
 }

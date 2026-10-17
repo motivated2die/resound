@@ -207,8 +207,21 @@ func TestFlowRender(t *testing.T) {
 	missing.YouPipe = Pipe{State: PipeBroken, Badge: alert("Output failed", ToneBad)}
 	missing.Cable.Name, missing.Cable.Placeholder, missing.Cable.Level = "", "Not installed", level(0)
 
+	// Own routing (e.g. Voicemeeter): the user's mixer combines mic and
+	// sounds; the card names the device others' apps listen to.
+	info := func(label string) *Badge { return &Badge{Icon: IconInfo, Label: label, Tip: "why", OnClick: func() {}} }
+	own := testFlow()
+	own.Mic.Options = []Option{{Label: "Mikrofon (BlackShark V3 Pro XBOX - Chat)"}}
+	own.MicPipe.Badge = info("Via your mixer")
+	own.CablePipe.Badge = info("")
+	own.CableLine.Badge = info("Your mixer")
+	own.Cable.Name = "Out B1"
+	ownUnset := own
+	ownUnset.CableLine = Pipe{State: PipeBroken, Badge: alert("Choose output", ToneWarning)}
+	ownUnset.Cable.Name, ownUnset.Cable.Placeholder, ownUnset.Cable.Level = "", "Choose one", level(0)
+
 	for name, f := range map[string]AudioFlow{"flow-playing": testFlow(), "flow-setup": setup, "flow-preview": preview,
-		"flow-held": held, "flow-paused": paused, "flow-missing": missing} {
+		"flow-held": held, "flow-paused": paused, "flow-missing": missing, "flow-own": own, "flow-own-unset": ownUnset} {
 		for _, scale := range []float64{1, 1.5} {
 			img := renderRows(t, f.Rows(), scale, nil)
 			if scale == 1.5 {
@@ -228,6 +241,35 @@ func TestFlowRender(t *testing.T) {
 				}
 			}
 		}
+	}
+}
+
+// TestWarningRender saves the Warning row and checks that the app's texts
+// (the Advanced section's in pages.go, the setup's in wizard.go: keep them
+// in sync) fit beside the icon and the chevron.
+func TestWarningRender(t *testing.T) {
+	texts := []string{"Non-standard setup: click for help", "Voicemeeter: VB-Cable may break routing"}
+	rows := []Row{Separator(), Section("Advanced"),
+		Dropdown("cable-target", "Sounds for others play into", "", []Option{{Label: "Voicemeeter AUX Input (VB-Audio Voicemeeter VAIO)", Detail: "Voicemeeter"}}, 0, func(int) {})}
+	for _, s := range texts {
+		rows = append(rows, Warning(s, "why", func() {}))
+	}
+	for _, scale := range []float64{1, 1.5} {
+		name := "warning"
+		if scale == 1.5 {
+			name += "@1.5x"
+		}
+		savePNG(t, renderRows(t, rows, scale, map[int]rowState{4: {hover: 0, press: -1, open: -1}}), name)
+		renderCanvas(t, 10, 10, scale, func(c *canvas) {
+			w := warningRow{onClick: func() {}}
+			box := w.box(c, rect{0, 0, c.px(popupWidthL), c.px(w.height())})
+			room := w.textBox(c, box).w()
+			for _, s := range texts {
+				if tw := c.textWidth(s, fontBody); tw > room {
+					t.Errorf("@%vx: %q is %d px wide, room for %d", scale, s, tw, room)
+				}
+			}
+		})
 	}
 }
 

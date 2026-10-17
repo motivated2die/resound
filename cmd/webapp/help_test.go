@@ -40,6 +40,34 @@ func TestHelpCenter(t *testing.T) {
 	}
 }
 
+// The help articles the desktop panel opens (the help… constants in
+// internal/app/pages.go, e.g. "voicemeeter#before-you-install-vb-cable")
+// exist, with their headings.
+func TestAppHelpLinks(t *testing.T) {
+	src, err := os.ReadFile(filepath.Join("..", "..", "internal", "app", "pages.go"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	links := regexp.MustCompile(`(?m)^\s*help[A-Z]\w*\s*=\s*"([^"]+)"`).FindAllStringSubmatch(string(src), -1)
+	if len(links) == 0 {
+		t.Fatal("no help… constants found in internal/app/pages.go")
+	}
+	files, err := buildHelp(helpSrc)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, l := range links {
+		slug, frag, _ := strings.Cut(l[1], "#")
+		page, ok := files["help/"+slug+".html"]
+		switch {
+		case !ok:
+			t.Errorf("%q: no help article %s.md", l[1], slug)
+		case frag != "" && !strings.Contains(string(page), `id="`+frag+`"`):
+			t.Errorf("%q: %s.md has no such heading", l[1], slug)
+		}
+	}
+}
+
 // Like the app, the help center loads nothing from other hosts (the CSP
 // would refuse it): no URLs in its styles, scripts, template or
 // visualizations, other than links the reader follows.

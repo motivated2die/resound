@@ -78,11 +78,47 @@ func (a *App) selectMonitor(id string) {
 	a.render()
 }
 
-// selectCable chooses the "others hear" output: "" = automatic (VB-Cable).
+// selectCable chooses the "others hear" output: "" = automatic (VB-Cable),
+// which also ends an own routing.
 func (a *App) selectCable(id string) {
 	a.cfg.CableDeviceID = id
+	if id == "" && a.cfg.AppsMicDeviceID != "" {
+		a.cfg.AppsMicDeviceID = ""
+		a.refreshRouting(true) // the automatic mic may have skipped it
+	}
 	a.save()
 	a.openCableOutput()
+	a.render()
+}
+
+// ownRouting reports whether sounds for others play into a device of the
+// user's own routing (e.g. a Voicemeeter input) instead of VB-Cable. The
+// user's mixer then combines the mic and the sounds; Resound doesn't route
+// the mic, and never reads or changes the mixer's settings.
+func (a *App) ownRouting() bool {
+	return a.cfg.CableDeviceID != "" && !a.cableSelected()
+}
+
+// appsMic is the recording device others' apps use as their microphone
+// with an own routing; nil while none is chosen or it is missing.
+func (a *App) appsMic() *routing.Input {
+	if a.cfg.AppsMicDeviceID == "" {
+		return nil
+	}
+	for i := range a.route.Inputs {
+		if a.route.Inputs[i].ID == a.cfg.AppsMicDeviceID {
+			return &a.route.Inputs[i]
+		}
+	}
+	return nil
+}
+
+// selectAppsMic chooses the device others' apps listen to with an own
+// routing; the flow shows it and measures what arrives there.
+func (a *App) selectAppsMic(id string) {
+	a.cfg.AppsMicDeviceID = id
+	a.save()
+	a.refreshRouting(true)
 	a.render()
 }
 
@@ -96,7 +132,7 @@ func (a *App) restartOutputs() {
 
 // refreshRouting re-reads cable, microphone and listen state.
 func (a *App) refreshRouting(verbose bool) {
-	st, err := routing.Check(a.cfg.MicDeviceID)
+	st, err := routing.Check(a.cfg.MicDeviceID, a.cfg.AppsMicDeviceID)
 	a.route, a.routeErr = st, err
 	if err != nil {
 		logx.Printf("routing check: %v", err)
@@ -114,7 +150,8 @@ func (a *App) refreshRouting(verbose bool) {
 	if st.Mic != nil {
 		mic = st.Mic.Name
 	}
-	logx.Printf("routing: cable installed=%v, mic=%q, mic routed=%v", st.CableInstalled(), mic, st.MicRouted)
+	logx.Printf("routing: cable installed=%v, voicemeeter=%v, mic=%q, mic routed=%v, own routing=%v",
+		st.CableInstalled(), st.Voicemeeter, mic, st.MicRouted, a.ownRouting())
 }
 
 func (a *App) selectMic(id string) {

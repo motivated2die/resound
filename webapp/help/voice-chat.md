@@ -50,6 +50,6 @@ In Settings → Audio & voice chat:
 
 To test in Discord, use **Let's Check** under Voice & Video while a sound plays. Windows' own Sound dialog is a poor test: its meters react late and only move while the dialog is open.
 
-:::tip Using your own mixer?
-With a virtual mixer such as Voicemeeter you can send the sounds for others elsewhere: Settings → Audio & voice chat → Advanced. Only do this for your own routing; otherwise your sounds and your voice no longer meet in VB-Cable.
+:::tip Using Voicemeeter?
+Your mixer can combine your voice and sounds instead of VB-Cable, and if it already uses VB-Cable, installing or connecting it here can break that. Read [Use Voicemeeter or another mixer](voicemeeter.md) first.
 :::

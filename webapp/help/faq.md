@@ -38,7 +38,7 @@ Only what you ask for, each time with a prompt: it installs VB-Cable, turns on *
 
 ## Can I use Voicemeeter or another mixer?
 
-Yes. Settings → Audio & voice chat → Advanced chooses where sounds for others play, for example a Voicemeeter input. Your voice then has to be mixed in by that mixer.
+Yes, without VB-Cable. Settings → Audio & voice chat → Advanced chooses where sounds for others play (for example a Voicemeeter input) and which output of your mixer others' apps listen to. Your mixer then combines your voice and the sounds: [Use Voicemeeter or another mixer](voicemeeter.md).
 
 ## How do I use Resound with OBS?
 

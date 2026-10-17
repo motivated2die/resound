@@ -162,8 +162,18 @@ func (a *App) homePage() []ui.Row {
 // openHelp opens the help center (setup guides, features, troubleshooting)
 // in the browser: /help/ on the app's site (webapp/help, built by
 // cmd/webapp), which the installed app doesn't cache.
-func (a *App) openHelp() {
-	url := strings.TrimSuffix(a.appURL(), "/") + "/help/"
+func (a *App) openHelp() { a.openHelpAt("") }
+
+// Help articles the panel links to (webapp/help/<article>.md, an optional
+// #heading). TestAppHelpLinks in cmd/webapp checks they exist.
+const (
+	helpOwnMixer      = "voicemeeter"
+	helpBeforeVBCable = "voicemeeter#before-you-install-vb-cable"
+)
+
+// openHelpAt opens one help article ("" = the help center's start page).
+func (a *App) openHelpAt(article string) {
+	url := strings.TrimSuffix(a.appURL(), "/") + "/help/" + article
 	if err := ui.ShellOpen(url); err != nil {
 		logx.Printf("help: %v", err)
 	}
@@ -238,13 +248,19 @@ func (a *App) audioSummary() (string, ui.Tone) {
 // audioPage is the audio flow with everything that sets it up: installing
 // VB-Cable, connecting it, and the options of what happens while sounds play.
 func (a *App) audioPage() []ui.Row {
+	through := "VB-Cable"
+	if a.ownRouting() {
+		through = "your own routing"
+	}
 	rows := []ui.Row{
 		ui.Header("Audio & voice chat", a.back),
 		ui.Paragraph("Speak and play the test sound: the bars show what arrives where. "+
-			"Others hear your microphone and sounds through VB-Cable; you hear the sounds yourself.", ui.ToneMuted),
+			"Others hear your microphone and sounds through "+through+"; you hear the sounds yourself.", ui.ToneMuted),
 	}
 	rows = append(rows, a.flowRows()...)
-	if !a.route.CableInstalled() {
+	if a.ownRouting() {
+		rows = append(rows, a.cableOutputHint()...)
+	} else if !a.route.CableInstalled() {
 		rows = append(rows, ui.Section("Install VB-Cable"))
 		rows = append(rows, a.cableInstallRows()...)
 	} else {
@@ -268,13 +284,69 @@ func (a *App) audioPage() []ui.Row {
 			ui.Action{Label: "Windows sound", Icon: ui.IconExternalLink, Closes: true, OnClick: func() { _ = ui.ShellRun("control.exe", "mmsys.cpl,,1") }},
 		),
 		ui.Text("Restart outputs after plugging in a device.", "", ui.ToneMuted),
-		ui.Section("Advanced _____"),
-		a.cableOutputDropdown(),
-		ui.Paragraph("Only for your own routing, e.g. a virtual mixer such as Voicemeeter. "+
-			"Otherwise your sounds and your voice no longer meet in VB-Cable.", ui.ToneMuted),
 	)
+	rows = append(rows, a.ownRoutingRows()...)
 	rows = append(rows, a.cableCredit()...)
 	return append(rows, ui.Spacer(4))
+}
+
+// ownRoutingRows are the Advanced section: sounds for others into a device
+// of the user's own routing (e.g. a Voicemeeter input) instead of VB-Cable,
+// and the device others' apps then listen to. Resound never reads or
+// changes the mixer; the short how-to is all it gives.
+func (a *App) ownRoutingRows() []ui.Row {
+	rows := []ui.Row{ui.Separator(), ui.Section("Advanced"), a.cableOutputDropdown()}
+	if !a.ownRouting() {
+		rows = append(rows, ui.Paragraph("Only for your own routing, e.g. a virtual mixer such as Voicemeeter. "+
+			"Otherwise your sounds and your voice no longer meet in VB-Cable.", ui.ToneMuted))
+		if a.route.Voicemeeter {
+			rows = append(rows, ui.Paragraph("Voicemeeter is installed. To use it instead of VB-Cable, choose one of its inputs above, "+
+				"e.g. Voicemeeter AUX Input.", ui.ToneMuted))
+		}
+		return rows
+	}
+	rows = append(rows,
+		ui.Warning("Non-standard setup: click for help",
+			"Your sounds for others don't go to VB-Cable: your own mixer has to combine them with your microphone. Click for the setup guide.",
+			func() { a.openHelpAt(helpOwnMixer) }),
+		ui.Paragraph("Your mixer has to combine your microphone and these sounds into one output. Choose that output here and as the microphone in your apps.", ui.ToneMuted),
+		a.appsMicDropdown(),
+	)
+	if a.route.Voicemeeter {
+		rows = append(rows, ui.Paragraph("Voicemeeter Banana: choose your mic as Hardware Input 1. Turn on B1 for it and for the strip Resound plays into, "+
+			"and turn A1 off on that strip, or you hear the sounds twice. Then choose “Voicemeeter Out B1” here. Keep Voicemeeter running.", ui.ToneMuted))
+	}
+	return append(rows,
+		ui.Paragraph("Under “Your microphone”, choose the mic your mixer records, so Resound mutes it while sounds play.", ui.ToneMuted),
+		ui.Button("Back to VB-Cable", ui.ButtonNormal, false, a.useCableAsOutput),
+	)
+}
+
+// appsMicDropdown chooses the recording device others' apps use as their
+// microphone with an own routing: where the mixer sends voice and sounds.
+func (a *App) appsMicDropdown() ui.Row {
+	var opts []ui.Option
+	var ids []string
+	sel := -1
+	for _, in := range a.route.Inputs {
+		if a.route.Mic != nil && in.ID == a.route.Mic.ID && a.cfg.MicDeviceID != "" {
+			continue // the chosen real mic
+		}
+		o := ui.Option{Label: in.Name}
+		if in.IsVoicemeeter() {
+			o.Detail = "Voicemeeter"
+		}
+		if in.ID == a.cfg.AppsMicDeviceID {
+			sel = len(opts)
+		}
+		opts = append(opts, o)
+		ids = append(ids, in.ID)
+	}
+	placeholder := "Choose a recording device…"
+	if a.cfg.AppsMicDeviceID != "" && sel < 0 {
+		placeholder = "Not connected: choose another one…"
+	}
+	return ui.Dropdown("apps-mic", "Others' apps listen to", placeholder, opts, sel, func(i int) { a.selectAppsMic(ids[i]) })
 }
 
 // --- voice chat (VB-Cable, microphone, push-to-talk) -------------------------
@@ -283,6 +355,10 @@ func (a *App) voiceSummary() (string, ui.Tone) {
 	switch {
 	case a.routeErr != nil && a.busy == "":
 		return "Check failed", ui.ToneBad
+	case a.ownRouting() && a.appsMic() == nil:
+		return "Choose your mixer's output", ui.ToneWarning
+	case a.ownRouting():
+		return "Own routing", ui.ToneGood
 	case a.cable.busy():
 		return "Installing VB-Cable…", ui.ToneWarning
 	case a.cable.state == cableRestart:
@@ -290,11 +366,8 @@ func (a *App) voiceSummary() (string, ui.Tone) {
 	case !a.route.CableInstalled():
 		return "VB-Cable missing", ui.ToneWarning
 	}
-	switch {
-	case a.voiceReady():
+	if a.voiceReady() {
 		return "Ready", ui.ToneGood
-	case !a.cableSelected():
-		return "Sounds go elsewhere", ui.ToneWarning
 	}
 	return "Mic not routed", ui.ToneWarning
 }
@@ -305,8 +378,13 @@ func (a *App) cableSelected() bool {
 
 // voiceReady reports whether voice chat is connected: VB-Cable installed,
 // sounds playing into it, and the microphone routed into it (or there is
-// no microphone to route: the sounds still reach the cable).
+// no microphone to route: the sounds still reach the cable). With an own
+// routing, the mixer does the routing: ready once the device others' apps
+// listen to is chosen and present.
 func (a *App) voiceReady() bool {
+	if a.ownRouting() {
+		return a.appsMic() != nil
+	}
 	st := a.route
 	return st.CableInstalled() && a.cableSelected() && (st.MicRouted || st.Mic == nil)
 }
@@ -377,9 +455,17 @@ func (a *App) connectRows() []ui.Row {
 
 // cableOutputHint is the user's own step: their apps listen to the cable.
 func (a *App) cableOutputHint() []ui.Row {
+	name := "CABLE Output"
+	if a.ownRouting() {
+		m := a.appsMic()
+		if m == nil {
+			return nil // the flow and the Advanced section ask for it
+		}
+		name = shortDeviceName(m.Name)
+	}
 	return []ui.Row{
 		ui.Section("In your apps"),
-		ui.Paragraph("In Games, Discord or OBS choose “CABLE Output” as your microphone so others hear you and your sounds.", ui.ToneMuted),
+		ui.Paragraph("In Games, Discord or OBS choose “"+name+"” as your microphone so others hear you and your sounds.", ui.ToneMuted),
 	}
 }
 

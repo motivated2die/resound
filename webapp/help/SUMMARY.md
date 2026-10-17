@@ -7,6 +7,7 @@
 - [Install Resound](install.md)
 - [The guided setup](guided-setup.md)
 - [Set up voice chat](voice-chat.md)
+- [Use Voicemeeter or another mixer](voicemeeter.md)
 - [Use Resound in Discord and games](apps.md)
 - [Connect your phone](connect-phone.md)
 
