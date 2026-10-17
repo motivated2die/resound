@@ -60,7 +60,7 @@ func (a *App) setOutput(role, id string, enabled bool) {
 	start := time.Now()
 	if err := a.engine.SetOutput(role, id, enabled); err != nil {
 		logx.Printf("%v", err)
-		a.playback.lastError = err.Error()
+		a.playback.lastError = roleLabel(role) + ": " + audio.Problem(err) + "."
 	}
 	for _, s := range a.engine.Status() {
 		if s.Role == role && s.Running {

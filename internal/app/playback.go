@@ -323,7 +323,7 @@ func (a *App) onEngineEvent(ev audio.Event) {
 		}
 	case audio.EventOutputFailed:
 		logx.Printf("%s output failed: %v", ev.Output, ev.Err)
-		pb.lastError = fmt.Sprintf("%s output stopped: %v", ev.Output, ev.Err)
+		pb.lastError = roleLabel(ev.Output) + " stopped: " + audio.Problem(ev.Err) + "."
 		// Voices on a dead output never finish; don't keep the mic muted.
 		clear(pb.remaining)
 		pb.vmu.Lock()

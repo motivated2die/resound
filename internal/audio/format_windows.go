@@ -14,10 +14,6 @@ const (
 	waveFormatPCM        = 0x0001
 	waveFormatIEEEFloat  = 0x0003
 	waveFormatExtensible = 0xFFFE
-
-	// HRESULTs worth naming in logs.
-	audclntEDeviceInvalidated = 0x88890004
-	audclntEServiceNotRunning = 0x88890010
 )
 
 var (
@@ -63,10 +59,10 @@ func parseFormat(wfx *wca.WAVEFORMATEX) (sampleFormat, error) {
 		f.Float = true
 	case tag == waveFormatPCM && (f.Bits == 16 || f.Bits == 24 || f.Bits == 32):
 	default:
-		return f, fmt.Errorf("unsupported mix format (tag %#x, %d bits)", tag, f.Bits)
+		return f, fmt.Errorf("%w (tag %#x, %d bits)", errUnsupportedFormat, tag, f.Bits)
 	}
 	if f.Channels < 1 || f.BlockAlign != f.Channels*f.Bits/8 {
-		return f, fmt.Errorf("unexpected mix format layout (%d ch, block %d)", f.Channels, f.BlockAlign)
+		return f, fmt.Errorf("%w: unexpected layout (%d ch, block %d)", errUnsupportedFormat, f.Channels, f.BlockAlign)
 	}
 	return f, nil
 }
@@ -86,17 +82,17 @@ func boostThreadPriority() func() {
 	return func() { procAvRevertMmThreadCharacteristics.Call(h) }
 }
 
-// describeHRESULT adds a readable hint to well-known WASAPI errors.
+// describeHRESULT replaces a COM error with one named by its HRESULT (see
+// hresultError): go-ole's own text for WASAPI's codes is only
+// FormatMessage failing. Errors described already pass unchanged.
 func describeHRESULT(err error) error {
+	var he *hresultError
+	if errors.As(err, &he) {
+		return err
+	}
 	var oleErr *ole.OleError
 	if !errors.As(err, &oleErr) {
 		return err
 	}
-	switch uint32(oleErr.Code()) {
-	case audclntEDeviceInvalidated:
-		return fmt.Errorf("device was removed or disabled: %w", err)
-	case audclntEServiceNotRunning:
-		return fmt.Errorf("Windows audio service is not running: %w", err)
-	}
-	return err
+	return &hresultError{code: uint32(oleErr.Code()), err: err}
 }

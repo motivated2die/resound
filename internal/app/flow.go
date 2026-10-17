@@ -353,7 +353,7 @@ func (a *App) audioFlow() ui.AudioFlow {
 	if s, ok := a.outputStatus(audio.RoleMonitor); ok && !s.Running && s.Err != nil {
 		f.YouPipe = ui.Pipe{State: ui.PipeBroken, Badge: &ui.Badge{
 			Icon: ui.IconAlert, Label: "Output failed", Tone: ui.ToneBad,
-			Tip:     "You hear nothing: " + s.Err.Error() + ". Click to restart the outputs, e.g. after plugging the device back in.",
+			Tip:     "You hear nothing: " + audio.Problem(s.Err) + ". Click to restart the outputs, e.g. after plugging the device back in.",
 			OnClick: a.restartOutputs,
 		}}
 	}
@@ -619,7 +619,7 @@ func (a *App) cablePipe() ui.Pipe {
 		return ui.Pipe{State: ui.PipeOff} // no VB-Cable: the cable explains
 	case cable.Err != nil && !cable.Running:
 		return ui.Pipe{State: ui.PipeBroken, Badge: &ui.Badge{Icon: ui.IconAlert, Label: "Output failed", Tone: ui.ToneBad,
-			Tip:     "Others don't hear your sounds: " + cable.Err.Error() + ". Click to restart the outputs.",
+			Tip:     "Others don't hear your sounds: " + audio.Problem(cable.Err) + ". Click to restart the outputs.",
 			OnClick: a.restartOutputs}}
 	case a.ownRouting():
 		return ui.Pipe{State: ui.PipeOn, Level: a.flowLevel(&a.levels.cableSend), Badge: &ui.Badge{Icon: ui.IconInfo,
