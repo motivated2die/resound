@@ -113,6 +113,44 @@ func (s *Server) Start(port int) error {
 	return err
 }
 
+// SignOut forgets one paired device and ends its open connections, so it
+// has to pair again.
+func (s *Server) SignOut(id string) {
+	s.auth.ForgetDevice(id)
+	if rtc := s.currentRTC(); rtc != nil {
+		rtc.closeDevice(id)
+	}
+}
+
+// SignOutAll signs out every device (Auth.ResetAll) and ends their open
+// connections.
+func (s *Server) SignOutAll() error {
+	err := s.auth.ResetAll()
+	if rtc := s.currentRTC(); rtc != nil {
+		rtc.closeDevice("")
+	}
+	return err
+}
+
+// Connected returns the IDs of the devices connected right now.
+func (s *Server) Connected() map[string]bool {
+	out := map[string]bool{}
+	if rtc := s.currentRTC(); rtc != nil {
+		for _, sess := range rtc.signedIn("") {
+			sess.mu.Lock()
+			out[sess.device] = true
+			sess.mu.Unlock()
+		}
+	}
+	return out
+}
+
+func (s *Server) currentRTC() *RTC {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.rtc
+}
+
 // Close stops listening and ends all connections.
 func (s *Server) Close() {
 	s.mu.Lock()

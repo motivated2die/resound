@@ -205,11 +205,56 @@ func (a *App) resetRemote() {
 	if a.srv == nil {
 		return
 	}
-	if err := a.srv.Auth().ResetAll(); err != nil {
+	if err := a.srv.SignOutAll(); err != nil {
 		logx.Printf("signing out all devices: %v", err)
 	}
 	logx.Printf("remote: all devices signed out")
 	a.render()
+}
+
+// pairedDeviceRows list the paired devices on the Phone remote page, each
+// with a small Remove button that signs out just that one. None: no rows.
+func (a *App) pairedDeviceRows() []ui.Row {
+	connected := a.srv.Connected()
+	var rows []ui.Row
+	now := time.Now()
+	for _, d := range a.srv.Auth().Devices() {
+		id, name := d.ID, server.DescribeAgent(d.Agent)
+		used := "Used " + dayText(d.LastSeen, now)
+		if connected[id] {
+			used = "Connected now"
+		}
+		rows = append(rows, ui.Item(name, used+" · paired "+dateText(d.Created, now), "Remove", func() {
+			a.srv.SignOut(id)
+			logx.Printf("remote: device %s (%s) signed out", id, name)
+			a.render()
+		}))
+	}
+	return rows
+}
+
+// dayText says when t was in days: "today", "yesterday", "3 days ago", or
+// its date from a week on.
+func dayText(t, now time.Time) string {
+	y, m, d := now.Date()
+	today := time.Date(y, m, d, 0, 0, 0, 0, now.Location())
+	switch days := int(today.Sub(t.In(now.Location())).Hours()/24 + 1); {
+	case !t.Before(today):
+		return "today"
+	case days == 1:
+		return "yesterday"
+	case days < 7:
+		return fmt.Sprintf("%d days ago", days)
+	}
+	return "on " + dateText(t, now)
+}
+
+// dateText is t's date, with the year only when it isn't now's.
+func dateText(t, now time.Time) string {
+	if t.Year() != now.Year() {
+		return t.Local().Format("2 Jan 2006")
+	}
+	return t.Local().Format("2 Jan")
 }
 
 // --- library (UI thread) ---------------------------------------------------

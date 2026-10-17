@@ -395,26 +395,43 @@ func (s *rtcSession) receive(frame []byte) {
 	s.handle(msg)
 }
 
-// broadcast sends a message to every signed-in app connection and returns
-// how many got it. Connections still pairing or saying hello get nothing.
-func (r *RTC) broadcast(v any) int {
+// signedIn returns the signed-in connections, of device id only unless id
+// is "".
+func (r *RTC) signedIn(id string) []*rtcSession {
 	r.mu.Lock()
 	sessions := make([]*rtcSession, 0, len(r.sessions))
 	for _, s := range r.sessions {
 		sessions = append(sessions, s)
 	}
 	r.mu.Unlock()
-	n := 0
+	out := sessions[:0]
 	for _, s := range sessions {
 		s.mu.Lock()
-		signedIn := s.device != ""
+		device := s.device
 		s.mu.Unlock()
-		if signedIn {
-			s.send(v)
-			n++
+		if device != "" && (id == "" || device == id) {
+			out = append(out, s)
 		}
 	}
-	return n
+	return out
+}
+
+// closeDevice ends the open connections of a device that was signed out
+// (of every device for id ""). The app reconnects, and its hello is denied.
+func (r *RTC) closeDevice(id string) {
+	for _, s := range r.signedIn(id) {
+		s.close()
+	}
+}
+
+// broadcast sends a message to every signed-in app connection and returns
+// how many got it. Connections still pairing or saying hello get nothing.
+func (r *RTC) broadcast(v any) int {
+	sessions := r.signedIn("")
+	for _, s := range sessions {
+		s.send(v)
+	}
+	return len(sessions)
 }
 
 // send writes one message, split into frames.

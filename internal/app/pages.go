@@ -689,12 +689,10 @@ func (a *App) remotePage() []ui.Row {
 		)
 	}
 	if a.srv != nil {
-		n := a.srv.Auth().DeviceCount()
-		rows = append(rows,
-			ui.Separator(),
-			ui.Text("Paired devices", fmt.Sprint(n), ui.ToneNormal),
-			ui.Button("Sign out all devices", ui.ButtonDanger, n == 0, a.resetRemote),
-		)
+		devices := a.pairedDeviceRows()
+		rows = append(rows, ui.Separator(), ui.Section("Paired devices"))
+		rows = append(rows, devices...)
+		rows = append(rows, ui.Button("Sign out all devices", ui.ButtonDanger, len(devices) == 0, a.resetRemote))
 	}
 	rows = append(rows, a.firewallRows()...)
 	return append(rows, ui.Spacer(4))
