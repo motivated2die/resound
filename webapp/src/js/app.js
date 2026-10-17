@@ -960,14 +960,11 @@ async function loadTabs() {
             tabsContainerEl.appendChild(tabElement);
         });
 
-        // Determine which tab to activate
-        // Use persisted lastTabId, default to 'favorites' if not set or invalid
-        let persistedTabId = String(state.settings.lastTabId || 'favorites'); // Ensure string
-
-        // Verify the persisted tab ID still exists (either 'favorites' or in the API tabs)
-        const isValidPersistedId = persistedTabId === 'favorites' || tabsFromApi.some(t => String(t.id) === persistedTabId);
-
-        const targetTabId = isValidPersistedId ? persistedTabId : 'favorites'; // Fallback to favorites
+        // The open tab stays open (a rebuilt tab bar, a reload within this
+        // session); otherwise the start tab.
+        const exists = (id) => id === 'favorites' || tabsFromApi.some(t => String(t.id) === id);
+        const keep = state.currentTab ?? sessionTab();
+        const targetTabId = keep !== null && exists(String(keep)) ? String(keep) : startTab(tabsFromApi);
 
         const tabToActivate = tabsContainerEl.querySelector(`[data-tab-id="${targetTabId}"]`);
 
@@ -994,6 +991,27 @@ async function loadTabs() {
         state.currentTab = null; // Reset state on error
         if(soundsContainerEl) soundsContainerEl.innerHTML = '<p class="error-text">Failed to load tabs.</p>';
     }
+}
+
+// --- The tab the app opens on ---
+// A fresh start opens Favorites, or, with no favorites yet, the library's
+// first tab, so it starts on buttons rather than an empty page (Favorites
+// again when there are no tabs either). Within a session the open tab is
+// kept in sessionStorage, so reloads (an app update taking over, coming back
+// from the connect page) return to it; closing the app ends the session.
+const SESSION_TAB_KEY = 'resound.openTab';
+
+function startTab(tabs) {
+    const favorites = Object.values(state.settings?.soundSettings || {}).some(s => s.favorite === true);
+    return favorites || tabs.length === 0 ? 'favorites' : String(tabs[0].id);
+}
+
+function sessionTab() {
+    try { return sessionStorage.getItem(SESSION_TAB_KEY); } catch (_) { return null; }
+}
+
+function rememberSessionTab(tabId) {
+    try { sessionStorage.setItem(SESSION_TAB_KEY, tabId); } catch (_) { /* storage blocked: start fresh next time */ }
 }
 
 function createTabElement(name, id, iconName = null) {
@@ -1061,10 +1079,8 @@ async function setActiveTab(tabElement, tabId) {
     }
 
 
-    // Update global state and persistence
     state.currentTab = newTabIdStr;
-    state.settings.lastTabId = newTabIdStr;
-    persistence.save(state.settings); // Save the last active tab
+    rememberSessionTab(newTabIdStr);
 
     // Notify other modules about the change *before* loading sounds
     document.dispatchEvent(new CustomEvent('tabChanged', { detail: { tabId: newTabIdStr } }));
@@ -1265,11 +1281,7 @@ function createSoundCardElement(sound, { animate = true, tabId = state.currentTa
         // Get progress info if available in the tracking map
         const playingInstance = soundProgress.activeSounds.get(state.currentlyPlaying.get(sound.id));
         if (playingInstance && playingInstance.lengthInMs > 0) {
-            const percentage = (playingInstance.readInMs / playingInstance.lengthInMs) * 100;
-            // Apply gradient background only if not in list view
-            if (!soundsContainerEl?.classList.contains('layout-list')) {
-                setCardProgress(soundElement, percentage);
-            }
+            setCardProgress(soundElement, (playingInstance.readInMs / playingInstance.lengthInMs) * 100);
         }
     }
 
@@ -1313,9 +1325,6 @@ function updateSoundCardDisplay(soundId, cardElement = null, tabId = state.searc
 
     const contentWrapper = card.querySelector('.sound-content-wrapper');
     const textElement = card.querySelector('.sound-text');
-    // The layout of the grid the card is in: a swipe preview or the sheet's
-    // floating copy may differ from the live page. Not placed yet: the page's.
-    const isList = (card.closest('.sounds-grid') || soundsContainerEl)?.classList.contains('layout-list');
 
     // --- Indicators ---
     let indicators = card.querySelector('.sound-indicators');
@@ -1372,22 +1381,28 @@ function updateSoundCardDisplay(soundId, cardElement = null, tabId = state.searc
         ? `var(--sound-color-${soundSettings.color}-progress)` : 'var(--sound-progress-default)');
 
     // --- Apply Emoji ---
-    card.style.removeProperty('--sound-emoji'); // Remove potential grid emoji style
-    // Remove existing list emoji span if present
-    const existingEmojiSpan = contentWrapper?.querySelector('.sound-emoji-list');
-    if (existingEmojiSpan) contentWrapper.removeChild(existingEmojiSpan);
-
-    if (soundSettings.emoji && textElement && contentWrapper) {
-        if (isList) {
-            // Add emoji span before the text in list view
-            const emojiSpan = document.createElement('span');
+    // A card carries its emoji in both forms: --sound-emoji for the grid
+    // layouts' large emoji behind the name (::before), and a span before the
+    // name for the list. CSS shows the one its grid's layout uses, so a card
+    // is right in any layout without being rebuilt. (Built for one layout,
+    // cards of a swipe preview took the live page's: a neighbour tab in
+    // another layout showed no emoji until the swipe ended, then they popped
+    // in.) Unchanged emoji are left alone, so updates don't redraw them.
+    const emoji = soundSettings.emoji || '';
+    let emojiSpan = contentWrapper?.querySelector('.sound-emoji-list');
+    if (emoji && textElement && contentWrapper) {
+        const value = `"${emoji}"`;
+        if (card.style.getPropertyValue('--sound-emoji') !== value) card.style.setProperty('--sound-emoji', value);
+        if (!emojiSpan) {
+            emojiSpan = document.createElement('span');
             emojiSpan.className = 'sound-emoji-list';
-            emojiSpan.textContent = soundSettings.emoji;
+            emojiSpan.setAttribute('aria-hidden', 'true');
             contentWrapper.insertBefore(emojiSpan, textElement);
-        } else {
-            // Apply emoji as background pseudo-element in grid view
-            card.style.setProperty('--sound-emoji', `"${soundSettings.emoji}"`);
         }
+        if (emojiSpan.textContent !== emoji) emojiSpan.textContent = emoji;
+    } else {
+        card.style.removeProperty('--sound-emoji');
+        emojiSpan?.remove();
     }
 
     // --- Background Reset ---
@@ -1401,17 +1416,12 @@ function updateSoundCardDisplay(soundId, cardElement = null, tabId = state.searc
             card.style.backgroundColor = ''; // Use default CSS background
         }
     } else {
-         // If it IS playing, re-apply the gradient with the current base color
-         // This ensures the non-progress part matches the card color
+         // Playing: keep the fill where the sound is.
          const playingInstance = soundProgress.activeSounds.get(state.currentlyPlaying.get(soundId));
          const percentage = (playingInstance && playingInstance.lengthInMs > 0)
                            ? (playingInstance.readInMs / playingInstance.lengthInMs) * 100
                            : 0;
-         if (!isList) { // Only for grid layouts
-              setCardProgress(card, percentage);
-         } else {
-              card.style.background = ''; // Ensure list items don't have gradient
-         }
+         setCardProgress(card, percentage);
     }
 }
 
@@ -1594,26 +1604,19 @@ async function fetchSoundProgress() {
                 percentage = Math.min(100, Math.max(0, (readMs / lengthMs) * 100));
                 maxProgressPercentage = Math.max(maxProgressPercentage, percentage); // Track max percentage
 
-                // Update Individual Card Background (Only Grid View)
-                if (soundsContainerEl && !soundsContainerEl.classList.contains('layout-list')) {
-                    const soundCard = soundsContainerEl.querySelector(`.sound-card[data-sound-id="${existingSound.soundId}"]`);
-                    if (soundCard) {
-                        setCardProgress(soundCard, percentage);
-                        if (!soundCard.classList.contains('playing')) {
-                            soundCard.classList.add('playing');
-                        }
+                // The card's fill (grid and list layouts).
+                const soundCard = soundsContainerEl?.querySelector(`.sound-card[data-sound-id="${existingSound.soundId}"]`);
+                if (soundCard) {
+                    setCardProgress(soundCard, percentage);
+                    if (!soundCard.classList.contains('playing')) {
+                        soundCard.classList.add('playing');
                     }
                 }
             } else {
-                 // If paused or length is zero, ensure background is reset for grid items
-                 if (soundsContainerEl && !soundsContainerEl.classList.contains('layout-list')) {
-                     const soundCard = soundsContainerEl.querySelector(`.sound-card[data-sound-id="${existingSound.soundId}"]`);
-                     // Only reset if it was visually playing before
-                     if (soundCard && soundCard.classList.contains('playing')) {
-                          // Don't remove 'playing' class if paused, just reset background
-                          soundCard.style.background = '';
-                          // updateSoundCardDisplay(existingSound.soundId, soundCard); // Avoid recursive updates if possible
-                     }
+                 // Paused or no length yet: the card keeps its 'playing' class.
+                 const soundCard = soundsContainerEl?.querySelector(`.sound-card[data-sound-id="${existingSound.soundId}"]`);
+                 if (soundCard && soundCard.classList.contains('playing')) {
+                      soundCard.style.background = '';
                  }
             }
         });

@@ -1,6 +1,11 @@
 package ui
 
-import "testing"
+import (
+	"os"
+	"path/filepath"
+	"regexp"
+	"testing"
+)
 
 func TestOverlayGeometry(t *testing.T) {
 	if h := overlayBarHeight(3); h != 3*44+2*6+2*6 {
@@ -63,6 +68,25 @@ func TestOverlayPlacement(t *testing.T) {
 		// At the start the frame is moved out by edge and cut there.
 		if _, src, cw, _ := overlayPlacement(mon, w, h, left, edge, 0); cw != w-edge || (left && src.X != edge) {
 			t.Errorf("left=%v at the start: src %d width %d", left, src.X, cw)
+		}
+	}
+}
+
+// TestOverlayColorsMatchApp checks that the overlay has a colour for every
+// one the phone offers (webapp/src/app.html), so no button falls back to
+// grey.
+func TestOverlayColorsMatchApp(t *testing.T) {
+	data, err := os.ReadFile(filepath.Join("..", "..", "webapp", "src", "app.html"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	found := regexp.MustCompile(`data-color="([a-z]+)"`).FindAllStringSubmatch(string(data), -1)
+	if len(found) < 8 {
+		t.Fatalf("found %d colours in app.html", len(found))
+	}
+	for _, m := range found {
+		if _, ok := overlayColors[m[1]]; !ok && m[1] != "default" {
+			t.Errorf("no overlay colour for %q", m[1])
 		}
 	}
 }

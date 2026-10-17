@@ -1,10 +1,11 @@
 // State management
 let currentSoundId = null;
 let currentSoundData = null; // Stores details fetched for the current sound
-let startY = 0;
-let currentY = 0;
+let startX = 0, startY = 0;
+let currentX = 0, currentY = 0;
 let isDragging = false;
-let cardHeight = 0;
+let dragAxis = null; // side sheet: 'x' closes it, 'y' scrolls it; decided by the first move
+let cardHeight = 0, cardWidth = 0;
 let currentPreviewId = null;
 let emojiPickerInstance = null; // Reference to the emoji picker element INSIDE THE MODAL
 let emojiPickerInputElement = null; // To store the reference to the search input inside the shadow DOM of the picker in the modal
@@ -18,6 +19,8 @@ const tabNameElement = document.getElementById('settings-tab-name');
 const favoriteButton = document.getElementById('favorite-button');
 const previewButton = document.getElementById('preview-button');
 const volumeSlider = document.getElementById('volume-slider');
+const volumeInfoButton = document.getElementById('volume-info-button');
+const volumeInfo = document.getElementById('volume-info');
 const colorSelector = document.getElementById('color-selector');
 // Emoji Elements (Settings Card)
 const emojiDisplayArea = document.getElementById('emoji-display-area'); // Area showing selected emoji + clear button in settings
@@ -43,6 +46,7 @@ function initSoundSettings() {
 
     setupDragBehavior();
     setupButtonActions();
+    setupVolumeInfo();
     setupColorSelection();
     setupEmojiSelection(); // Now handles modal logic
     setupLongPressDetection();
@@ -51,6 +55,14 @@ function initSoundSettings() {
 
     settingsBackdrop?.addEventListener('click', closeSettingsMenu);
     document.addEventListener('soundprogress', syncPreview); // app.js, every poll
+    window.addEventListener('resize', placeLifted);
+    SIDE_SHEET_QUERY.addEventListener?.('change', placeLifted);
+    // Esc closes the emoji picker, else the sheet (on PCs and keyboards).
+    document.addEventListener('keydown', (e) => {
+        if (e.key !== 'Escape' || settingsOverlay.classList.contains('hidden')) return;
+        if (emojiPickerModalOverlay && !emojiPickerModalOverlay.classList.contains('hidden')) closeEmojiPickerModal();
+        else closeSettingsMenu();
+    });
 }
 
 // --- MODIFIED: Function to set the selected emoji (called from modal) ---
@@ -211,7 +223,18 @@ function handleTouchEnd() {
     longPressSoundCard = null; longPressStartPosition = null; hasMoved = false;
 }
 
-// Setup drag behavior for the settings card
+// --- Bottom sheet or side sheet ---
+// Phones in portrait get a bottom sheet (at most 520 px wide). Landscape and
+// wide screens get a side sheet from the right, with the button's copy
+// floating to its left (styles.css, same query). The sheet's shown and
+// hidden transforms differ; SHEET_SHOWN works for both.
+const SIDE_SHEET_QUERY = window.matchMedia('(min-aspect-ratio: 1/1) and (min-width: 600px)');
+const isSideSheet = () => SIDE_SHEET_QUERY.matches;
+const SHEET_SHOWN = 'translate(0, 0)';
+const sheetHidden = () => isSideSheet() ? 'translateX(100%)' : 'translateY(100%)';
+
+// Setup drag behavior for the settings card: down closes the bottom sheet,
+// right closes the side sheet (whose vertical moves scroll it).
 function setupDragBehavior() {
     if (!settingsCard) return;
     settingsCard.addEventListener('touchstart', onCardTouchStart, { passive: true });
@@ -229,8 +252,11 @@ function onCardTouchStart(e) {
     {
         return;
     }
-    startY = e.touches[0].clientY;
+    startX = currentX = e.touches[0].clientX;
+    startY = currentY = e.touches[0].clientY;
     cardHeight = settingsCard.offsetHeight;
+    cardWidth = settingsCard.offsetWidth;
+    dragAxis = null;
     isDragging = true;
     settingsCard.style.transition = 'none';
 }
@@ -238,8 +264,22 @@ function onCardTouchStart(e) {
 // Handle card touch move for dragging
 function onCardTouchMove(e) {
     if (!isDragging) return;
+    currentX = e.touches[0].clientX;
     currentY = e.touches[0].clientY;
+    const deltaX = currentX - startX;
     const deltaY = currentY - startY;
+    if (isSideSheet()) {
+        if (!dragAxis) {
+            if (Math.abs(deltaX) < 10 && Math.abs(deltaY) < 10) return;
+            dragAxis = Math.abs(deltaX) > Math.abs(deltaY) ? 'x' : 'y';
+        }
+        if (dragAxis !== 'x' || deltaX <= 0) return; // vertical: the sheet scrolls
+        e.preventDefault();
+        const translateX = Math.min(deltaX, cardWidth);
+        settingsCard.style.transform = `translateX(${translateX}px)`;
+        if (settingsBackdrop) settingsBackdrop.style.opacity = 1 - (translateX / cardWidth) * 0.5;
+        return;
+    }
     if (deltaY > 0) { // Only allow dragging down
         e.preventDefault();
         const translateY = Math.min(deltaY, cardHeight);
@@ -254,13 +294,14 @@ function onCardTouchEnd() {
     isDragging = false;
     settingsCard.style.transition = `transform 0.3s ${SHEET_EASE}`;
     if (settingsBackdrop) settingsBackdrop.style.transition = 'opacity 0.3s ease';
-    const deltaY = currentY - startY;
-    if (deltaY > cardHeight * 0.3) { closeSettingsMenu(); }
+    const side = isSideSheet();
+    const moved = side ? (dragAxis === 'x' ? currentX - startX : 0) : currentY - startY;
+    if (moved > (side ? cardWidth : cardHeight) * 0.3) { closeSettingsMenu(); }
     else {
-        settingsCard.style.transform = 'translateY(0)';
+        settingsCard.style.transform = SHEET_SHOWN;
         if (settingsBackdrop) settingsBackdrop.style.opacity = '1';
     }
-    startY = 0; currentY = 0;
+    startX = startY = currentX = currentY = 0;
 }
 
 // Setup button actions within the settings card
@@ -314,6 +355,23 @@ function setupButtonActions() {
     } else { console.error("Clear emoji button (settings) not found."); }
 }
 
+// --- Custom button volume: the (i) after its title ---
+// Tapping it shows what a custom volume does; the next tap anywhere, the
+// sheet closing or another sound's sheet hides it.
+function setupVolumeInfo() {
+    if (!volumeInfoButton || !volumeInfo) return;
+    volumeInfoButton.addEventListener('click', () => showVolumeInfo(volumeInfo.hidden));
+    document.addEventListener('pointerdown', (e) => {
+        if (!volumeInfo.hidden && !volumeInfoButton.contains(e.target)) showVolumeInfo(false);
+    }, true);
+}
+
+function showVolumeInfo(show) {
+    if (!volumeInfoButton || !volumeInfo) return;
+    volumeInfo.hidden = !show;
+    volumeInfoButton.setAttribute('aria-expanded', String(show));
+}
+
 // Setup color selection
 function setupColorSelection() {
     if (!colorSelector) {
@@ -348,8 +406,10 @@ function setupEmojiSelection() {
         return;
     }
 
-    // 1. Listener for the "Select Background Emoji" button (in settings card)
+    // 1. "Select Background Emoji" (no emoji yet), or the current emoji: the
+    // picker opens, and the emoji chosen there replaces it.
     selectEmojiButton.addEventListener('click', openEmojiPickerModal);
+    selectedEmojiButton?.addEventListener('click', openEmojiPickerModal);
 
     // 2. Listener for selecting an emoji within the MODAL
     emojiPickerInstance.addEventListener('emoji-click', event => {
@@ -552,12 +612,14 @@ function openSoundSettings(soundId) {
         }
         // --- End Modified Emoji Visibility Logic ---
 
-        // The sheet slides up while the button lifts out of the grid above it.
+        // The sheet slides in (up, or from the right) while the button lifts
+        // out of the grid into the space beside it.
         settingsOverlay.classList.remove('hidden');
+        settingsCard.scrollTop = 0; // a side sheet scrolls
         liftCard(sound);
         requestAnimationFrame(() => {
             if (settingsBackdrop) settingsBackdrop.style.opacity = '1';
-            settingsCard.style.transform = 'translateY(0)';
+            settingsCard.style.transform = SHEET_SHOWN;
         });
 
     })
@@ -577,6 +639,7 @@ function resetMenuState() {
 
     // Reset Buttons and Slider
     if (currentPreviewId !== null) stopPreview(); else showPreviewStopped();
+    showVolumeInfo(false);
 
     setSliderPosition(0);
     if (favoriteButton) favoriteButton.classList.remove('active');
@@ -606,9 +669,10 @@ function resetMenuState() {
 // Close settings menu
 function closeSettingsMenu() {
     if (!settingsOverlay || !settingsCard) return;
-    settingsCard.style.transform = 'translateY(100%)';
+    settingsCard.style.transform = sheetHidden();
     if (settingsBackdrop) settingsBackdrop.style.opacity = '0';
     dropCard();
+    showVolumeInfo(false);
 
     if (currentPreviewId !== null) stopPreview();
 
@@ -710,12 +774,12 @@ function resetPreviewFill() {
 // lifts out of the grid as the sheet slides up and settles back into place
 // when it closes. It is built and updated like the grid's cards, so colour,
 // emoji, volume and favourite changes show on it at once, and tapping it
-// previews the sound. In the list layout, which shows no colours, it is a
-// grid card.
+// previews the sound. It has the page's layout: a list row in the list
+// layout, as wide as the row and not enlarged.
 
 const SHEET_EASE = 'cubic-bezier(0.2, 0.9, 0.25, 1)';
 const LIFT_MS = 320;
-let lifted = null; // { card, soundId, w, h, fromList }
+let lifted = null; // { card, soundId, w, h, list }
 let previewStage = null;
 
 function setupLiftedCard() {
@@ -742,45 +806,66 @@ function liftCard(sound) {
     dropCard(true);
     if (!previewStage || !window.app) return;
     const container = document.getElementById('sounds-container');
-    const fromList = !container || container.classList.contains('layout-list');
-    const layout = fromList ? 'layout-grid-3'
-        : [...container.classList].find(c => c.startsWith('layout-')) || 'layout-grid-3';
+    const layout = [...(container?.classList || [])].find(c => c.startsWith('layout-')) || 'layout-grid-3';
+    const list = layout === 'layout-list';
     previewStage.className = 'sounds-grid ' + layout;
 
     const source = gridCard(sound.id);
     const rect = source?.getBoundingClientRect();
-    const w = rect && !fromList ? rect.width : Math.min(160, window.innerWidth * 0.4);
-    const h = rect && !fromList ? rect.height : 85;
+    // A list row keeps its height and gets the room's width, at most the
+    // sheet's (a row on a PC spans the screen); a grid button keeps its size.
+    const area = floatArea();
+    const w = list ? Math.min(rect ? rect.width : window.innerWidth - 20, area.right - area.left, 520)
+        : rect ? rect.width : Math.min(160, window.innerWidth * 0.4);
+    const h = rect ? rect.height : list ? 44 : 85;
 
+    // Card colours, emoji and marks show in every layout (app.js).
     const card = app.createSoundCardElement(sound, { animate: false, tabId: null }); // tabId null: shows the favourite mark
     card.style.width = w + 'px';
     card.style.height = h + 'px';
     card.setAttribute('aria-label', 'Preview ' + (sound.name || 'sound'));
     previewStage.append(card);
-    app.updateSoundCardDisplay(sound.id, card, null); // again, now in the stage's layout
-    lifted = { card, soundId: sound.id, w, h, fromList };
+    lifted = { card, soundId: sound.id, w, h, list };
 
-    // Where it floats: centred in the space above the sheet, larger, never
-    // wider than the screen.
-    const top = parseFloat(getComputedStyle(previewStage).paddingTop) + 16;
-    const bottom = window.innerHeight - settingsCard.offsetHeight - 16;
-    const room = bottom - top;
-    const scale = Math.max(0.5, Math.min(1.6, (window.innerWidth - 48) / w, room / h));
-    const x = (window.innerWidth - w * scale) / 2;
-    const y = top + Math.max(0, (room - h * scale) / 2);
-    const to = `translate(${x}px, ${y}px) scale(${scale})`;
-    card.style.transform = to;
+    const to = floatTransform(w, h, list);
+    card.style.transform = to.transform;
 
     let from;
-    if (rect && onScreen(rect) && !fromList) {
-        from = { transform: `translate(${rect.left}px, ${rect.top}px) scale(1)`, opacity: 1 };
+    if (rect && onScreen(rect)) {
+        from = { transform: `translate(${rect.left + (rect.width - w) / 2}px, ${rect.top}px) scale(1)`, opacity: 1 };
         source.classList.add('lifted'); // the copy takes its place
-    } else if (rect && onScreen(rect)) { // a list row: grows out of the row
-        from = { transform: `translate(${rect.left + rect.width / 2 - w * 0.3}px, ${rect.top + rect.height / 2 - h * 0.3}px) scale(0.6)`, opacity: 0 };
     } else {
-        from = { transform: `translate(${x}px, ${y + 40}px) scale(${scale * 0.9})`, opacity: 0 };
+        from = { transform: `translate(${to.x}px, ${to.y + 40}px) scale(${to.scale * 0.9})`, opacity: 0 };
     }
-    card.animate([from, { transform: to, opacity: 1 }], { duration: LIFT_MS, easing: SHEET_EASE });
+    card.animate([from, { transform: to.transform, opacity: 1 }], { duration: LIFT_MS, easing: SHEET_EASE });
+}
+
+// floatArea is where the copy floats: the space above a bottom sheet, or
+// left of a side sheet.
+function floatArea() {
+    const top = parseFloat(getComputedStyle(previewStage).paddingTop) + 16;
+    if (isSideSheet()) {
+        return { left: 16, right: window.innerWidth - settingsCard.offsetWidth - 16, top, bottom: window.innerHeight - 16 };
+    }
+    return { left: 10, right: window.innerWidth - 10, top, bottom: window.innerHeight - settingsCard.offsetHeight - 16 };
+}
+
+// floatTransform centres a w×h copy in floatArea: a grid button enlarged
+// (up to 1.6×, with a margin), a list row at its size.
+function floatTransform(w, h, list) {
+    const a = floatArea();
+    const roomW = a.right - a.left - (list ? 0 : 28);
+    const roomH = a.bottom - a.top;
+    const scale = Math.max(0.5, Math.min(list ? 1 : 1.6, roomW / w, roomH / h));
+    const x = a.left + (a.right - a.left - w * scale) / 2;
+    const y = a.top + Math.max(0, (roomH - h * scale) / 2);
+    return { x, y, scale, transform: `translate(${x}px, ${y}px) scale(${scale})` };
+}
+
+// placeLifted moves the copy when the screen turns or the window resizes,
+// which may also switch between bottom and side sheet.
+function placeLifted() {
+    if (lifted) lifted.card.style.transform = floatTransform(lifted.w, lifted.h, lifted.list).transform;
 }
 
 // dropCard settles the copy back onto its card in the grid (or fades it
@@ -796,8 +881,10 @@ function dropCard(instant) {
     if (instant) { done(); return; }
     const source = gridCard(l.soundId);
     const rect = source?.getBoundingClientRect();
-    const to = rect && onScreen(rect) && !l.fromList
-        ? { transform: `translate(${rect.left}px, ${rect.top}px) scale(${rect.width / l.w})`, opacity: 1 }
+    const to = rect && onScreen(rect)
+        ? { transform: l.list // a row back to its place, at its width
+            ? `translate(${rect.left + (rect.width - l.w) / 2}px, ${rect.top}px) scale(1)`
+            : `translate(${rect.left}px, ${rect.top}px) scale(${rect.width / l.w})`, opacity: 1 }
         : { transform: l.card.style.transform + ' scale(0.85)', opacity: 0 };
     const anim = l.card.animate([{ transform: l.card.style.transform, opacity: 1 }, to],
         { duration: 280, easing: SHEET_EASE, fill: 'forwards' });

@@ -1,6 +1,6 @@
 // Settings persistence (v3).
 //
-// Device-only preferences (last tab, fullscreen, keep the screen on,
+// Device-only preferences (fullscreen, keep the screen on,
 // vibration, button position) are kept in this browser's localStorage.
 // Everything about sounds and tabs -
 // card colors, emoji, layout modes and custom orders - is stored on the PC
@@ -24,7 +24,6 @@ const persistence = (() => {
 
     const getDefaultSettings = () => ({
         version: CURRENT_VERSION,
-        lastTabId: 'favorites',
         autoFullscreenEnabled: true,
         keepScreenOn: true,
         haptics: true,
@@ -63,7 +62,6 @@ const persistence = (() => {
         for (const key of LEGACY_KEYS) {
             const old = readJSON(key);
             if (old && typeof old === 'object') {
-                if (old.lastTabId) defaults.lastTabId = String(old.lastTabId);
                 if (typeof old.autoFullscreenEnabled === 'boolean') defaults.autoFullscreenEnabled = old.autoFullscreenEnabled;
                 if (typeof old.swapButtonPosition === 'boolean') defaults.swapButtonPosition = old.swapButtonPosition;
                 break;

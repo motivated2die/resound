@@ -242,7 +242,7 @@ function startSounduxTutorial() {
              // Step 4: Talk-Through Button
              { element: '#talk-through-button', popover: { title: 'Push-to-Talk', description: 'Hold this button to temporarily pause playback and talk through your default microphone output.', side: "top", align: 'center' } },
              // Step 5: Sound Tabs
-             { element: '#tabs-container', popover: { title: 'Sound Tabs', description: 'Tabs from the desktop app get shown here. Tap a tab name to switch between different pages of sounds, or simply swipe left and right on the soundboard buttons.', side: "top", align: 'center' } },
+             { element: '#tabs-container', popover: { title: 'Sound Tabs', description: 'Tabs from the desktop app get shown here. Click on a tab to switch between different pages of sounds, or simply swipe left and right on the soundboard buttons.', side: "top", align: 'center' } },
              // Step 6: Edit Mode Button
              { element: '#edit-mode-button', popover: { title: 'Edit Mode', description: 'Tap this button to enter Edit Mode for customizing sounds and rearranging the layout.', side: "bottom", align: 'center' } },
              // Step 7: Top Bar Overview (Edit Mode Active)

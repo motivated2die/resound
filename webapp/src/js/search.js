@@ -20,7 +20,9 @@
 
     const MAX_RESULTS = 200;
     const PULL_OPEN_PX = 70;   // two-finger pull that opens the search
-    const COLORS = ['default', 'red', 'orange', 'yellow', 'green', 'blue', 'purple', 'pink'];
+    // In the sound sheet's order (app.html): the hues from pink round to purple, between the two greys.
+    const COLORS = ['default', 'pink', 'red', 'orange', 'yellow', 'lime', 'green', 'teal', 'sky', 'blue', 'purple', 'grey'];
+    const COLOR_NAMES = { default: 'No colour', grey: 'Light grey', lime: 'Light green', sky: 'Light blue' };
 
     const $ = (id) => document.getElementById(id);
     let panel, input, colors, grid, wrapper, topBar, button;
@@ -302,7 +304,7 @@
             chip.className = `search-color color-swatch ${c}`;
             chip.dataset.color = c;
             chip.setAttribute('role', 'radio');
-            chip.setAttribute('aria-label', c === 'default' ? 'No colour' : c[0].toUpperCase() + c.slice(1));
+            chip.setAttribute('aria-label', COLOR_NAMES[c] || c[0].toUpperCase() + c.slice(1));
             colors.append(chip);
         }
         colors.addEventListener('click', (e) => {

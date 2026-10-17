@@ -16,7 +16,7 @@ As soon as an app uses a Bluetooth headset's microphone, Windows switches the he
 
 ## Some sounds are much louder than others
 
-Turn on **Even out the loudness of sounds**. For single sounds, change their own volume on the phone (long-press the button → Volume Adjustment). See [Volume and loudness](volume.md).
+Turn on **Even out the loudness of sounds**. For single sounds, change their own volume on the phone (long-press the button → Custom Button Volume). See [Volume and loudness](volume.md).
 
 ## Sounds play late
 

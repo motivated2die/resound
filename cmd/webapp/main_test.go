@@ -142,3 +142,46 @@ func TestBuild(t *testing.T) {
 		}
 	}
 }
+
+// TestCardColors checks that every colour the sound sheet offers
+// (app.html) has its card, playing highlight, fill and swatch styles, and is
+// offered by the search's colour filter too. internal/ui's
+// TestOverlayColorsMatchApp checks the in-game overlay knows them.
+func TestCardColors(t *testing.T) {
+	read := func(path string) string {
+		data, err := fs.ReadFile(src, path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return string(data)
+	}
+	var sheet []string
+	for _, m := range regexp.MustCompile(`data-color="([a-z]+)"`).FindAllStringSubmatch(read("app.html"), -1) {
+		sheet = append(sheet, m[1])
+	}
+	if len(sheet) != 12 || sheet[0] != "default" {
+		t.Fatalf("sheet colours = %v", sheet)
+	}
+	m := regexp.MustCompile(`const COLORS = \[([^\]]*)\]`).FindStringSubmatch(read("js/search.js"))
+	if m == nil {
+		t.Fatal("search.js: no COLORS list")
+	}
+	css := read("css/styles.css")
+	for _, c := range sheet {
+		if !strings.Contains(m[1], "'"+c+"'") {
+			t.Errorf("search.js: the colour filter lacks %q", c)
+		}
+		if !strings.Contains(css, ".color-swatch."+c+" {") {
+			t.Errorf("styles.css: no swatch for %q", c)
+		}
+		if c == "default" {
+			continue
+		}
+		for _, want := range []string{"--sound-color-" + c + "-bg:", "--sound-color-" + c + "-progress:", "--sound-color-" + c + "-highlight:",
+			".sound-card.sound-color-" + c + " {", ".sound-card.sound-color-" + c + ".playing {"} {
+			if !strings.Contains(css, want) {
+				t.Errorf("styles.css: %q is missing for colour %q", want, c)
+			}
+		}
+	}
+}
