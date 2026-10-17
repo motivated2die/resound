@@ -16,7 +16,7 @@ From top to bottom:
 
 - **Status:** “Ready”, the number of things that need attention, or what's playing. **Update** appears here when a new version is out.
 - **Problems**, if there are any, such as a failed output or voice chat that isn't set up. Click one to get to its fix.
-- **Sound library:** your folders, a refresh button, and **Import buttons** to [import sounds](import-sounds.md).
+- **Sound library:** your folders, a refresh button, and **import sounds**, which leads to [importing sounds](import-sounds.md).
 - **The audio flow**, below.
 - **Phone remote:** pairing, and a button that opens the app in a window on this PC.
 - **Help**, **Settings** and **Quit**. Quit stops Resound: sounds stop and the phone can't connect until you start it again.
@@ -27,7 +27,7 @@ The audio flow draws where your audio goes: from your microphone and the soundbo
 
 - **Your microphone:** choose it here. **Automatic** uses Windows' default recording device.
 - **Soundboard:** **Test sound** plays a short chime to both outputs.
-- **Others hear:** always CABLE Output, the virtual microphone you choose in your apps. The slider with the speaker icon sets how loud your sounds are for others.
+- **Others hear:** always CABLE Output, the virtual microphone you choose in your apps; hover over its name to see where. The slider with the speaker icon sets how loud your sounds are for others.
 - **You hear:** your headphones or speakers, with its own volume. **System default** uses Windows' default playback device.
 
 Markers on the lines show what's going on. Hover over one to see why, click it to get to the fix:
@@ -42,7 +42,7 @@ Markers on the lines show what's going on. Hover over one to see why, click it t
 | **Holding …** | Resound holds your push-to-talk key while sounds play |
 | **Paused**, **Talking**, **Pause key held** | Playback is paused from the phone, by talk-through or by a pause key |
 | **Elsewhere** | Sounds for others go to another device than VB-Cable (Advanced) |
-| **Output failed** | A device stopped working or was unplugged. Click it to restart the outputs |
+| **Output failed** | A device stopped working, was unplugged, or another app uses it exclusively (hover to see which). Click it to restart the outputs |
 | **Not connected** | The microphone you chose is unplugged |
 
 :::note The microphone-in-use icon

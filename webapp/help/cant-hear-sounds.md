@@ -14,6 +14,10 @@ In the audio flow (home page, or Settings → Audio & voice chat), look at **You
 
 Resound keeps playing to the device it opened at start. After plugging in a headset, switching Windows' default device, or when a line shows **Output failed**, click **Restart outputs** under Settings → Audio & voice chat.
 
+## Another app is using the device
+
+If hovering **Output failed** says *another app is using this device exclusively*, a program has taken the device for itself, often an audio mixer such as Voicemeeter or SteelSeries Sonar. Either choose one of that program's own devices under **You hear** (such as *Voicemeeter Input* or *Sonar - Gaming*), or stop it from taking the device: press <kbd>Win</kbd>+<kbd>R</kbd>, run `mmsys.cpl`, open the device's **Properties** → **Advanced**, and turn off **Allow applications to take exclusive control of this device**. Then click **Restart outputs**.
+
 ## Muted in Windows
 
 Resound appears in Windows' volume mixer like any app. Settings → System → Sound → **Volume mixer**: check that Resound isn't muted or turned down.
