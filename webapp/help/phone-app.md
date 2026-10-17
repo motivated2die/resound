@@ -31,7 +31,7 @@ Long-press a button, or enter edit mode and tap it, to open its settings:
 - **Button Color:** twelve colors: the default dark grey, then pink, red, orange, yellow, light green, green, teal, light blue, blue and purple, and a light grey.
 - **Button Emoji:** shows large in the button's background, or before the name in a list. Tap the emoji to change it, or **Delete** it.
 
-Above the settings, the button shows how it looks with them, as a list row when the tab is a list. Tap it to preview.
+The settings open as a sheet from the bottom, or, on a PC, a tablet or a phone turned sideways, from the right. The button floats beside them and shows how it looks, as a list row when the tab is a list; tap it to preview. Drag the sheet down (or to the right), tap outside it or press <kbd>Esc</kbd> to close it.
 
 ## Layouts
 

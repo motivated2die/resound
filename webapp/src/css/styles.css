@@ -1244,11 +1244,15 @@ h1.brand {
   opacity: 1;
 }
 
+/* A bottom sheet on phones, as wide as the screen up to the install
+   sheet's width; on wide or landscape screens a side sheet (below). */
 #settings-card {
   position: absolute;
   bottom: 0;
   left: 0;
   right: 0;
+  max-width: 520px;
+  margin: 0 auto;
   background-color: var(--v-secondary-darken1);
   border-radius: 16px 16px 0 0;
   padding: 12px 20px calc(env(safe-area-inset-bottom) + 20px) 20px;
@@ -3263,4 +3267,43 @@ emoji-picker section#favorites
 }
 #app-settings-modal .toggle-switch {
   padding: 6px 0;
+}
+
+/* --- The sound sheet as a side sheet ---
+   On landscape and wide screens (phones turned sideways, tablets, PCs) a
+   bottom sheet would be very wide and leave little room above it, so the
+   sheet slides in from the right instead: full height, at most 400 px
+   wide, scrolling when its content is taller. The button's copy floats in
+   the space to its left (sound-settings.js). Keep the query in sync with
+   SIDE_SHEET_QUERY there. */
+@media (min-aspect-ratio: 1/1) and (min-width: 600px) {
+  #settings-card {
+    top: 0;
+    bottom: 0;
+    left: auto;
+    right: 0;
+    width: min(400px, 50vw);
+    max-width: none;
+    max-height: none;
+    margin: 0;
+    border-radius: 16px 0 0 16px;
+    padding: calc(env(safe-area-inset-top) + 20px) calc(env(safe-area-inset-right) + 20px)
+      calc(env(safe-area-inset-bottom) + 20px) 20px;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    /* The browser only scrolls it; sideways moves are the sheet's own drag
+       to close, never the browser's swipe back (also over the colours). */
+    touch-action: pan-y;
+    scrollbar-width: thin;
+    box-shadow: -4px 0 20px rgba(0, 0, 0, 0.5);
+    transform: translateX(110%);
+  }
+
+  #sound-settings-overlay:not(.hidden) #settings-card {
+    transform: translateX(0);
+  }
+
+  #settings-card .handle-bar {
+    display: none; /* it is dragged sideways, by any part */
+  }
 }
