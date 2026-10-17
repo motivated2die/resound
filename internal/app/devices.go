@@ -58,9 +58,12 @@ func (a *App) syncCableOutput() {
 
 func (a *App) setOutput(role, id string, enabled bool) {
 	start := time.Now()
+	// A failure shows under the flow while it lasts (outputErrorRows, from
+	// the engine's state). A test play that failed on the old device is
+	// outdated now.
+	a.playback.lastError = ""
 	if err := a.engine.SetOutput(role, id, enabled); err != nil {
 		logx.Printf("%v", err)
-		a.playback.lastError = roleLabel(role) + ": " + audio.Problem(err) + "."
 	}
 	for _, s := range a.engine.Status() {
 		if s.Role == role && s.Running {

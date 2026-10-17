@@ -276,11 +276,26 @@ func (a *App) heldKey() string {
 
 // --- building the flow -------------------------------------------------------------
 
+// outputErrorRows say why an output isn't playing, e.g. "You hear: another
+// app is using this device exclusively." They follow the engine's current
+// state, so choosing a device that works (or a restart that succeeds)
+// clears them.
+func (a *App) outputErrorRows() []ui.Row {
+	var rows []ui.Row
+	for _, s := range a.engine.Status() {
+		if !s.Running && s.Err != nil {
+			rows = append(rows, ui.Paragraph(roleLabel(s.Role)+": "+audio.Problem(s.Err)+".", ui.ToneBad))
+		}
+	}
+	return rows
+}
+
 // flowRows returns the audio flow's rows and marks the page as showing it,
 // which keeps the meters running while the panel is open.
 func (a *App) flowRows() []ui.Row {
 	a.flowOnPage = true
 	rows := a.audioFlow().Rows()
+	rows = append(rows, a.outputErrorRows()...)
 	if a.playback.lastError != "" {
 		rows = append(rows, ui.Paragraph(a.playback.lastError, ui.ToneBad))
 	}
