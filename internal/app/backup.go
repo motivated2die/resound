@@ -46,7 +46,7 @@ func (a *App) backupPage() []ui.Row {
 		ui.Header("Backup & restore", func() { a.restoreCandidate = ""; a.back() }),
 		ui.Paragraph("A backup holds your settings: audio devices and volumes, sound folders, push-to-talk, "+
 			"favorites, sound volumes and colors, phone layouts, and the PIN with paired phones. "+
-			"Sound files are not included.", ui.ToneMuted),
+			"Sound files are not included; zip them under Sound files below.", ui.ToneMuted),
 		ui.Buttons(
 			ui.Action{Label: "Back up now", Icon: ui.IconSave, Style: ui.ButtonPrimary, OnClick: a.backupNow},
 			ui.Action{Label: "Save as…", Closes: true, OnClick: a.backupSaveAs},
@@ -90,9 +90,9 @@ func (a *App) backupPage() []ui.Row {
 			rows = append(rows, a.restoreConfirmRows(m.Created)...)
 		}
 	}
-	return append(rows,
-		ui.Paragraph("Backups are kept next to the settings. Uninstalling removes them, so save important ones elsewhere with “Save as…”.", ui.ToneMuted),
-		ui.Spacer(4))
+	rows = append(rows,
+		ui.Paragraph("Backups are kept next to the settings. Uninstalling removes them, so save important ones elsewhere with “Save as…”.", ui.ToneMuted))
+	return append(append(rows, a.soundsZipRows()...), ui.Spacer(4))
 }
 
 func (a *App) restoreConfirmRows(created time.Time) []ui.Row {

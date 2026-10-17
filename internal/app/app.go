@@ -102,6 +102,7 @@ type App struct {
 	backupNote       string // result of the last backup action
 	backupFailed     bool
 	restoreCandidate string    // backup awaiting the restore confirmation
+	zip              soundsZip // the zip of all sound folders (soundzip.go)
 	lastIndex        time.Time // last panel refresh for indexer progress
 	watching         bool      // animate is running
 	wasPlaying       bool      // playback state at the last tick
@@ -320,6 +321,7 @@ func (a *App) quit() {
 	a.cancelCableDownload()
 	a.cancelUpdate()
 	a.imports.cancel()
+	a.stopSoundsZip()
 	if a.srv != nil {
 		a.srv.Close() // before the UI thread stops answering server calls
 	}
