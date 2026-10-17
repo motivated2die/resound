@@ -12,6 +12,8 @@
   --v-secondary-darken2: #16171b; /* bottom bar */
   --v-background-dark: #1c1d22;   /* background (colBackground) */
   --v-surface-dark: #25272d;      /* sound cards (colList) */
+  --list-surface: #212328;        /* default list rows: between the background and a card */
+  --list-row-height: 44px;        /* one line of the list layout */
   --divider-color: #33353c;       /* colDivider */
   --edit-mode-color: #2f8f6b;
   --text-primary: #ececf0;        /* colText */
@@ -33,6 +35,10 @@
   --sound-color-blue-highlight: rgba(100, 154, 255, 0.7);
   --sound-color-purple-highlight: rgba(200, 100, 255, 0.7);
   --sound-color-pink-highlight: rgba(255, 150, 208, 0.7);
+  --sound-color-grey-highlight: rgba(220, 222, 230, 0.7);
+  --sound-color-lime-highlight: rgba(210, 255, 100, 0.7);
+  --sound-color-teal-highlight: rgba(80, 222, 168, 0.7);
+  --sound-color-sky-highlight: rgba(120, 200, 255, 0.7);
 
   /* Top bar progress color */
   --top-bar-progress-color: #3a3d46;
@@ -47,6 +53,10 @@
   --sound-color-blue-progress: #3b5270;
   --sound-color-purple-progress: #553b6d;
   --sound-color-pink-progress: #6b3b54;
+  --sound-color-grey-progress: #575a63;
+  --sound-color-lime-progress: #66783a;
+  --sound-color-teal-progress: #2d6b57;
+  --sound-color-sky-progress: #417593;
 
   /* Sound Card Colors */
   --sound-color-red-bg: #4a2a2a;
@@ -56,6 +66,10 @@
   --sound-color-blue-bg: #2a3a4a;
   --sound-color-purple-bg: #3a2a4a;
   --sound-color-pink-bg: #4a2a3a;
+  --sound-color-grey-bg: #42444c;  /* lighter than the default card */
+  --sound-color-lime-bg: #48542a;  /* between yellow and green */
+  --sound-color-teal-bg: #1f4a3d;  /* a dark shade of the accent */
+  --sound-color-sky-bg: #2e5266;   /* lighter than blue */
 
   /* Layout */
   --border-radius: 10px;
@@ -252,6 +266,7 @@ body {
 .icon[data-icon="favorite-fill"] { --icon: url("../assets/icons/favorite-fill.svg"); }
 .icon[data-icon="bolt"] { --icon: url("../assets/icons/bolt.svg"); }
 .icon[data-icon="help"] { --icon: url("../assets/icons/help.svg"); }
+.icon[data-icon="info"] { --icon: url("../assets/icons/info.svg"); }
 .icon[data-icon="install_mobile"] { --icon: url("../assets/icons/install_mobile.svg"); }
 .icon[data-icon="mic"] { --icon: url("../assets/icons/mic.svg"); }
 .icon[data-icon="pause"] { --icon: url("../assets/icons/pause.svg"); }
@@ -476,7 +491,7 @@ body {
 .sounds-grid.layout-list {
   display: flex;
   flex-direction: column;
-  gap: 0;
+  gap: 6px;
   padding-left: 10px;
   padding-right: 10px;
 }
@@ -586,10 +601,6 @@ body {
   transition: none;
 }
 
-.sounds-grid.layout-list .sound-card::after {
-  display: none;
-}
-
 /* A sound that couldn't be played (e.g. damaged file). */
 .sound-card.play-failed {
   animation: playFailed 0.6s ease;
@@ -665,6 +676,26 @@ body {
   --highlight-shadow-color: var(--sound-color-pink-highlight);
 }
 
+.sound-card.sound-color-grey.playing {
+  --highlight-border-color: #d6d8de;
+  --highlight-shadow-color: var(--sound-color-grey-highlight);
+}
+
+.sound-card.sound-color-lime.playing {
+  --highlight-border-color: #d4e89a;
+  --highlight-shadow-color: var(--sound-color-lime-highlight);
+}
+
+.sound-card.sound-color-teal.playing {
+  --highlight-border-color: #7ae8bf;
+  --highlight-shadow-color: var(--sound-color-teal-highlight);
+}
+
+.sound-card.sound-color-sky.playing {
+  --highlight-border-color: #9fd8f5;
+  --highlight-shadow-color: var(--sound-color-sky-highlight);
+}
+
 /* Sound Card Content Wrapper */
 .sound-content-wrapper {
   position: relative;
@@ -675,49 +706,74 @@ body {
   justify-content: center;
 }
 
-/* List Layout Specific Styles */
+/* List layout: one line per sound, in a rounded row like the grid's
+   buttons: the card colour as its background (default rows a little
+   subtler than default buttons, --list-surface), the playback fill and the
+   brief outline of a new play. Emoji, name and indicators share the row's
+   centre line; long names end in an ellipsis. */
 .sounds-grid.layout-list .sound-card {
-  min-height: auto;
-  max-height: none;
+  flex: none;
+  height: var(--list-row-height);
+  min-height: 0;
+  max-height: var(--list-row-height);
   justify-content: flex-start;
-  padding: 4% 15px;
+  gap: 8px;
+  padding: 0 12px;
   text-align: left;
-  border-radius: 0;
-  border: none;
-  border-bottom: 1px solid var(--v-secondary-darken1);
-  background-color: transparent;
-  --sound-base-color: transparent;
-  background: transparent !important;
-  animation: none;
-  border-color: transparent !important;
-  box-shadow: none !important;
+  background-color: var(--list-surface);
+  --sound-base-color: var(--list-surface);
 }
 
 .sounds-grid.layout-list .sound-card:hover {
-  background-color: var(--v-secondary-darken2);
-  --sound-base-color: var(--v-secondary-darken2);
-}
-
-.sounds-grid.layout-list .sound-card:last-child {
-  border-bottom: none;
+  background-color: var(--v-surface-dark);
+  --sound-base-color: var(--v-surface-dark);
 }
 
 .layout-list .sound-content-wrapper {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
   justify-content: flex-start;
   gap: 10px;
 }
 
 .layout-list .sound-text {
+  min-width: 0;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
   font-size: 1rem;
 }
 
+/* The list's emoji; grid layouts show it large behind the name instead. */
+.sound-emoji-list {
+  display: none;
+}
+
 .layout-list .sound-emoji-list {
-  font-size: 1.4em;
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
   width: 24px;
-  text-align: center;
+  height: 100%;
+  font-size: 1.4em;
+  line-height: 1;
+}
+
+/* Indicators in the row, on its centre line (grid: the bottom corner). */
+.layout-list .sound-indicators {
+  position: relative;
+  bottom: auto;
+  right: auto;
+  flex: none;
+  align-items: center;
+  align-self: stretch;
+  gap: 4px;
+}
+
+.layout-list .sound-indicators .indicator-icon {
+  font-size: 16px;
 }
 
 span.sound-text {
@@ -792,6 +848,26 @@ span.sound-text {
 .sound-card.sound-color-pink {
   background-color: var(--sound-color-pink-bg);
   --sound-base-color: var(--sound-color-pink-bg);
+}
+
+.sound-card.sound-color-grey {
+  background-color: var(--sound-color-grey-bg);
+  --sound-base-color: var(--sound-color-grey-bg);
+}
+
+.sound-card.sound-color-lime {
+  background-color: var(--sound-color-lime-bg);
+  --sound-base-color: var(--sound-color-lime-bg);
+}
+
+.sound-card.sound-color-teal {
+  background-color: var(--sound-color-teal-bg);
+  --sound-base-color: var(--sound-color-teal-bg);
+}
+
+.sound-card.sound-color-sky {
+  background-color: var(--sound-color-sky-bg);
+  --sound-base-color: var(--sound-color-sky-bg);
 }
 
 /* --- Tabs --- */
@@ -1272,7 +1348,7 @@ h1.brand {
 
 .search-colors {
   display: grid;
-  grid-template-columns: repeat(8, 1fr);
+  grid-template-columns: repeat(6, 1fr); /* two rows of six */
   gap: 6px;
 }
 
@@ -1574,7 +1650,7 @@ body.search-mode .sounds-grid {
   font-weight: 500;
 }
 
-/* Color Selector: two rows of four rounded rectangles */
+/* Color Selector: three rows of four rounded rectangles */
 .color-selector {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
@@ -1633,6 +1709,22 @@ body.search-mode .sounds-grid {
   background-color: var(--sound-color-pink-bg);
 }
 
+.color-swatch.grey {
+  background-color: var(--sound-color-grey-bg);
+}
+
+.color-swatch.lime {
+  background-color: var(--sound-color-lime-bg);
+}
+
+.color-swatch.teal {
+  background-color: var(--sound-color-teal-bg);
+}
+
+.color-swatch.sky {
+  background-color: var(--sound-color-sky-bg);
+}
+
 /* Emoji Selector Section Styling */
 .emoji-section {
   position: relative;
@@ -1663,7 +1755,7 @@ body.search-mode .sounds-grid {
   transition: all var(--transition-speed) ease;
   font-weight: 500;
   font-size: 0.9rem;
-  cursor: default;
+  cursor: pointer; /* opens the picker to change it */
   text-transform: uppercase;
 }
 
@@ -2318,9 +2410,9 @@ emoji-picker section#favorites {
 
 .volume-control .volume-header {
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  margin-bottom: 4px;
+  gap: 2px;
+  margin-bottom: 8px;
 }
 
 .volume-control h3 {
@@ -2330,10 +2422,57 @@ emoji-picker section#favorites {
   margin-bottom: 0;
 }
 
-.volume-control .volume-subtext {
-  font-size: 0.75rem;
+/* A small (i) after a section title; tapping it shows its .info-popover. */
+.info-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  margin: -6px 0;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: none;
   color: var(--text-secondary);
-  margin-bottom: 12px;
+  cursor: pointer;
+}
+
+.info-button .icon {
+  font-size: 18px;
+}
+
+.info-button:hover,
+.info-button[aria-expanded="true"] {
+  color: var(--text-primary);
+}
+
+/* Floats under its section's title, over the controls below, so the sheet
+   keeps its height. A tap anywhere closes it (sound-settings.js). */
+.info-popover {
+  position: absolute;
+  top: 30px;
+  left: 0;
+  right: 0;
+  z-index: 5;
+  padding: 10px 12px;
+  border-radius: var(--border-radius);
+  background-color: var(--v-secondary-base);
+  border: 1px solid var(--divider-color);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+  color: var(--text-primary);
+  font-size: 0.85rem;
+  line-height: 1.4;
+  animation: infoPopoverIn 0.15s ease-out;
+}
+
+.info-popover[hidden] {
+  display: none;
+}
+
+@keyframes infoPopoverIn {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: none; }
 }
 
 .slider-container {
@@ -2449,8 +2588,8 @@ emoji-picker section#favorites {
   transition: all var(--transition-speed) ease;
   font-weight: 500;
   font-size: 0.9rem;
-  cursor: default;
-  /* Not clickable itself */
+  cursor: pointer;
+  /* opens the picker to change the emoji */
   text-transform: uppercase;
   /* Uppercase text */
 }
@@ -2486,6 +2625,7 @@ emoji-picker section#favorites {
   /* Uppercase text */
 }
 
+#selected-emoji-button:hover,
 #clear-emoji-button-settings:hover {
   background-color: var(--v-secondary-darken1);
 }

@@ -18,6 +18,8 @@ const tabNameElement = document.getElementById('settings-tab-name');
 const favoriteButton = document.getElementById('favorite-button');
 const previewButton = document.getElementById('preview-button');
 const volumeSlider = document.getElementById('volume-slider');
+const volumeInfoButton = document.getElementById('volume-info-button');
+const volumeInfo = document.getElementById('volume-info');
 const colorSelector = document.getElementById('color-selector');
 // Emoji Elements (Settings Card)
 const emojiDisplayArea = document.getElementById('emoji-display-area'); // Area showing selected emoji + clear button in settings
@@ -43,6 +45,7 @@ function initSoundSettings() {
 
     setupDragBehavior();
     setupButtonActions();
+    setupVolumeInfo();
     setupColorSelection();
     setupEmojiSelection(); // Now handles modal logic
     setupLongPressDetection();
@@ -314,6 +317,23 @@ function setupButtonActions() {
     } else { console.error("Clear emoji button (settings) not found."); }
 }
 
+// --- Custom button volume: the (i) after its title ---
+// Tapping it shows what a custom volume does; the next tap anywhere, the
+// sheet closing or another sound's sheet hides it.
+function setupVolumeInfo() {
+    if (!volumeInfoButton || !volumeInfo) return;
+    volumeInfoButton.addEventListener('click', () => showVolumeInfo(volumeInfo.hidden));
+    document.addEventListener('pointerdown', (e) => {
+        if (!volumeInfo.hidden && !volumeInfoButton.contains(e.target)) showVolumeInfo(false);
+    }, true);
+}
+
+function showVolumeInfo(show) {
+    if (!volumeInfoButton || !volumeInfo) return;
+    volumeInfo.hidden = !show;
+    volumeInfoButton.setAttribute('aria-expanded', String(show));
+}
+
 // Setup color selection
 function setupColorSelection() {
     if (!colorSelector) {
@@ -348,8 +368,10 @@ function setupEmojiSelection() {
         return;
     }
 
-    // 1. Listener for the "Select Background Emoji" button (in settings card)
+    // 1. "Select Background Emoji" (no emoji yet), or the current emoji: the
+    // picker opens, and the emoji chosen there replaces it.
     selectEmojiButton.addEventListener('click', openEmojiPickerModal);
+    selectedEmojiButton?.addEventListener('click', openEmojiPickerModal);
 
     // 2. Listener for selecting an emoji within the MODAL
     emojiPickerInstance.addEventListener('emoji-click', event => {
@@ -577,6 +599,7 @@ function resetMenuState() {
 
     // Reset Buttons and Slider
     if (currentPreviewId !== null) stopPreview(); else showPreviewStopped();
+    showVolumeInfo(false);
 
     setSliderPosition(0);
     if (favoriteButton) favoriteButton.classList.remove('active');
@@ -609,6 +632,7 @@ function closeSettingsMenu() {
     settingsCard.style.transform = 'translateY(100%)';
     if (settingsBackdrop) settingsBackdrop.style.opacity = '0';
     dropCard();
+    showVolumeInfo(false);
 
     if (currentPreviewId !== null) stopPreview();
 
@@ -710,12 +734,12 @@ function resetPreviewFill() {
 // lifts out of the grid as the sheet slides up and settles back into place
 // when it closes. It is built and updated like the grid's cards, so colour,
 // emoji, volume and favourite changes show on it at once, and tapping it
-// previews the sound. In the list layout, which shows no colours, it is a
-// grid card.
+// previews the sound. It has the page's layout: a list row in the list
+// layout, as wide as the row and not enlarged.
 
 const SHEET_EASE = 'cubic-bezier(0.2, 0.9, 0.25, 1)';
 const LIFT_MS = 320;
-let lifted = null; // { card, soundId, w, h, fromList }
+let lifted = null; // { card, soundId, w, h }
 let previewStage = null;
 
 function setupLiftedCard() {
@@ -742,41 +766,38 @@ function liftCard(sound) {
     dropCard(true);
     if (!previewStage || !window.app) return;
     const container = document.getElementById('sounds-container');
-    const fromList = !container || container.classList.contains('layout-list');
-    const layout = fromList ? 'layout-grid-3'
-        : [...container.classList].find(c => c.startsWith('layout-')) || 'layout-grid-3';
+    const layout = [...(container?.classList || [])].find(c => c.startsWith('layout-')) || 'layout-grid-3';
+    const list = layout === 'layout-list';
     previewStage.className = 'sounds-grid ' + layout;
 
     const source = gridCard(sound.id);
     const rect = source?.getBoundingClientRect();
-    const w = rect && !fromList ? rect.width : Math.min(160, window.innerWidth * 0.4);
-    const h = rect && !fromList ? rect.height : 85;
+    const w = rect ? rect.width : list ? window.innerWidth - 20 : Math.min(160, window.innerWidth * 0.4);
+    const h = rect ? rect.height : list ? 44 : 85;
 
+    // Card colours, emoji and marks show in every layout (app.js).
     const card = app.createSoundCardElement(sound, { animate: false, tabId: null }); // tabId null: shows the favourite mark
     card.style.width = w + 'px';
     card.style.height = h + 'px';
     card.setAttribute('aria-label', 'Preview ' + (sound.name || 'sound'));
     previewStage.append(card);
-    app.updateSoundCardDisplay(sound.id, card, null); // again, now in the stage's layout
-    lifted = { card, soundId: sound.id, w, h, fromList };
+    lifted = { card, soundId: sound.id, w, h };
 
-    // Where it floats: centred in the space above the sheet, larger, never
-    // wider than the screen.
+    // Where it floats: centred in the space above the sheet; a grid button
+    // larger, a list row at its size; never wider than the screen.
     const top = parseFloat(getComputedStyle(previewStage).paddingTop) + 16;
     const bottom = window.innerHeight - settingsCard.offsetHeight - 16;
     const room = bottom - top;
-    const scale = Math.max(0.5, Math.min(1.6, (window.innerWidth - 48) / w, room / h));
+    const scale = Math.max(0.5, Math.min(list ? 1 : 1.6, (window.innerWidth - (list ? 20 : 48)) / w, room / h));
     const x = (window.innerWidth - w * scale) / 2;
     const y = top + Math.max(0, (room - h * scale) / 2);
     const to = `translate(${x}px, ${y}px) scale(${scale})`;
     card.style.transform = to;
 
     let from;
-    if (rect && onScreen(rect) && !fromList) {
+    if (rect && onScreen(rect)) {
         from = { transform: `translate(${rect.left}px, ${rect.top}px) scale(1)`, opacity: 1 };
         source.classList.add('lifted'); // the copy takes its place
-    } else if (rect && onScreen(rect)) { // a list row: grows out of the row
-        from = { transform: `translate(${rect.left + rect.width / 2 - w * 0.3}px, ${rect.top + rect.height / 2 - h * 0.3}px) scale(0.6)`, opacity: 0 };
     } else {
         from = { transform: `translate(${x}px, ${y + 40}px) scale(${scale * 0.9})`, opacity: 0 };
     }
@@ -796,7 +817,7 @@ function dropCard(instant) {
     if (instant) { done(); return; }
     const source = gridCard(l.soundId);
     const rect = source?.getBoundingClientRect();
-    const to = rect && onScreen(rect) && !l.fromList
+    const to = rect && onScreen(rect)
         ? { transform: `translate(${rect.left}px, ${rect.top}px) scale(${rect.width / l.w})`, opacity: 1 }
         : { transform: l.card.style.transform + ' scale(0.85)', opacity: 0 };
     const anim = l.card.animate([{ transform: l.card.style.transform, opacity: 1 }, to],
