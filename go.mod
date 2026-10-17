@@ -1,6 +1,6 @@
 module github.com/motivated2die/resound
 
-go 1.24.0
+go 1.25.0
 
 toolchain go1.27.1
 
@@ -18,8 +18,8 @@ require (
 	github.com/srwiley/rasterx v0.0.0-20220730225603-2ab79fcdd4ef
 	github.com/yuin/goldmark v1.8.6
 	golang.org/x/image v0.24.0
-	golang.org/x/net v0.50.0
-	golang.org/x/sys v0.41.0
+	golang.org/x/net v0.54.0
+	golang.org/x/sys v0.45.0
 )
 
 require (
@@ -43,7 +43,7 @@ require (
 	github.com/pion/turn/v5 v5.1.2 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/wlynxg/anet v0.0.5 // indirect
-	golang.org/x/crypto v0.48.0 // indirect
-	golang.org/x/text v0.34.0 // indirect
+	golang.org/x/crypto v0.52.0 // indirect
+	golang.org/x/text v0.37.0 // indirect
 	golang.org/x/time v0.14.0 // indirect
 )
