@@ -244,6 +244,35 @@ func TestFlowRender(t *testing.T) {
 	}
 }
 
+// TestWarningRender saves the Warning row and checks that the app's texts
+// (the Advanced section's in pages.go, the setup's in wizard.go: keep them
+// in sync) fit beside the icon and the chevron.
+func TestWarningRender(t *testing.T) {
+	texts := []string{"Non-standard setup: click for help", "Voicemeeter: VB-Cable may break routing"}
+	rows := []Row{Separator(), Section("Advanced"),
+		Dropdown("cable-target", "Sounds for others play into", "", []Option{{Label: "Voicemeeter AUX Input (VB-Audio Voicemeeter VAIO)", Detail: "Voicemeeter"}}, 0, func(int) {})}
+	for _, s := range texts {
+		rows = append(rows, Warning(s, "why", func() {}))
+	}
+	for _, scale := range []float64{1, 1.5} {
+		name := "warning"
+		if scale == 1.5 {
+			name += "@1.5x"
+		}
+		savePNG(t, renderRows(t, rows, scale, map[int]rowState{4: {hover: 0, press: -1, open: -1}}), name)
+		renderCanvas(t, 10, 10, scale, func(c *canvas) {
+			w := warningRow{onClick: func() {}}
+			box := w.box(c, rect{0, 0, c.px(popupWidthL), c.px(w.height())})
+			room := w.textBox(c, box).w()
+			for _, s := range texts {
+				if tw := c.textWidth(s, fontBody); tw > room {
+					t.Errorf("@%vx: %q is %d px wide, room for %d", scale, s, tw, room)
+				}
+			}
+		})
+	}
+}
+
 func TestFlowSegments(t *testing.T) {
 	c := &canvas{scale: 1}
 	r := rect{0, 0, popupWidthL, 200}

@@ -140,6 +140,14 @@ func (a *App) wizardAudio() []ui.Row {
 		a.wizardHeader("Audio and voice chat"),
 		ui.Paragraph("Choose your microphone and where you want to hear sounds yourself. Below is a live visualization. "+combined, ui.ToneMuted),
 	}
+	if a.route.Voicemeeter && !a.ownRouting() {
+		// Voicemeeter users often route VB-Cable themselves; installing or
+		// connecting it here could break that.
+		rows = append(rows, ui.Warning("Voicemeeter: VB-Cable may break routing",
+			"Voicemeeter is installed, so you may route your audio yourself. Installing VB-Cable, or connecting one your mixer already uses, "+
+				"can break that setup. Click to check first, or to use Voicemeeter instead.",
+			func() { a.openHelpAt(helpBeforeVBCable) }))
+	}
 	rows = append(rows, a.cableNoteRows()...)
 	rows = append(rows, a.flowRows()...)
 	if a.ownRouting() {

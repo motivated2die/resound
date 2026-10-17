@@ -1,0 +1,67 @@
+<!-- Voicemeeter Banana instead of VB-Cable, as Resound's Advanced section
+     and voicemeeter.md describe it, in Voicemeeter's own words: Hardware
+     Input 1 and the Voicemeeter AUX strip send to B1 (bus buttons A1 … B2);
+     apps record "Voicemeeter Out B1". Lines reuse help.css .vf-*; the
+     mixer is .vm-*, with the same columns, so the lines meet its strips. -->
+<div class="vf vm" role="img" aria-label="Your microphone is Voicemeeter's Hardware Input 1. Resound plays your sounds into Voicemeeter AUX Input. Both strips send to bus B1, with A1 off on the AUX strip. Discord and games use Voicemeeter Out B1 as their microphone, so they get your voice and your sounds together. Resound plays the sounds to your headphones itself.">
+    <div class="vf-node vf-mic">
+        <span class="icon" data-icon="mic" aria-hidden="true"></span>
+        <strong>Your microphone</strong>
+        <span>your voice</span>
+    </div>
+    <div class="vf-node vf-board">
+        <img src="/assets/resound-192.png" alt="" width="26" height="26">
+        <strong>Resound</strong>
+        <span>sounds for others</span>
+    </div>
+
+    <div class="vf-links" aria-hidden="true">
+        <span class="vf-line vf-v vf-l"></span>
+        <span class="vf-line vf-v vf-r"></span>
+        <span class="vf-label vf-label-mic">Hardware Input 1</span>
+        <span class="vf-label vf-label-you">Voicemeeter AUX Input</span>
+    </div>
+
+    <div class="vm-mixer" aria-hidden="true">
+        <p class="vm-title">Voicemeeter Banana</p>
+        <div class="vm-strip">
+            <small>Hardware Input 1</small>
+            <strong>your microphone</strong>
+            <span class="vm-buses"><i>A1</i><i>A2</i><i>A3</i><i class="on">B1</i><i>B2</i></span>
+            <em>A1 only to hear yourself</em>
+        </div>
+        <div class="vm-strip vm-aux">
+            <small>Virtual input</small>
+            <strong>Voicemeeter AUX</strong>
+            <span class="vm-buses"><i class="off">A1</i><i>A2</i><i>A3</i><i class="on">B1</i><i>B2</i></span>
+            <em>A1 off, or you hear sounds twice</em>
+        </div>
+        <div class="vf-links vm-join">
+            <span class="vf-line vf-v vf-l"></span>
+            <span class="vf-line vf-h"></span>
+            <span class="vf-line vf-v vf-r vm-half"></span>
+            <span class="vf-label vf-label-others">B1</span>
+        </div>
+        <div class="vm-strip vm-bus">
+            <small>Virtual out</small>
+            <strong>B1</strong>
+            <span>voice + sounds, mixed</span>
+        </div>
+    </div>
+
+    <div class="vf-links vf-links-bottom" aria-hidden="true">
+        <span class="vf-line vf-v vf-l"></span>
+        <span class="vf-label vf-label-out">Voicemeeter Out B1</span>
+    </div>
+
+    <div class="vf-node vf-apps">
+        <span class="icon" data-icon="computer" aria-hidden="true"></span>
+        <strong>Discord, games, OBS</strong>
+        <span>microphone: Voicemeeter Out B1</span>
+    </div>
+    <div class="vf-node vm-you">
+        <span class="icon" data-icon="headset_mic" aria-hidden="true"></span>
+        <strong>Your headphones</strong>
+        <span>“You hear”: straight from Resound</span>
+    </div>
+</div>

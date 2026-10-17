@@ -157,6 +157,66 @@ func mix(a, b uint32, t float64) uint32 {
 	return ch(0) | ch(8) | ch(16)
 }
 
+// --- Warning -----------------------------------------------------------------
+
+type warningRow struct {
+	text, tipText string
+	onClick       func()
+}
+
+// Warning is a short, clickable warning: a yellow outline around a
+// warning icon and one line of text, with a chevron saying it leads on
+// (e.g. to a help page). tip, shown on hover, says more. Clicking closes
+// the popup, as it usually opens the browser.
+func Warning(text, tip string, onClick func()) Row { return warningRow{text, tip, onClick} }
+
+func (w warningRow) tip(*canvas, rect, int) string { return w.tipText }
+
+func (warningRow) height() int { return 38 }
+func (w warningRow) box(c *canvas, r rect) rect {
+	in := inset(c, r)
+	return rect{in.Left, r.Top + c.px(3), in.Right, r.Bottom - c.px(3)}
+}
+func (w warningRow) segments(c *canvas, r rect) []rect {
+	if w.onClick == nil {
+		return nil
+	}
+	return []rect{w.box(c, r)}
+}
+func (w warningRow) click(int) {
+	if w.onClick != nil {
+		w.onClick()
+	}
+}
+func (warningRow) keepsOpen() bool { return false }
+func (w warningRow) paint(c *canvas, r rect, st rowState) {
+	box := w.box(c, r)
+	tint := 0.07
+	switch {
+	case st.press == 0:
+		tint = 0.17
+	case st.hover == 0:
+		tint = 0.12
+	}
+	c.frame(box, c.px(10), mix(colBackground, colWarning, tint), colWarning)
+	iw, pad := c.px(buttonIconL), c.px(10)
+	c.icon(IconAlert, rect{box.Left + pad, box.Top, box.Left + pad + iw, box.Bottom}, buttonIconL, colWarning)
+	if w.onClick != nil {
+		c.icon(IconChevronRight, rect{box.Right - pad - iw, box.Top, box.Right - pad, box.Bottom}, buttonIconL, colWarning)
+	}
+	c.text(w.text, w.textBox(c, box), fontBody, colText, dtLeft)
+}
+
+// textBox is where the text goes: between the icon and the chevron.
+func (w warningRow) textBox(c *canvas, box rect) rect {
+	iw, pad := c.px(buttonIconL), c.px(10)
+	right := box.Right - pad
+	if w.onClick != nil {
+		right -= iw + c.px(5)
+	}
+	return rect{box.Left + pad + iw + c.px(8), box.Top, right, box.Bottom}
+}
+
 // --- Buttons -----------------------------------------------------------------
 
 // Action is one button of a Buttons row.

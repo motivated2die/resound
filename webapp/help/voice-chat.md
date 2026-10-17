@@ -50,14 +50,6 @@ In Settings → Audio & voice chat:
 
 To test in Discord, use **Let's Check** under Voice & Video while a sound plays. Windows' own Sound dialog is a poor test: its meters react late and only move while the dialog is open.
 
-## Use your own mixer instead (Voicemeeter)
-
-If you already route your audio with a virtual mixer such as Voicemeeter, you don't need VB-Cable: your mixer combines your voice and the sounds. Resound never reads or changes your mixer's settings; you set it up yourself.
-
-1. In Resound, Settings → Audio & voice chat → **Advanced**: under **Sounds for others play into**, choose an input of your mixer, for example **Voicemeeter AUX Input**.
-2. In your mixer, send your microphone and that input to the same output. In Voicemeeter Banana: choose your microphone as **Hardware Input 1**, turn on **B1** for it and for the AUX strip, and turn **A1** off on the AUX strip (Resound already plays the sounds to your headphones; with A1 on you'd hear them twice).
-3. Back in Resound, under **Others' apps listen to**, choose that output, for example **Voicemeeter Out B1**. The audio flow's **Others hear** bar now shows what arrives there.
-4. Under **Your microphone**, choose the microphone your mixer records, so muting it while sounds play works.
-5. In Discord and your games, choose that output (**Voicemeeter Out B1**) as your microphone.
-
-Keep your mixer running: while it's closed, its output stays silent. To go back, click **Back to VB-Cable** under Advanced.
+:::tip Using Voicemeeter?
+Your mixer can combine your voice and sounds instead of VB-Cable, and if it already uses VB-Cable, installing or connecting it here can break that. Read [Use Voicemeeter or another mixer](voicemeeter.md) first.
+:::

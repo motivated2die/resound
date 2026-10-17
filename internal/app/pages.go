@@ -162,8 +162,18 @@ func (a *App) homePage() []ui.Row {
 // openHelp opens the help center (setup guides, features, troubleshooting)
 // in the browser: /help/ on the app's site (webapp/help, built by
 // cmd/webapp), which the installed app doesn't cache.
-func (a *App) openHelp() {
-	url := strings.TrimSuffix(a.appURL(), "/") + "/help/"
+func (a *App) openHelp() { a.openHelpAt("") }
+
+// Help articles the panel links to (webapp/help/<article>.md, an optional
+// #heading). TestAppHelpLinks in cmd/webapp checks they exist.
+const (
+	helpOwnMixer      = "voicemeeter"
+	helpBeforeVBCable = "voicemeeter#before-you-install-vb-cable"
+)
+
+// openHelpAt opens one help article ("" = the help center's start page).
+func (a *App) openHelpAt(article string) {
+	url := strings.TrimSuffix(a.appURL(), "/") + "/help/" + article
 	if err := ui.ShellOpen(url); err != nil {
 		logx.Printf("help: %v", err)
 	}
@@ -285,7 +295,7 @@ func (a *App) audioPage() []ui.Row {
 // and the device others' apps then listen to. Resound never reads or
 // changes the mixer; the short how-to is all it gives.
 func (a *App) ownRoutingRows() []ui.Row {
-	rows := []ui.Row{ui.Section("Advanced _____"), a.cableOutputDropdown()}
+	rows := []ui.Row{ui.Separator(), ui.Section("Advanced"), a.cableOutputDropdown()}
 	if !a.ownRouting() {
 		rows = append(rows, ui.Paragraph("Only for your own routing, e.g. a virtual mixer such as Voicemeeter. "+
 			"Otherwise your sounds and your voice no longer meet in VB-Cable.", ui.ToneMuted))
@@ -296,6 +306,9 @@ func (a *App) ownRoutingRows() []ui.Row {
 		return rows
 	}
 	rows = append(rows,
+		ui.Warning("Non-standard setup: click for help",
+			"Your sounds for others don't go to VB-Cable: your own mixer has to combine them with your microphone. Click for the setup guide.",
+			func() { a.openHelpAt(helpOwnMixer) }),
 		ui.Paragraph("Your mixer has to combine your microphone and these sounds into one output. Choose that output here and as the microphone in your apps.", ui.ToneMuted),
 		a.appsMicDropdown(),
 	)
