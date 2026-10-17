@@ -129,7 +129,7 @@ func (a *App) homePage() []ui.Row {
 		refresh = a.refreshLibrary
 	}
 	rows = append(rows,
-		ui.SectionLink("Sound library", "Import buttons",
+		ui.SectionLink("Sound library", "import sounds",
 			"Import sound buttons from websites into your folders, on the Sound library page",
 			func() { a.openPage(pageLibrary) }),
 		ui.NavTool(ui.IconRefresh, "Refresh the library: picks up new, renamed and edited files", refresh,
