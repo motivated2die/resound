@@ -349,6 +349,42 @@ func TestFlowSegments(t *testing.T) {
 	}
 }
 
+// TestCableInfoHitArea checks that the cable card's info tooltip shows over
+// its mic icon, info icon and name, not only over the small info icon, and
+// not without info.
+func TestCableInfoHitArea(t *testing.T) {
+	dc, _, _ := procCreateCompatibleDC.Call(0)
+	if dc == 0 {
+		t.Skip("no device context")
+	}
+	defer procDeleteDC.Call(dc)
+	for _, scale := range []float64{1, 1.5} {
+		f := newFonts(scale)
+		c := &canvas{dc: dc, scale: scale, fonts: f}
+		o := flowOutputsRow{testFlow().Cable, testFlow().You}
+		r := rect{0, 0, c.px(popupWidthL), c.px(o.height())}
+		card := o.columns(c, r)[0].field
+		l := o.cardLayout(c, card)
+		area := o.segments(c, r)[segCableInfo]
+		nameEnd := l.name.Left + c.textWidth(o.cable.Name, fontBold)
+		cy := card.Top + card.h()/2
+		for what, x := range map[string]int32{"mic icon": l.mic.Left + 1, "info icon": l.info.Left + l.info.w()/2,
+			"name": (l.name.Left + nameEnd) / 2, "name's end": nameEnd - 1} {
+			if x < area.Left || x >= area.Right || cy < area.Top || cy >= area.Bottom {
+				t.Errorf("scale %v: %s at x=%d is outside the info area %v", scale, what, x, area)
+			}
+		}
+		if area.Right > card.Right || area.Left < card.Left {
+			t.Errorf("scale %v: info area %v leaves the card %v", scale, area, card)
+		}
+		o.cable.Info = ""
+		if s := o.segments(c, r)[segCableInfo]; s.w() != 0 {
+			t.Errorf("scale %v: info area %v without info", scale, s)
+		}
+		f.destroy()
+	}
+}
+
 // TestBadgeHitArea checks that a badge's clickable segment is the whole
 // pill, label included, when segments are computed with the popup's
 // measuring DC (as hit testing does), not just its icon.
