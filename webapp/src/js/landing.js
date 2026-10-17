@@ -106,6 +106,7 @@
         // app. A tap swaps the pad and the emoji.
         if (still) {
             stage.classList.add('still');
+            tiles[0].classList.add('playing');
             showEmoji(emojiOf(tiles[0]));
             tiles.forEach((tile) => tile.addEventListener('click', () => {
                 tiles.forEach((t) => t.classList.toggle('playing', t === tile));
@@ -113,7 +114,6 @@
             }));
             return;
         }
-        tiles.forEach((t) => t.classList.remove('playing'));
 
         const offTimers = new WeakMap();
         const later = (el, ms, fn) => { clearTimeout(offTimers.get(el)); offTimers.set(el, setTimeout(fn, ms)); };
@@ -148,9 +148,9 @@
             send(emojiOf(tile));
         };
 
-        // Plays by themselves, only while the picture is on screen and not
-        // right after a tap.
-        let last = null, userUntil = 0, timer = 0, visible = false;
+        // Plays by themselves, only once the page has loaded, while the
+        // picture is on screen and not right after a tap.
+        let last = null, userUntil = 0, timer = 0, visible = false, ready = false;
         const auto = () => {
             timer = 0;
             if (!visible) return;
@@ -169,14 +169,29 @@
         }));
         const run = (on) => {
             visible = on;
-            if (on && !timer) timer = setTimeout(auto, 700);
+            if (on && ready && !timer) timer = setTimeout(auto, 700);
             if (!on && timer) { clearTimeout(timer); timer = 0; }
         };
+        pageReady().then(() => { ready = true; run(visible); });
         if ('IntersectionObserver' in window) {
             new IntersectionObserver((entries) => run(entries[0].isIntersecting), { threshold: 0.3 }).observe(stage);
         } else {
             run(true);
         }
+    }
+
+    // pageReady resolves once the page has loaded (stylesheets, scripts,
+    // images), its fonts are ready and a frame with them has been drawn.
+    // Started earlier, on a slow first visit, the hero played while the
+    // page was still coming in. In a background tab it waits for the tab to
+    // be shown (no frames are drawn there).
+    function pageReady() {
+        const loaded = document.readyState === 'complete'
+            ? Promise.resolve()
+            : new Promise((resolve) => window.addEventListener('load', resolve, { once: true }));
+        const fonts = document.fonts ? document.fonts.ready.catch(() => {}) : Promise.resolve();
+        return Promise.all([loaded, fonts])
+            .then(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
     }
 
     // The picture of the desktop panel plays what the panel shows (internal/
