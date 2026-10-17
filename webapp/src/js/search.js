@@ -20,8 +20,8 @@
 
     const MAX_RESULTS = 200;
     const PULL_OPEN_PX = 70;   // two-finger pull that opens the search
-    // In hue order, like the sound sheet's colours (app.html).
-    const COLORS = ['default', 'grey', 'red', 'orange', 'yellow', 'lime', 'green', 'teal', 'sky', 'blue', 'purple', 'pink'];
+    // In the sound sheet's order (app.html): the hues from pink round to purple, between the two greys.
+    const COLORS = ['default', 'pink', 'red', 'orange', 'yellow', 'lime', 'green', 'teal', 'sky', 'blue', 'purple', 'grey'];
     const COLOR_NAMES = { default: 'No colour', grey: 'Light grey', lime: 'Light green', sky: 'Light blue' };
 
     const $ = (id) => document.getElementById(id);

@@ -28,7 +28,7 @@ Long-press a button, or enter edit mode and tap it, to open its settings:
 - **♡ Favorite:** adds it to the Favorites tab and to the [in-game overlay](overlay.md).
 - **Preview:** plays it on your PC's “You hear” device only, so only you hear it.
 - **Custom Button Volume:** turns just this button up or down, for you and for others alike; the (i) next to it says so. The middle is the normal volume, and your default volumes on the PC stay as they are.
-- **Button Color:** twelve colors, from the default dark grey and a light grey through red, orange, yellow, light green, green, teal, light blue, blue and purple to pink.
+- **Button Color:** twelve colors: the default dark grey, then pink, red, orange, yellow, light green, green, teal, light blue, blue and purple, and a light grey.
 - **Button Emoji:** shows large in the button's background, or before the name in a list. Tap the emoji to change it, or **Delete** it.
 
 Above the settings, the button shows how it looks with them, as a list row when the tab is a list. Tap it to preview.
