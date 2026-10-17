@@ -13,7 +13,7 @@ Both sliders change loudness evenly along their length. A good start: set **Othe
 
 ## A sound's own volume
 
-In the phone app, long-press a button to open its settings. **Volume Adjustment** makes that one sound quieter (left) or louder, up to twice as loud (right), for you and for others alike. The middle is the normal volume.
+In the phone app, long-press a button to open its settings. **Custom Button Volume** makes that one sound quieter (left) or louder, up to twice as loud (right), for you and for others alike. The middle is the normal volume.
 
 ## Even out the loudness
 

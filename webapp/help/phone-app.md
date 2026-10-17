@@ -11,7 +11,9 @@ The Resound app is your soundboard: tabs of buttons that play on your PC. Everyt
 
 ## Tabs
 
-Each [sound folder](sound-library.md) is a tab at the bottom. Tap a tab, or swipe left and right over the buttons. **Favorites** is the first tab.
+Each [sound folder](sound-library.md) is a tab at the bottom. Click on a tab, or swipe left and right over the buttons. **Favorites** is the first tab.
+
+The app opens on **Favorites**, or, while you have no favorites yet, on your first tab. While it stays open, it keeps the tab you are on, also when it reloads for an update.
 
 To arrange the tabs, enter edit mode (the pencil at the top), then long-press a tab and drag it. The order is saved for all devices.
 
@@ -25,14 +27,17 @@ Long-press a button, or enter edit mode and tap it, to open its settings:
 
 - **♡ Favorite:** adds it to the Favorites tab and to the [in-game overlay](overlay.md).
 - **Preview:** plays it on your PC's “You hear” device only, so only you hear it.
-- **Volume Adjustment:** this sound's own volume, for you and for others. The middle is the normal volume.
-- **Button Color** and **Button Emoji**: an emoji shows large in the button's background.
+- **Custom Button Volume:** turns just this button up or down, for you and for others alike; the (i) next to it says so. The middle is the normal volume, and your default volumes on the PC stay as they are.
+- **Button Color:** twelve colors, from the default dark grey and a light grey through red, orange, yellow, light green, green, teal, light blue, blue and purple to pink.
+- **Button Emoji:** shows large in the button's background, or before the name in a list. Tap the emoji to change it, or **Delete** it.
+
+Above the settings, the button shows how it looks with them, as a list row when the tab is a list. Tap it to preview.
 
 ## Layouts
 
 In edit mode:
 
-- the layout button at the top switches this tab between 3 columns, 2 columns and a list;
+- the layout button at the top switches this tab between 3 columns, 2 columns and a list (one line per sound, in its color, with the emoji before the name);
 - drag buttons to put them in your own order.
 
 Tap ✅ to leave edit mode.
