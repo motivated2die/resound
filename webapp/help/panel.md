@@ -6,6 +6,7 @@ Resound's controls on the PC live in a panel that opens from its tray icon, next
 
 - **Open:** click the tray icon, or start Resound again from the Start Menu. From the phone app, a long press on the logo in the bottom bar opens or closes it.
 - **Close:** the **✕ CLOSE** tab above the panel, <kbd>Esc</kbd>, or the tray icon. <kbd>Esc</kbd> first goes back one page.
+- **Quick menu:** right-click the tray icon for **Show panel** and **Quit**, whatever page the panel is on.
 
 The panel stays open when you click into another window, so you can drag folders from Explorer or sounds from your browser onto it. It reopens on the page you left.
 
@@ -26,7 +27,7 @@ The audio flow draws where your audio goes: from your microphone and the soundbo
 
 - **Your microphone:** choose it here. **Automatic** uses Windows' default recording device.
 - **Soundboard:** **Test sound** plays a short chime to both outputs.
-- **Others hear:** always CABLE Output, the virtual microphone you choose in your apps. The slider sets how loud your sounds are for others.
+- **Others hear:** always CABLE Output, the virtual microphone you choose in your apps. The slider with the speaker icon sets how loud your sounds are for others.
 - **You hear:** your headphones or speakers, with its own volume. **System default** uses Windows' default playback device.
 
 Markers on the lines show what's going on. Hover over one to see why, click it to get to the fix:
@@ -58,7 +59,7 @@ While the audio flow is on screen, Resound listens to your microphone and to CAB
 | In-game overlay | The overlay's key and screen edge |
 | Phone remote | Pairing, the firewall, signing out devices |
 | App & startup | Version, start with Windows, updates, uninstall |
-| Backup & restore | Backups of your settings |
+| Backup & restore | Backups of your settings, and a zip of your sound files |
 | Diagnostics | Devices, latency test, log and data folders |
 
 At the bottom: **Run the guided setup again**.
