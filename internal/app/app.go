@@ -217,6 +217,7 @@ func Run() int {
 	a.tray.Popup().OnDrop = a.onDropAnywhere // drops on a folder go to its own field
 	a.tray.Popup().OnKey = a.onPanelKey
 	a.tray.Popup().OnEscape = a.onEscape
+	a.tray.OnQuit = a.quit // the tray icon's right-click menu
 	a.tray.OnQuitRequest = func() {
 		logx.Printf("quit requested by another process (update or uninstall)")
 		a.quit()

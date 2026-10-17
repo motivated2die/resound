@@ -24,6 +24,7 @@ type Tray struct {
 	hwnd           uintptr
 	nid            notifyIconData
 	popup          *Popup
+	menu           *trayMenu // right-click: Show panel, Quit
 	taskbarCreated uint32
 
 	qmu   sync.Mutex
@@ -32,6 +33,10 @@ type Tray struct {
 	// OnQuitRequest runs on the UI thread when another process (installer,
 	// uninstaller) asks this instance to exit.
 	OnQuitRequest func()
+
+	// OnQuit runs on the UI thread when the user chooses Quit in the tray
+	// icon's right-click menu. Without it, the tray just quits.
+	OnQuit func()
 
 	// OnEndSession runs on the UI thread when Windows signs out, restarts
 	// or shuts down. The process ends right after it returns, without Run
@@ -57,6 +62,13 @@ func NewTray(tooltip string) (*Tray, error) {
 	t.hwnd = h
 	if t.popup, err = newPopup(); err != nil {
 		return nil, fmt.Errorf("creating popup: %w", err)
+	}
+	t.menu, err = newTrayMenu([2]Action{
+		{Label: "Show panel", OnClick: t.showPanelFromMenu},
+		{Label: "Quit", Icon: IconPower, Style: ButtonDanger, OnClick: t.quitFromMenu},
+	})
+	if err != nil {
+		return nil, fmt.Errorf("creating tray menu: %w", err)
 	}
 	r, _, _ := procRegisterWindowMessageW.Call(uintptr(unsafe.Pointer(utf16Ptr("TaskbarCreated"))))
 	t.taskbarCreated = uint32(r)
@@ -116,6 +128,7 @@ func (t *Tray) Run() {
 
 // Quit removes the icon and ends Run. Call it on the UI thread.
 func (t *Tray) Quit() {
+	t.menu.hide()
 	t.popup.Hide()
 	_ = t.notify(nimDelete)
 	procPostQuitMessage.Call(0)
@@ -142,6 +155,36 @@ func (t *Tray) togglePopup() {
 	}
 }
 
+// toggleMenu opens the right-click menu at the cursor, or closes it.
+func (t *Tray) toggleMenu() {
+	switch {
+	case t.menu.visible():
+		t.menu.hide()
+	case t.menu.recentlyHidden():
+		// This click closed it by taking the focus away; leave it closed.
+	default:
+		t.menu.show(cursorPos())
+	}
+}
+
+// showPanelFromMenu opens the panel, or brings it to the front when it is
+// open already (e.g. behind a window that has the focus).
+func (t *Tray) showPanelFromMenu() {
+	if t.popup.Visible() {
+		procSetForegroundWindow.Call(t.popup.hwnd)
+		return
+	}
+	t.ShowPanel()
+}
+
+func (t *Tray) quitFromMenu() {
+	if t.OnQuit != nil {
+		t.OnQuit()
+	} else {
+		t.Quit()
+	}
+}
+
 func (t *Tray) runQueue() {
 	t.qmu.Lock()
 	q := t.queue
@@ -155,9 +198,14 @@ func (t *Tray) runQueue() {
 func (t *Tray) wndProc(hwnd uintptr, m uint32, w, l uintptr) uintptr {
 	switch {
 	case m == wmTray:
+		// Left-click opens or closes the panel; right-click opens the small
+		// menu with Show panel and Quit.
 		switch uint32(l) {
-		case wmLButtonUp, wmRButtonUp, wmContextMenu:
+		case wmLButtonUp:
+			t.menu.hide()
 			t.togglePopup()
+		case wmRButtonUp, wmContextMenu:
+			t.toggleMenu()
 		}
 		return 0
 	case m == wmInvoke:

@@ -30,9 +30,14 @@ const (
 
 var procUpdateLayeredWindow = user32.NewProc("UpdateLayeredWindow")
 
+var shadowRegistered bool // UI thread only: the panel and the tray menu each have a shadow
+
 func newShadow() (*shadow, error) {
-	if err := registerClass(shadowClass, 0, windows.NewCallback(defWindowProc)); err != nil {
-		return nil, err
+	if !shadowRegistered {
+		if err := registerClass(shadowClass, 0, windows.NewCallback(defWindowProc)); err != nil {
+			return nil, err
+		}
+		shadowRegistered = true
 	}
 	h, err := createWindow(wsExLayered|wsExTransparent|wsExToolWindow|wsExTopmost|wsExNoActivate, wsPopup, shadowClass)
 	if err != nil {
