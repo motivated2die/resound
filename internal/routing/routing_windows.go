@@ -27,6 +27,10 @@ type Input struct {
 // virtual microphone others hear), which must never be routed into itself.
 func (in Input) IsCableOutput() bool { return IsCableName(in.Name) }
 
+// IsVoicemeeter reports whether this is one of Voicemeeter's virtual
+// devices (e.g. "Voicemeeter Out B1"): a mixer's output, never a real mic.
+func (in Input) IsVoicemeeter() bool { return IsVoicemeeterName(in.Name) }
+
 // Endpoint is a render endpoint relevant to routing.
 type Endpoint struct {
 	ID   string
@@ -41,6 +45,9 @@ type Status struct {
 	Mic         *Input    // the chosen (or automatically picked) real microphone
 	// MicRouted is true when Mic listens through CableInput.
 	MicRouted bool
+	// Voicemeeter is true when Voicemeeter's virtual devices are present,
+	// i.e. the mixer is installed. Its own settings are never read.
+	Voicemeeter bool
 }
 
 // CableInstalled reports whether both ends of VB-Cable were found.
@@ -53,9 +60,18 @@ func IsCableName(name string) bool {
 	return strings.HasPrefix(n, "cable input") || strings.HasPrefix(n, "cable output")
 }
 
+// IsVoicemeeterName matches the devices of Voicemeeter's virtual audio
+// driver ("Voicemeeter Input", "Voicemeeter Out B1", … "(VB-Audio
+// Voicemeeter VAIO)").
+func IsVoicemeeterName(name string) bool {
+	return strings.Contains(strings.ToLower(name), "voicemeeter")
+}
+
 // Check inspects the current device setup. micID selects the microphone;
-// "" picks the default recording device unless that is the cable itself.
-func Check(micID string) (Status, error) {
+// "" picks the default recording device unless that is the cable itself, a
+// Voicemeeter device or appsMicID (the device others' apps use as their
+// microphone with the user's own routing).
+func Check(micID, appsMicID string) (Status, error) {
 	var st Status
 	err := wincom.Run(func() error {
 		e, err := wincom.NewEnumerator()
@@ -69,9 +85,11 @@ func Check(micID string) (Status, error) {
 			return err
 		}
 		for _, o := range outs {
-			if strings.HasPrefix(strings.ToLower(o.Name), "cable input") {
+			if st.CableInput == nil && strings.HasPrefix(strings.ToLower(o.Name), "cable input") {
 				st.CableInput = &Endpoint{ID: o.ID, Name: o.Name}
-				break
+			}
+			if IsVoicemeeterName(o.Name) {
+				st.Voicemeeter = true
 			}
 		}
 
@@ -94,19 +112,21 @@ func Check(micID string) (Status, error) {
 	}
 
 	for i := range st.Inputs {
-		if strings.HasPrefix(strings.ToLower(st.Inputs[i].Name), "cable output") {
+		if st.CableOutput == nil && strings.HasPrefix(strings.ToLower(st.Inputs[i].Name), "cable output") {
 			st.CableOutput = &st.Inputs[i]
-			break
+		}
+		if st.Inputs[i].IsVoicemeeter() {
+			st.Voicemeeter = true
 		}
 	}
-	st.Mic = pickMic(st.Inputs, micID)
+	st.Mic = pickMic(st.Inputs, micID, appsMicID)
 	if st.Mic != nil && st.CableInput != nil {
 		st.MicRouted = st.Mic.Listening && strings.EqualFold(st.Mic.ListenTarget, st.CableInput.ID)
 	}
 	return st, nil
 }
 
-func pickMic(inputs []Input, micID string) *Input {
+func pickMic(inputs []Input, micID, appsMicID string) *Input {
 	if micID != "" {
 		for i := range inputs {
 			if inputs[i].ID == micID {
@@ -115,13 +135,18 @@ func pickMic(inputs []Input, micID string) *Input {
 		}
 		return nil // chosen mic is unplugged
 	}
+	// Never a mixer's output: muting it while sounds play would silence
+	// the sounds for others too.
+	real := func(in Input) bool {
+		return !in.IsCableOutput() && !in.IsVoicemeeter() && (appsMicID == "" || in.ID != appsMicID)
+	}
 	for i := range inputs {
-		if inputs[i].Default && !inputs[i].IsCableOutput() {
+		if inputs[i].Default && real(inputs[i]) {
 			return &inputs[i]
 		}
 	}
 	for i := range inputs {
-		if !inputs[i].IsCableOutput() {
+		if real(inputs[i]) {
 			return &inputs[i]
 		}
 	}

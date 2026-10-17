@@ -163,7 +163,7 @@ func (a *App) cableFailed(err error) {
 // waitForCable polls until both cable devices are active. Off the UI thread.
 func waitForCable(timeout time.Duration) bool {
 	for deadline := time.Now().Add(timeout); ; time.Sleep(time.Second) {
-		if st, err := routing.Check(""); err == nil && st.CableInstalled() {
+		if st, err := routing.Check("", ""); err == nil && st.CableInstalled() {
 			return true
 		}
 		if time.Now().After(deadline) {

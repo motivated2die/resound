@@ -354,7 +354,7 @@ func (a *App) updateTooltip() {
 		}
 	}
 	tip := fmt.Sprintf("Resound · %d output(s) running", running)
-	if a.route.CableInstalled() && !a.route.MicRouted {
+	if a.route.CableInstalled() && !a.route.MicRouted && !a.ownRouting() {
 		tip += " · mic not routed"
 	}
 	a.tray.SetTooltip(tip)

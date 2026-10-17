@@ -131,14 +131,20 @@ func (a *App) wizardSounds() []ui.Row {
 // and route the microphone into it. Each problem shows on its pipe, and
 // clicking its badge fixes it right here.
 func (a *App) wizardAudio() []ui.Row {
+	combined := "CABLE Output is the combined mic and effects."
+	if a.ownRouting() {
+		// Set up under Advanced in Settings; the setup only shows it.
+		combined = "Your own routing combines your mic and the sounds (Settings → Audio & voice chat → Advanced)."
+	}
 	rows := []ui.Row{
 		a.wizardHeader("Audio and voice chat"),
-		ui.Paragraph("Choose your microphone and where you want to hear sounds yourself. Below is a live visualization. "+
-			"CABLE Output is the combined mic and effects.", ui.ToneMuted),
+		ui.Paragraph("Choose your microphone and where you want to hear sounds yourself. Below is a live visualization. "+combined, ui.ToneMuted),
 	}
 	rows = append(rows, a.cableNoteRows()...)
 	rows = append(rows, a.flowRows()...)
-	if !a.route.CableInstalled() {
+	if a.ownRouting() {
+		rows = append(rows, a.cableOutputHint()...)
+	} else if !a.route.CableInstalled() {
 		rows = append(rows, ui.Section("Install VB-Cable"))
 		rows = append(rows, a.cableInstallRows()...)
 	} else {

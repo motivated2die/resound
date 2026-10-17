@@ -207,8 +207,21 @@ func TestFlowRender(t *testing.T) {
 	missing.YouPipe = Pipe{State: PipeBroken, Badge: alert("Output failed", ToneBad)}
 	missing.Cable.Name, missing.Cable.Placeholder, missing.Cable.Level = "", "Not installed", level(0)
 
+	// Own routing (e.g. Voicemeeter): the user's mixer combines mic and
+	// sounds; the card names the device others' apps listen to.
+	info := func(label string) *Badge { return &Badge{Icon: IconInfo, Label: label, Tip: "why", OnClick: func() {}} }
+	own := testFlow()
+	own.Mic.Options = []Option{{Label: "Mikrofon (BlackShark V3 Pro XBOX - Chat)"}}
+	own.MicPipe.Badge = info("Via your mixer")
+	own.CablePipe.Badge = info("")
+	own.CableLine.Badge = info("Your mixer")
+	own.Cable.Name = "Out B1"
+	ownUnset := own
+	ownUnset.CableLine = Pipe{State: PipeBroken, Badge: alert("Choose output", ToneWarning)}
+	ownUnset.Cable.Name, ownUnset.Cable.Placeholder, ownUnset.Cable.Level = "", "Choose one", level(0)
+
 	for name, f := range map[string]AudioFlow{"flow-playing": testFlow(), "flow-setup": setup, "flow-preview": preview,
-		"flow-held": held, "flow-paused": paused, "flow-missing": missing} {
+		"flow-held": held, "flow-paused": paused, "flow-missing": missing, "flow-own": own, "flow-own-unset": ownUnset} {
 		for _, scale := range []float64{1, 1.5} {
 			img := renderRows(t, f.Rows(), scale, nil)
 			if scale == 1.5 {

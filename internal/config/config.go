@@ -19,6 +19,11 @@ type Config struct {
 	// "CABLE Input" when it is installed, else none. Another device is an
 	// advanced choice, e.g. a virtual mixer's input.
 	CableDeviceID string `json:"cableDeviceId"`
+	// AppsMicDeviceID is, with such an own routing, the recording device
+	// others' apps use as their microphone (e.g. "Voicemeeter Out B1"),
+	// where the user's mixer combines the voice and the sounds. Resound
+	// only shows it and measures it. Cleared when going back to VB-Cable.
+	AppsMicDeviceID string `json:"appsMicDeviceId,omitempty"`
 	// Volumes in percent, 0-100, on the loudness curve (audio.Gain).
 	MonitorVolume int `json:"monitorVolume"`
 	CableVolume   int `json:"cableVolume"`
