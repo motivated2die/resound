@@ -45,6 +45,7 @@ Each folder contains the component's license file(s) and a README naming the exa
 ## Icons
 
 - [Tabler Icons](https://tabler.io/icons) (`internal/ui/icons/`): MIT, © Paweł Kuna.
+- [Font Awesome Free](https://fontawesome.com) 6.7.2 icons (`internal/ui/icons/fa-*.svg`, the volume icon): CC BY 4.0, © Fonticons, Inc. The license comment is kept in each file.
 
 ## Not included: VB-Cable
 

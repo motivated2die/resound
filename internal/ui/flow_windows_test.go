@@ -244,6 +244,34 @@ func TestFlowRender(t *testing.T) {
 	}
 }
 
+// TestTrackIconClearsKnob checks that the volume tracks' speaker icon sits
+// at the right end up to trackIconFlip percent and at the left end above it,
+// and that the knob (hovered, so at its widest) never covers it.
+func TestTrackIconClearsKnob(t *testing.T) {
+	o := flowOutputsRow{testFlow().Cable, testFlow().You}
+	for _, scale := range []float64{1, 1.25, 1.5, 1.75, 2} {
+		c := &canvas{scale: scale}
+		r := rect{0, 0, c.px(popupWidthL), c.px(o.height())}
+		for i, col := range o.columns(c, r) {
+			track, x0, x1 := trackRange(c, col.track)
+			for v := 0; v <= 100; v++ {
+				icon := trackIconBox(c, track, v, 100)
+				if right := icon.Right > track.Left+track.w()/2; right != (v <= trackIconFlip) {
+					t.Fatalf("scale %v, track %d, %d%%: icon at the right end = %v", scale, i, v, right)
+				}
+				if icon.Left < track.Left || icon.Right > track.Right || icon.Top < track.Top || icon.Bottom > track.Bottom {
+					t.Fatalf("scale %v, track %d, %d%%: icon %v outside the track %v", scale, i, v, icon, track)
+				}
+				kx := x0 + int32(int64(x1-x0)*int64(v)/100)
+				kw := c.px(sliderKnobWL + 1)
+				if kx-kw/2 < icon.Right && kx-kw/2+kw > icon.Left {
+					t.Errorf("scale %v, track %d, %d%%: knob at %d..%d covers the icon %d..%d", scale, i, v, kx-kw/2, kx-kw/2+kw, icon.Left, icon.Right)
+				}
+			}
+		}
+	}
+}
+
 // TestWarningRender saves the Warning row and checks that the app's texts
 // (the Advanced section's in pages.go, the setup's in wizard.go: keep them
 // in sync) fit beside the icon and the chevron.

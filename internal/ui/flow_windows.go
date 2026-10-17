@@ -842,7 +842,9 @@ func (o flowOutputsRow) paint(c *canvas, r rect, st rowState) {
 	for i, v := range o.volumes() {
 		if v != nil {
 			track, x0, x1 := trackRange(c, cols[i].track)
-			paintTrack(c, track, track.h(), x0, x1, v.Value, 100, st.hover == segCableVolume+i, st.press == segCableVolume+i)
+			hover, press := st.hover == segCableVolume+i, st.press == segCableVolume+i
+			paintTrack(c, track, track.h(), x0, x1, v.Value, 100, hover, press)
+			paintTrackIcon(c, track, v.Value, 100, hover || press)
 		}
 	}
 }
