@@ -67,6 +67,9 @@ type soundImport struct {
 	src            string // editing: the file's name
 	token, editURL string // editing: the file's token and the edit page's address
 	opened         bool   // editing: the page has loaded the file
+	replace        string // editing: the library sound the editor's saves replace ("" = new clips)
+
+	verb string // done: what the folder's note says happened ("" = "Added")
 
 	path, name, ext string // the saved file
 	voice           uint64 // its preview, while playing
@@ -522,7 +525,11 @@ func (a *App) folderImport(dir string) (note string, active bool) {
 		case importNaming:
 			note, active = "Name the new sound", true
 		case importDone:
-			note = "Added “" + job.name + "”"
+			verb := job.verb
+			if verb == "" {
+				verb = "Added"
+			}
+			note = verb + " “" + job.name + "”"
 		case importDiscarded:
 			note = "Discarded “" + job.name + "”"
 		}

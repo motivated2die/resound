@@ -98,6 +98,7 @@ type App struct {
 	libSeq    int          // identifies the current libNote, so an old timer leaves a newer one
 	keepNote  bool         // reopening after a dialog: keep libNote and backupNote
 	imports   importsState // sounds dropped onto folders (import.go)
+	lists     soundLists   // the library page's opened folders (sounds.go)
 
 	backupNote       string // result of the last backup action
 	backupFailed     bool

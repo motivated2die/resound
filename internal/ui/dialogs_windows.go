@@ -111,6 +111,48 @@ func ShellOpen(path string) error {
 	return windows.ShellExecute(0, utf16Ptr("open"), utf16Ptr(path), nil, nil, windows.SW_SHOWNORMAL)
 }
 
+// shFileOpStructW mirrors SHFILEOPSTRUCTW; natural alignment on 64-bit
+// Windows, as Go lays it out.
+type shFileOpStructW struct {
+	Owner                uintptr
+	Func                 uint32
+	From, To             *uint16 // lists ending in two NULs
+	Flags                uint16
+	AnyOperationsAborted int32
+	NameMappings         uintptr
+	ProgressTitle        *uint16
+}
+
+var procSHFileOperationW = shell32.NewProc("SHFileOperationW")
+
+// RecycleFile moves a file to the Recycle Bin, without the shell's own
+// confirmation, progress or error dialogs: the caller asks first.
+func RecycleFile(path string) error {
+	const (
+		foDelete          = 3
+		fofSilent         = 0x0004
+		fofNoConfirmation = 0x0010
+		fofAllowUndo      = 0x0040
+		fofNoErrorUI      = 0x0400
+	)
+	from, err := windows.UTF16FromString(path)
+	if err != nil {
+		return err
+	}
+	op := shFileOpStructW{
+		Func:  foDelete,
+		From:  &append(from, 0)[0], // the list's second NUL
+		Flags: fofAllowUndo | fofNoConfirmation | fofSilent | fofNoErrorUI,
+	}
+	if r, _, _ := procSHFileOperationW.Call(uintptr(unsafe.Pointer(&op))); r != 0 {
+		return fmt.Errorf("moving %s to the Recycle Bin failed (error %#x)", path, r)
+	}
+	if op.AnyOperationsAborted != 0 {
+		return fmt.Errorf("moving %s to the Recycle Bin was cancelled", path)
+	}
+	return nil
+}
+
 // ShellRun starts a program with arguments, e.g. ("control.exe", "mmsys.cpl,,1").
 func ShellRun(file, args string) error {
 	return windows.ShellExecute(0, utf16Ptr("open"), utf16Ptr(file), utf16Ptr(args), nil, windows.SW_SHOWNORMAL)

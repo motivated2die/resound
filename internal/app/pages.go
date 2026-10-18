@@ -583,15 +583,17 @@ func (a *App) libraryPage() []ui.Row {
 // too, as the last scan found them) as drop fields: sounds dragged onto one
 // are downloaded or copied into it (see import.go), and the field shows how
 // that goes. Each library folder has a trash button that asks for
-// confirmation in place; clicking a field opens the folder in Explorer.
+// confirmation in place. Clicking a field opens its list of sounds below it
+// (sounds.go); under the pointer, a button on the field opens the folder in
+// Explorer.
 func (a *App) folderRows() []ui.Row {
 	tabsByRoot := map[string][2]int{} // folder -> {tabs, sounds}
-	soundsIn := map[string]int{}      // tab folder (lower case) -> sounds
 	for _, t := range a.lib.Tabs() {
 		c := tabsByRoot[t.Root]
 		tabsByRoot[t.Root] = [2]int{c[0] + 1, c[1] + len(t.Sounds)}
-		soundsIn[strings.ToLower(filepath.Clean(t.Path))] = len(t.Sounds)
 	}
+	soundsIn := a.soundsByFolder()
+	toggle := func(dir string) func() { return func() { a.toggleFolder(dir) } }
 	open := func(dir string) func() {
 		return func() {
 			if err := ui.ShellOpen(dir); err != nil {
@@ -612,7 +614,8 @@ func (a *App) folderRows() []ui.Row {
 			Name: filepath.Base(f), Detail: detail, Tip: f, Note: note, Active: active,
 			ActionIcon: ui.IconTrash, ActionTip: "Remove from the library (the folder and its files stay on disk)",
 			OnAction: func() { a.removing = folder; a.render() },
-			OnClick:  open(f), OnDrop: a.dropOnFolder(f), DropHint: dropHint,
+			OnClick:  toggle(f), Expanded: a.lists.isOpen(f), OnOpen: open(f),
+			OnDrop: a.dropOnFolder(f), DropHint: dropHint,
 		}), a.importRows(f))...)
 		if a.removing == folder {
 			rows = append(rows,
@@ -623,16 +626,23 @@ func (a *App) folderRows() []ui.Row {
 				),
 				ui.Separator())
 		}
+		if a.lists.isOpen(f) {
+			rows = append(rows, a.soundRows(soundsIn[folderKey(f)], 1)...)
+		}
 		for _, sub := range a.lib.Folders(f) {
 			detail := "Empty"
-			if n := soundsIn[strings.ToLower(sub.Path)]; n > 0 {
+			if n := len(soundsIn[folderKey(sub.Path)]); n > 0 {
 				detail = plural(n, "sound")
 			}
 			note, active := a.folderImport(sub.Path)
 			rows = append(rows, a.importGroup(active, ui.FolderDrop(ui.FolderSpec{
 				Name: filepath.Base(sub.Path), Detail: detail, Tip: sub.Path, Depth: sub.Depth,
-				Note: note, Active: active, OnClick: open(sub.Path), OnDrop: a.dropOnFolder(sub.Path), DropHint: dropHint,
+				Note: note, Active: active, OnClick: toggle(sub.Path), Expanded: a.lists.isOpen(sub.Path), OnOpen: open(sub.Path),
+				OnDrop: a.dropOnFolder(sub.Path), DropHint: dropHint,
 			}), a.importRows(sub.Path))...)
+			if a.lists.isOpen(sub.Path) {
+				rows = append(rows, a.soundRows(soundsIn[folderKey(sub.Path)], sub.Depth+1)...)
+			}
 		}
 	}
 	return rows

@@ -14,17 +14,21 @@
 
 * { box-sizing: border-box; }
 
-html, body { height: 100%; margin: 0; }
+html, body { margin: 0; }
 
 body {
     display: flex;
     flex-direction: column;
+    min-height: 100vh;
     background: var(--background);
     color: var(--text);
     font: 15px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif;
 }
 
 .bar {
+    position: sticky;
+    top: 0;
+    z-index: 1;
     display: flex;
     align-items: center;
     gap: 12px;
@@ -93,9 +97,16 @@ h1 { margin: 0; font-size: 15px; font-weight: 600; }
     font-weight: 600;
 }
 
-.stage { position: relative; flex: 1; min-height: 0; }
+.stage { position: relative; flex: 1 0 auto; display: flex; flex-direction: column; }
 
-.stage iframe { display: block; width: 100%; height: 100%; border: 0; background: var(--background); }
+/* The editor's page is always taller than its frame: its session banner
+   sits above an area that is itself as tall as the frame (empty below the
+   controls). So the frame doesn't scroll (scrolling="no", edit.js) and is
+   at least as tall as the editor's controls need; in a shorter window this
+   page scrolls instead, with the site's scrollbar, under the sticky bar.
+   The wheel over the frame stays with the editor (its page stops scroll
+   chaining); over the bar, and the scrollbar, scroll this page. */
+.stage iframe { flex: 1 0 auto; display: block; width: 100%; min-height: 480px; border: 0; background: var(--background); }
 
 .notice {
     max-width: 520px;
@@ -107,6 +118,32 @@ h1 { margin: 0; font-size: 15px; font-weight: 600; }
 
 .lead { font-size: 16px; }
 .hint { font-size: 13px; color: var(--text-secondary); }
+
+/* The consent notice: what the editor is, More info and the OK. */
+.consent { max-width: 560px; text-align: left; }
+.consent h2 { margin: 0 0 8px; font-size: 22px; line-height: 1.25; }
+.consent .lead { color: var(--text-secondary); }
+.consent .lead strong { color: var(--text); }
+.eyebrow { margin: 0 0 10px; color: var(--accent); font-size: 12px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; }
+.actions { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 10px; margin-top: 22px; }
+.btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 40px;
+    padding: 0 18px;
+    border: 0;
+    border-radius: 10px;
+    font: inherit;
+    font-weight: 600;
+    text-decoration: none;
+    cursor: pointer;
+}
+.btn-primary { background: var(--accent); color: var(--on-accent); }
+.btn-primary:hover { background: color-mix(in srgb, var(--accent) 85%, white); }
+.btn-secondary { background: var(--border); color: var(--text); }
+.btn-secondary:hover { background: color-mix(in srgb, var(--border) 80%, white); }
+.btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
 progress { width: 100%; accent-color: var(--accent); }
 

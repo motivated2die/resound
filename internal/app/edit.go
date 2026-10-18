@@ -4,14 +4,17 @@ package app
 // another format, dropped onto a folder opens the app's edit page in a
 // browser window, which embeds the editor (audiocutter.online) with the
 // file loaded. Every clip the user adds there is saved into the folder and
-// named on the usual card (import.go). The file goes from this PC to the
-// browser and back over package editbridge; the app's host never sees it.
+// named on the usual card (import.go). A sound of the library opens there
+// too (its scissors on the library page, sounds.go): what the editor saves
+// replaces it. The file goes from this PC to the browser and back over
+// package editbridge; the app's host never sees it.
 
 import (
 	"errors"
 	"fmt"
 	"io"
 	"net/url"
+	"os"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -82,13 +85,30 @@ func (a *App) editFiles(dir string, files []string) {
 		files = files[:maxEdits]
 	}
 	for _, f := range files {
-		a.editFile(dir, f)
+		a.openInEditor(dir, f, false)
 	}
 }
 
-func (a *App) editFile(dir, path string) {
+// editSound opens a sound of the library in the editor; what it saves
+// replaces the sound. A sound open already brings its editor back.
+func (a *App) editSound(path string) {
+	for _, j := range a.imports.jobs {
+		if j.state == importEditing && strings.EqualFold(j.replace, path) {
+			a.showEditor(j)
+			return
+		}
+	}
+	a.openInEditor(filepath.Dir(path), path, true)
+}
+
+// openInEditor opens path in the editor; new clips go into dir, or, with
+// replace, the editor's saves replace the file.
+func (a *App) openInEditor(dir, path string, replace bool) {
 	job := a.imports.add(&soundImport{dir: dir, host: "editor", state: importEditing, src: filepath.Base(path)})
-	token, port, err := a.editBridge().Add(path, dir)
+	if replace {
+		job.replace = path
+	}
+	token, port, err := a.editBridge().Add(path, dir, replace)
 	if err != nil {
 		logx.Printf("edit: %s: %v", path, err)
 		msg := "The file could not be opened in the editor: " + err.Error()
@@ -152,9 +172,13 @@ func (a *App) editorClosed(token string) {
 }
 
 // saveClip saves a clip from the editor into the job's folder under the
-// edited file's name, then shows the naming card as for a download. It runs
-// on the bridge's goroutine; its error is shown in the page.
+// edited file's name, then shows the naming card as for a download; for a
+// sound of the library, it replaces the sound. It runs on the bridge's
+// goroutine; its error is shown in the page.
 func (a *App) saveClip(j editbridge.Job, body io.Reader) (string, error) {
+	if j.Replace {
+		return a.replaceSound(j, body)
+	}
 	name := importer.SanitizeName(strings.TrimSuffix(filepath.Base(j.Path), filepath.Ext(j.Path)))
 	if name == "" {
 		name = "Clip"
@@ -170,6 +194,63 @@ func (a *App) saveClip(j editbridge.Job, body io.Reader) (string, error) {
 		a.finishImport(job, saved, dups, nil)
 	})
 	return saved.Name, nil
+}
+
+// replaceSound writes what the editor saved over the sound it edits: into
+// a temporary file next to it first, checked, then renamed over it. The
+// sound keeps its place in the library (same path: its ID and settings;
+// its length and loudness are measured again). Bridge goroutine.
+func (a *App) replaceSound(j editbridge.Job, body io.Reader) (string, error) {
+	ext := filepath.Ext(j.Path)
+	name := strings.TrimSuffix(filepath.Base(j.Path), ext)
+	tmp, err := writeChecked(body, j.Dir, ext)
+	if err != nil {
+		logx.Printf("edit: replacing %s: %v", j.Path, err)
+		return "", errors.New(clipMessage(err))
+	}
+	// Windows can't replace a file that is playing.
+	a.onUI(func() { a.stopSound(j.Path) })
+	if err := renameRetry(tmp, j.Path); err != nil {
+		os.Remove(tmp)
+		logx.Printf("edit: replacing %s: %v", j.Path, err)
+		return "", errors.New("The sound could not be replaced: " + err.Error())
+	}
+	logx.Printf("edit: replaced %s", j.Path)
+	a.tray.Post(func() {
+		a.rescan()
+		a.libraryChanged()
+		a.noteThenForget(a.imports.add(&soundImport{dir: j.Dir, state: importDone, name: name, verb: "Updated"}))
+	})
+	return name, nil
+}
+
+// writeChecked writes a sound to a temporary file in dir (a name the
+// library ignores, with extension ext, which the check decodes by) and
+// checks that it plays. It returns the file's path.
+func writeChecked(body io.Reader, dir, ext string) (string, error) {
+	f, err := os.CreateTemp(dir, "~resound-*"+ext)
+	if err != nil {
+		return "", err
+	}
+	n, err := io.Copy(f, io.LimitReader(body, maxClipBytes+1))
+	if cerr := f.Close(); err == nil {
+		err = cerr
+	}
+	switch {
+	case err == nil && n > maxClipBytes:
+		err = importer.ErrTooLarge
+	case err == nil && n == 0:
+		err = importer.ErrNoSound
+	case err == nil:
+		if cerr := audio.CheckFile(f.Name()); cerr != nil {
+			err = fmt.Errorf("%w: %w", importer.ErrUnsupported, cerr)
+		}
+	}
+	if err != nil {
+		os.Remove(f.Name())
+		return "", err
+	}
+	return f.Name(), nil
 }
 
 // clipMessage says why a clip from the editor wasn't saved.
@@ -189,7 +270,10 @@ func clipMessage(err error) string {
 // editor, with buttons to bring the editor back and to stop.
 func (a *App) editRows(job *soundImport) []ui.Row {
 	text := "Opening “" + job.src + "” in the editor in your browser…"
-	if job.opened {
+	switch {
+	case job.opened && job.replace != "":
+		text = "“" + job.src + "” is open in the editor in your browser. Trim it and press “Save to Resound”: it replaces the sound."
+	case job.opened:
 		text = "“" + job.src + "” is open in the editor in your browser. Cut the part you want and press “Add to Resound”: each clip is saved here."
 	}
 	return []ui.Row{

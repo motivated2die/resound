@@ -34,7 +34,7 @@ const (
 	// MaxSourceBytes limits the file handed to the editor, which reads it
 	// into the browser's memory whole.
 	MaxSourceBytes = 1 << 30
-	// Format is the format clips come back in. The editor renders at the
+	// Format is the format new clips come back in. The editor renders at the
 	// sample rate it guesses from the file's first bytes, which for videos
 	// can be any MP3 rate down to 8 kHz; Resound's MP3 decoder reads only
 	// MPEG-1 (32 kHz and up), FLAC every rate. FLAC is lossless too, so a
@@ -66,11 +66,17 @@ type Options struct {
 
 // Job is a file being edited.
 type Job struct {
-	Token  string
-	Path   string // the file
-	Dir    string // the folder clips go into
-	size   int64
-	closer *time.Timer // set while the page is away
+	Token string
+	Path  string // the file
+	Dir   string // the folder clips go into
+	// Replace: the file is a sound of the library, and what the editor
+	// saves replaces it, in its own format (Format otherwise). The editor
+	// reads the right sample rate from the headers of the formats Resound
+	// plays.
+	Replace bool
+	Format  string
+	size    int64
+	closer  *time.Timer // set while the page is away
 }
 
 // Bridge serves the files being edited. Its zero value is not usable; use New.
@@ -90,8 +96,8 @@ func New(opts Options) *Bridge {
 
 // Add offers a file to the editor and returns the token and port the page
 // needs (see PageURL). Clips cut from it go into dir; the page shows its
-// name.
-func (b *Bridge) Add(path, dir string) (token string, port int, err error) {
+// name. With replace, what the editor saves replaces the file (Job).
+func (b *Bridge) Add(path, dir string, replace bool) (token string, port int, err error) {
 	info, err := os.Stat(path)
 	if err != nil {
 		return "", 0, err
@@ -112,7 +118,11 @@ func (b *Bridge) Add(path, dir string) (token string, port int, err error) {
 			return "", 0, err
 		}
 	}
-	b.jobs[token] = &Job{Token: token, Path: path, Dir: dir, size: info.Size()}
+	format := Format
+	if replace {
+		format = strings.TrimPrefix(strings.ToLower(filepath.Ext(path)), ".")
+	}
+	b.jobs[token] = &Job{Token: token, Path: path, Dir: dir, Replace: replace, Format: format, size: info.Size()}
 	return token, b.port, nil
 }
 
@@ -211,10 +221,12 @@ func (b *Bridge) handler(port int) http.Handler {
 			b.opened(token)
 			writeJSON(w, http.StatusOK, map[string]any{
 				"filename": filepath.Base(j.Path),
+				"name":     strings.TrimSuffix(filepath.Base(j.Path), filepath.Ext(j.Path)),
 				"folder":   filepath.Base(j.Dir),
 				"size":     j.size,
 				"type":     contentType(j.Path),
-				"format":   Format,
+				"format":   j.Format,
+				"replace":  j.Replace,
 			})
 		case action == "source" && r.Method == http.MethodGet:
 			f, err := os.Open(j.Path)

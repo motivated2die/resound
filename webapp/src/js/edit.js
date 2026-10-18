@@ -25,6 +25,9 @@
     const HUE = -60;
     const ACCENT = '#155dfc';
     const STORE = 'resound.edit';
+    // The user's OK to load the editor (once per browser): set by the
+    // consent notice, read before anything reaches Resound.
+    const CONSENT = 'resound.editorConsent';
 
     const $ = (id) => document.getElementById(id);
     const status = $('status');
@@ -49,7 +52,7 @@
 
     const params = readParams();
     if (!params) {
-        fail('This page opens from Resound. In the Resound panel, drop a video or another audio file onto a folder on the Sound library page.');
+        fail('This page opens from Resound. On the Sound library page in the Resound panel, drop a video or another audio file onto a folder, or click a sound’s scissors.');
         return;
     }
     const base = `http://127.0.0.1:${params.port}/v1/${params.token}`;
@@ -121,6 +124,9 @@
         editor.referrerPolicy = 'no-referrer';
         editor.src = EDITOR + '/import/';
         editor.style.filter = `hue-rotate(${HUE}deg)`;
+        // Its own scrolling would only reveal empty space (edit.css); it must
+        // be set before the frame loads.
+        editor.setAttribute('scrolling', 'no');
         notice.replaceWith(editor);
         document.body.classList.add('editing'); // the editor's banner carries the logo and title now
 
@@ -135,7 +141,9 @@
                 if (!sent) {
                     sent = true;
                     editor.contentWindow.postMessage({ type: 'session', manifest: manifest(file) }, EDITOR);
-                    setStatus(`Saving clips into “${info.folder}”. Select the part you want and press “Add to Resound”.`);
+                    setStatus(info.replace
+                        ? `Editing “${info.name}” in “${info.folder}”. Select the part to keep and press “Save to Resound”: it replaces the sound.`
+                        : `Saving clips into “${info.folder}”. Select the part you want and press “Add to Resound”.`);
                 }
                 break;
             case 'result':
@@ -159,9 +167,15 @@
             },
             session: {
                 ui: {
-                    title: 'Cut a sound for Resound',
-                    instruction: 'Select the part you want, then press “Add to Resound”. You can add as many clips as you like.',
-                    submitLabel: 'Add to Resound',
+                    ...(info.replace ? {
+                        title: 'Edit a sound for Resound',
+                        instruction: 'Select the part to keep, then press “Save to Resound”. It replaces the sound in your library.',
+                        submitLabel: 'Save to Resound',
+                    } : {
+                        title: 'Cut a sound for Resound',
+                        instruction: 'Select the part you want, then press “Add to Resound”. You can add as many clips as you like.',
+                        submitLabel: 'Add to Resound',
+                    }),
                     accentColor: ACCENT,
                     logoUrl: logoData(),
                 },
@@ -194,7 +208,7 @@
             return;
         }
         queue = queue.then(async () => {
-            setStatus('Adding the clip to Resound…');
+            setStatus(info.replace ? 'Saving the sound in Resound…' : 'Adding the clip to Resound…');
             try {
                 const res = await resound('/result', {
                     method: 'POST',
@@ -203,7 +217,9 @@
                 });
                 const { name } = await res.json();
                 showClip(name);
-                setStatus(`Added “${name}” to “${info.folder}”. Name it in the Resound panel, or cut another clip.`);
+                setStatus(info.replace
+                    ? `Saved “${name}” in “${info.folder}”. Keep editing and save again, or close this window.`
+                    : `Added “${name}” to “${info.folder}”. Name it in the Resound panel, or cut another clip.`);
             } catch (e) {
                 setStatus(e instanceof ResoundError ? e.message : 'The clip could not be sent to Resound.', true);
             }
@@ -233,6 +249,8 @@
     }
 
     function fail(text) {
+        $('consent').hidden = true;
+        notice.hidden = false;
         setStatus(text, true);
         notice.classList.add('bad');
         $('spinner').hidden = true;
@@ -242,12 +260,37 @@
     }
 
     // Tell Resound when the window goes away; a reload comes back within
-    // its grace period and keeps the file open.
+    // its grace period and keeps the file open. Not before the user's OK:
+    // reaching Resound is what makes the browser ask for its permission.
+    let connected = false;
     window.addEventListener('pagehide', () => {
-        fetch(base + '/close', { method: 'POST', keepalive: true }).catch(() => {});
+        if (connected) fetch(base + '/close', { method: 'POST', keepalive: true }).catch(() => {});
     });
 
-    (async () => {
+    // First, once per browser, the consent notice: the editor is a third
+    // party's, loaded from its site. Its OK starts everything else.
+    function consented() {
+        try { return localStorage.getItem(CONSENT) === '1'; } catch { return false; }
+    }
+
+    if (consented()) {
+        start();
+    } else {
+        setStatus('The editor opens once you accept.');
+        const consent = $('consent');
+        consent.hidden = false;
+        $('accept').focus();
+        $('accept').addEventListener('click', () => {
+            try { localStorage.setItem(CONSENT, '1'); } catch { /* asked again next time */ }
+            consent.hidden = true;
+            start();
+        }, { once: true });
+    }
+
+    async function start() {
+        notice.hidden = false;
+        setStatus('Connecting to Resound…');
+        connected = true;
         try {
             info = await (await resound('')).json();
             $('notice-text').textContent = `Loading “${info.filename}” from Resound…`;
@@ -257,5 +300,5 @@
         } catch (e) {
             fail(e instanceof ResoundError ? e.message : 'Something went wrong: ' + e.message);
         }
-    })();
+    }
 })();

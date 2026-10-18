@@ -28,21 +28,11 @@ A folder dropped anywhere else on the page becomes a new library folder.
 
 Drop a video (MP4, MKV, WEBM, MOV and others) or audio Resound can't play as it is (M4A, AAC, OPUS, WMA, AIFF and others) onto a folder. While you drag it over the folder, the folder reads **Drop to cut in the editor**.
 
-1. A browser window opens with the file loaded in an audio editor ([audiocutter.online](https://audiocutter.online)).
-2. Select the part you want and press **Add to Resound**. The clip is saved into the folder (as a FLAC file, without losing quality), and the usual card opens in the panel to name it.
-3. Cut as many clips as you like; each **Add to Resound** saves one more. Close the window when you're done, or press **Stop editing** under the folder in the panel.
+1. A browser window opens with the file loaded in [the audio editor](audio-editor.md).
+2. Select the part you want and press **Add to Resound**. The clip is saved into the folder, and the usual card opens in the panel to name it.
+3. Cut as many clips as you like; each **Add to Resound** saves one more. Close the window when you're done.
 
-While you edit, <kbd>Esc</kbd> works in the editor and leaves the panel on the Sound library page. To close the panel, use its close button; it opens on the same page again.
-
-The editor uses a video's first audio track. To cut from another one (a second language, a commentary track), save that track as a file of its own first, for example with a video converter.
-
-The editor's own **Download file** button still works too: drag the downloaded file from your browser's download list onto a folder.
-
-:::note The first time
-Your browser may ask whether `getresound.app` may access apps on this device. Allow it: that's how the file gets from Resound into the editor window. The file goes from Resound straight to the editor; `getresound.app` never receives it.
-:::
-
-If the window says it can't reach Resound, check that Resound is running, then drop the file onto the folder again. If you blocked the browser's question, open the site settings for `getresound.app` (the icon at the left of the address bar, or in the window's title bar), allow access to apps on this device, and reload the window.
+[The audio editor](audio-editor.md) explains it all: the first-time notice, supported formats, trimming sounds already in your library, privacy and what to do when something goes wrong.
 
 ## Already in your library?
 

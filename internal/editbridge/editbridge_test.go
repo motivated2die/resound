@@ -23,7 +23,7 @@ func newTestBridge(t *testing.T, opts Options) (*Bridge, string, int) {
 	if err := os.WriteFile(src, []byte("not really a video"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	token, port, err := b.Add(src, filepath.Join(t.TempDir(), "Memes"))
+	token, port, err := b.Add(src, filepath.Join(t.TempDir(), "Memes"), false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -211,6 +211,33 @@ func TestServerLifetime(t *testing.T) {
 	b.Remove(token)
 	if _, err := http.Get("http://127.0.0.1:" + itoa(port) + "/"); err == nil {
 		t.Error("server still running without files")
+	}
+}
+
+// A sound of the library is replaced by what the editor saves, in its own
+// format; new clips come back as FLAC.
+func TestReplaceFormat(t *testing.T) {
+	b := New(Options{Origins: []string{testOrigin}})
+	t.Cleanup(b.Close)
+	dir := t.TempDir()
+	src := filepath.Join(dir, "Horn.MP3")
+	if err := os.WriteFile(src, []byte("mp3"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	token, port, err := b.Add(src, dir, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	rec := do(b, port, "GET", "/v1/"+token, testOrigin, "")
+	var info struct {
+		Name, Format string
+		Replace      bool
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &info); err != nil {
+		t.Fatal(err)
+	}
+	if info.Name != "Horn" || info.Format != "mp3" || !info.Replace {
+		t.Errorf("info = %+v", info)
 	}
 }
 

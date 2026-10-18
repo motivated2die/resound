@@ -1,8 +1,12 @@
 package app
 
 import (
+	"errors"
+	"os"
+	"strings"
 	"testing"
 
+	"github.com/motivated2die/resound/internal/importer"
 	"github.com/motivated2die/resound/internal/ui"
 )
 
@@ -88,5 +92,25 @@ func TestEscapeKeepsLibraryWhileEditing(t *testing.T) {
 	}
 	if (&App{page: pageHome}).onEscape() {
 		t.Error("Esc on the home page should still close the panel")
+	}
+}
+
+// A save from the editor replaces a sound only once it plays: junk and
+// empty saves are refused and leave nothing behind in the folder.
+func TestWriteChecked(t *testing.T) {
+	dir := t.TempDir()
+	for _, tc := range []struct {
+		body string
+		want error
+	}{
+		{"not an mp3 at all", importer.ErrUnsupported},
+		{"", importer.ErrNoSound},
+	} {
+		if _, err := writeChecked(strings.NewReader(tc.body), dir, ".mp3"); !errors.Is(err, tc.want) {
+			t.Errorf("writeChecked(%q) = %v, want %v", tc.body, err, tc.want)
+		}
+	}
+	if left, _ := os.ReadDir(dir); len(left) != 0 {
+		t.Errorf("left behind: %v", left)
 	}
 }
