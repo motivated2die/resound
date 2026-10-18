@@ -3,7 +3,7 @@
 Many games only send your voice while you hold a push-to-talk key, so a sound played without it isn't heard. Resound can hold that key for you while sounds play, mute your real microphone meanwhile, and react to keys of its own from inside your game. All of this is under Settings → **Push-to-talk**.
 
 :::viz ptt-timeline
-While a sound plays, Resound holds your push-to-talk key and mutes your microphone. Holding a **pause key** pauses the sound and lets go of both, so you can talk. Letting go resumes the sound; when it ends, everything is let go.
+While a sound plays, Resound holds your push-to-talk key and, if you turn it on, mutes your microphone. Holding a **pause key** pauses the sound and lets go of both, so you can talk. Letting go resumes the sound; when it ends, everything is let go.
 :::
 
 ## Set your game's push-to-talk key
@@ -20,9 +20,17 @@ No push-to-talk in your game (voice activity)? Leave the key empty. Make sure th
 
 ## Mute your microphone while sounds play
 
-On by default, under Settings → Audio & voice chat → **Mute my microphone while sounds play**. Others then hear the sound clearly, without you talking or typing in the background. Your microphone is unmuted as soon as the last sound ends. The audio flow shows **Muted for sounds** meanwhile.
+Off by default. Turn it on under Settings → Audio & voice chat → **Mute my microphone while sounds play**. Others then hear the sound clearly, without you talking or typing in the background. The audio flow shows **Muted for sounds** meanwhile.
 
-Turn it off if you want to talk over your sounds all the time.
+**Minimum sound length** (right below the switch, 5 seconds at first) decides which sounds mute it:
+
+- A sound **longer** than it mutes your microphone while it plays: music, long clips.
+- **Shorter** sounds leave it open, so you can keep talking over quick effects.
+- A sound whose length Resound doesn't know yet mutes it, to be safe.
+
+Each sound counts on its own: short sounds played one after another never add up. While a long sound plays, your microphone stays muted, also when short ones play alongside; it's back as soon as no long sound plays anymore.
+
+Use **−** and **+** to change the length, or click the value to type one, such as `2.5`. Below 1 second it reads **Always**: then every sound mutes your microphone.
 
 ## Talk over a sound
 

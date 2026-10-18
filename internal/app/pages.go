@@ -144,9 +144,9 @@ func (a *App) homePage() []ui.Row {
 
 	remoteDetail, remoteTone := a.remoteSummary()
 	rows = append(rows,
-		ui.Section("Phone"),
+		ui.Section("Sound buttons"),
 		ui.NavTool(ui.IconExternalLink, "Open the app in a window on this PC", a.openRemoteHereAction(),
-			"Phone remote", remoteDetail, remoteTone, func() { a.openPage(pageRemote) }),
+			"Remote App", remoteDetail, remoteTone, func() { a.openPage(pageRemote) }),
 		ui.Flex(),
 		ui.Separator(),
 		ui.Buttons(
@@ -203,7 +203,7 @@ func (a *App) settingsPage() []ui.Row {
 		ui.Nav("Push-to-talk", keys, keysTone, func() { a.openPage(pageKeys) }),
 		ui.Nav("Sound library", lib, libTone, func() { a.openPage(pageLibrary) }),
 		ui.Nav("In-game overlay", overlayDetail, overlayTone, func() { a.openPage(pageOverlay) }),
-		ui.Nav("Phone remote", remote, remoteTone, func() { a.openPage(pageRemote) }),
+		ui.Nav("Remote App", remote, remoteTone, func() { a.openPage(pageRemote) }),
 		ui.Nav("App & startup", appDetail, appTone, func() { a.openPage(pageApp) }),
 		ui.Nav("Backup & restore", backupDetail, backupTone, func() { a.openPage(pageBackup) }),
 		ui.Nav("Diagnostics", "Latency · logs", ui.ToneMuted, func() { a.openPage(pageDiagnostics) }),
@@ -423,15 +423,6 @@ func (a *App) handOverRows() []ui.Row {
 func (a *App) pttIntro() ui.Row {
 	return ui.Paragraph("Games with push-to-talk only send your voice while its key is held. "+
 		"Resound holds the key while sounds play, so others hear them.", ui.ToneMuted)
-}
-
-// muteMicRows are the option to mute the microphone while sounds play, with
-// why one would.
-func (a *App) muteMicRows() []ui.Row {
-	return []ui.Row{
-		ui.Toggle("Mute my microphone while sounds play", a.cfg.MuteMicWhilePlaying, a.toggleMuteWhilePlaying),
-		ui.Paragraph("By default Resound mutes your mic during playback so others won't hear you talking in the background during music. You can disable this here.", ui.ToneMuted),
-	}
 }
 
 // connectRows offer to connect VB-Cable in one go (sounds into CABLE Input,
@@ -675,7 +666,7 @@ func (a *App) libraryActions() []ui.Row {
 	return rows
 }
 
-// --- phone remote ----------------------------------------------------------
+// --- Remote App (the phone remote) -------------------------------------------
 
 func (a *App) remoteSummary() (string, ui.Tone) {
 	if a.srv == nil || a.serverErr != nil {
@@ -688,7 +679,7 @@ func (a *App) remoteSummary() (string, ui.Tone) {
 }
 
 func (a *App) remotePage() []ui.Row {
-	rows := []ui.Row{ui.Header("Phone remote", a.back)}
+	rows := []ui.Row{ui.Header("Remote App", a.back)}
 	pair, ok := a.pairRows()
 	rows = append(rows, pair...)
 	if ok {

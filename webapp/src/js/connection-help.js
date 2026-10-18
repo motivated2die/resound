@@ -8,15 +8,15 @@
 
     const STEPS = {
         running: ['Resound is running on the PC',
-            'The PC is awake, and Resound’s Phone remote page shows a QR code.'],
+            'The PC is awake, and Resound’s Remote App page shows a QR code.'],
         wifi: ['Same Wi-Fi as the PC',
             'Not mobile data, a guest network or a VPN.'],
         rescan: ['Scan the QR code again',
-            'In Resound, open Phone remote and scan its code. This picks up a changed address.'],
+            'In Resound, open Remote App and scan its code. This picks up a changed address.'],
         fresh: ['Use a new code',
-            'Each code works once, for 10 minutes. Phone remote in Resound shows a new one.'],
+            'Each code works once, for 10 minutes. Remote App in Resound shows a new one.'],
         firewall: ['Let it through the firewall',
-            'In Phone remote, click “Allow phones through the firewall”. In Windows’ network settings, the network must be Private.'],
+            'In Remote App, click “Allow phones through the firewall”. In Windows’ network settings, the network must be Private.'],
     };
 
     // note is what this device knows about its own network, if anything.

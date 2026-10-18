@@ -283,28 +283,50 @@ func (o radioRow) paint(c *canvas, r rect, st rowState) {
 type stepperRow struct {
 	label, value string
 	onDec, onInc func()
+	onValue      func() // StepperEdit: a click on the value
 }
 
 // Stepper shows a value with − / + buttons.
 func Stepper(label, value string, onDec, onInc func()) Row {
-	return stepperRow{label, value, onDec, onInc}
+	return stepperRow{label: label, value: value, onDec: onDec, onInc: onInc}
+}
+
+// StepperEdit is a Stepper whose value can be clicked too, e.g. to type a
+// value of one's own; it is underlined as a hint.
+func StepperEdit(label, value string, onDec, onInc, onValue func()) Row {
+	return stepperRow{label, value, onDec, onInc, onValue}
 }
 
 func (stepperRow) height() int { return 36 }
+
+// Segments: −, +, and with onValue the value between them.
 func (s stepperRow) segments(c *canvas, r rect) []rect {
 	in := inset(c, r)
 	size := c.px(28)
 	top := r.Top + (r.h()-size)/2
 	plus := rect{in.Right - size, top, in.Right, top + size}
 	minus := rect{plus.Left - c.px(64) - size, top, plus.Left - c.px(64), top + size}
-	return []rect{minus, plus}
+	var value rect
+	if s.onValue != nil {
+		value = rect{minus.Right + c.px(2), top, plus.Left - c.px(2), top + size}
+	}
+	return []rect{minus, plus, value}
 }
 func (s stepperRow) click(seg int) {
-	if seg == 0 && s.onDec != nil {
+	switch {
+	case seg == 0 && s.onDec != nil:
 		s.onDec()
-	} else if seg == 1 && s.onInc != nil {
+	case seg == 1 && s.onInc != nil:
 		s.onInc()
+	case seg == 2 && s.onValue != nil:
+		s.onValue()
 	}
+}
+func (s stepperRow) tip(_ *canvas, _ rect, seg int) string {
+	if seg == 2 && s.onValue != nil {
+		return "Click to type a value"
+	}
+	return ""
 }
 func (stepperRow) keepsOpen() bool { return true }
 func (s stepperRow) paint(c *canvas, r rect, st rowState) {
@@ -321,7 +343,17 @@ func (s stepperRow) paint(c *canvas, r rect, st rowState) {
 		c.roundRect(segs[i], c.px(8), bg)
 		c.text(glyph, segs[i], fontBold, colText, dtCenter)
 	}
-	c.text(s.value, rect{segs[0].Right, in.Top, segs[1].Left, in.Bottom}, fontBold, colText, dtCenter)
+	valueBox := rect{segs[0].Right, in.Top, segs[1].Left, in.Bottom}
+	if s.onValue != nil {
+		if st.hover == 2 || st.press == 2 {
+			c.roundRect(segs[2], c.px(8), colRowHover)
+		}
+		w := min(c.textWidth(s.value, fontBold), valueBox.w())
+		x := valueBox.Left + (valueBox.w()-w)/2
+		y := segs[2].Bottom - c.px(4)
+		c.fill(rect{x, y, x + w, y + max(1, c.px(1))}, colMuted)
+	}
+	c.text(s.value, valueBox, fontBold, colText, dtCenter)
 }
 
 // --- Separator & spacer ----------------------------------------------------

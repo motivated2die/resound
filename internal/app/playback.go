@@ -17,7 +17,8 @@ import (
 type voiceMeta struct {
 	soundID uint64 // 0 for test sounds
 	name    string
-	preview bool // plays for the user only ("You hear")
+	preview bool          // plays for the user only ("You hear")
+	length  time.Duration // as known when it started (0 = unknown): whether it mutes the mic (muteFor)
 }
 
 // playbackState tracks what is playing, for the latency readout, the
@@ -80,12 +81,14 @@ func (p *playbackState) dropVoice(id uint64) {
 }
 
 // start queues a prepared sound. When forOthers is true (not a preview),
-// the mic is muted and push-to-talk pressed first — after decoding, so
-// neither happens early. Runs on the UI thread.
+// push-to-talk is pressed and, for a sound long enough (muteFor), the mic
+// muted first — after decoding, so neither happens early. Runs on the UI
+// thread.
 func (a *App) start(p *audio.Prepared, opts audio.PlayOptions, meta voiceMeta, forOthers bool) (audio.PlayInfo, error) {
 	pb := &a.playback
+	meta.length = p.Length()
 	if forOthers {
-		a.holdPlayback()
+		a.holdPlayback(a.muteFor(meta.length))
 	}
 	info, err := a.engine.Start(p, opts)
 	if err != nil {
@@ -293,7 +296,7 @@ func (a *App) resume(ids []uint64) {
 		}
 	}
 	if resumed > 0 && pb.wasHolding {
-		a.holdPlayback()
+		a.holdPlayback(false) // the resumed voices count again (longPlaying)
 	}
 	pb.wasHolding = false
 }
@@ -317,9 +320,14 @@ func (a *App) onEngineEvent(ev audio.Event) {
 				pb.remaining[ev.VoiceID] = n - 1
 			}
 		}
-		if len(pb.remaining) == 0 {
+		switch {
+		case len(pb.remaining) == 0:
 			a.releasePlayback()
 			a.render() // the flow's mic and push-to-talk badges go
+		case pb.mutedMic != "" && !a.longPlaying():
+			// Only shorter sounds are left: they leave the mic open.
+			a.releaseMic()
+			a.render()
 		}
 	case audio.EventOutputFailed:
 		logx.Printf("%s output failed: %v", ev.Output, ev.Err) // shown under the flow from the engine's state
@@ -333,11 +341,53 @@ func (a *App) onEngineEvent(ev audio.Event) {
 	}
 }
 
-// holdPlayback is what happens while sounds play for others: the mic is
-// muted and push-to-talk held, each if enabled.
-func (a *App) holdPlayback() {
-	a.holdMic()
+// holdPlayback is what happens while sounds play for others, each if
+// enabled: push-to-talk is held, and the mic muted while a sound long
+// enough plays (longPlaying). long says that the sound about to start is
+// one; it isn't playing yet.
+func (a *App) holdPlayback(long bool) {
+	if long || a.longPlaying() {
+		a.holdMic()
+	}
 	a.setPTT(pttPlayback, a.cfg.PushToTalkWhilePlaying)
+}
+
+// muteFor reports whether a sound of this length mutes the mic: one longer
+// than the threshold (MuteMicMinSeconds), or of unknown length (0), as
+// muting was before there was a threshold. A threshold of 0 mutes for
+// every sound.
+func (a *App) muteFor(length time.Duration) bool {
+	return muteFor(length, a.cfg.MuteMicMinSeconds)
+}
+
+func muteFor(length time.Duration, minSeconds float64) bool {
+	return minSeconds <= 0 || length <= 0 || length.Seconds() > minSeconds
+}
+
+// longPlaying reports whether a sound that mutes the mic (muteFor) plays
+// for others right now: started, not finished, not paused. Each sound
+// counts on its own, so short sounds one after another never add up.
+func (a *App) longPlaying() bool {
+	pb := &a.playback
+	for _, v := range a.engine.Voices() {
+		if _, live := pb.remaining[v.ID]; !live || v.Paused {
+			continue
+		}
+		if m, ok := pb.voice(v.ID); ok && !m.preview && a.muteFor(m.length) {
+			return true
+		}
+	}
+	return false
+}
+
+// syncMic mutes or unmutes the mic for what plays now, after the mute
+// settings changed: turned off, the mic is let go at once.
+func (a *App) syncMic() {
+	if a.cfg.MuteMicWhilePlaying && a.longPlaying() {
+		a.holdMic()
+	} else {
+		a.releaseMic()
+	}
 }
 
 // releasePlayback undoes holdPlayback.

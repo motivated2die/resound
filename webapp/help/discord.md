@@ -19,7 +19,7 @@ In Discord: **User Settings** → **Voice & Video**.
 Discord renames and moves these settings now and then; look for the same words under Voice Processing or the advanced voice settings.
 
 :::note What about background noise?
-Without noise suppression Discord sends your microphone as it is. A headset microphone close to your mouth usually sounds fine. While sounds play, Resound mutes your microphone anyway ([mic mute](push-to-talk.md#mute-your-microphone-while-sounds-play)), so your room doesn't mix into them.
+Without noise suppression Discord sends your microphone as it is. A headset microphone close to your mouth usually sounds fine. Resound can also mute your microphone while longer sounds play ([mic mute](push-to-talk.md#mute-your-microphone-while-sounds-play)), so your room doesn't mix into them.
 :::
 
 ## Input sensitivity

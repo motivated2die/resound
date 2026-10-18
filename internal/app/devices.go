@@ -167,15 +167,6 @@ func (a *App) selectMic(id string) {
 	a.render()
 }
 
-func (a *App) toggleMuteWhilePlaying() {
-	a.cfg.MuteMicWhilePlaying = !a.cfg.MuteMicWhilePlaying
-	if !a.cfg.MuteMicWhilePlaying {
-		a.releaseMic()
-	}
-	a.save()
-	a.render()
-}
-
 // useCableAsOutput goes back to the automatic "others hear" output,
 // VB-Cable's CABLE Input.
 func (a *App) useCableAsOutput() { a.selectCable("") }
