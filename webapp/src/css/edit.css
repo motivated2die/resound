@@ -1,0 +1,102 @@
+/* The edit page (edit.html): a slim bar above the embedded editor. */
+
+:root {
+    --accent: #50dea8;
+    --on-accent: #10261d;
+    --background: #1c1d22;
+    --surface: #25272d;
+    --border: #34363e;
+    --text: #ececf0;
+    --text-secondary: #9a9ca6;
+    --bad: #ff8a8a;
+    color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+
+html, body { height: 100%; margin: 0; }
+
+body {
+    display: flex;
+    flex-direction: column;
+    background: var(--background);
+    color: var(--text);
+    font: 15px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+.bar {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 8px 16px;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    min-height: 56px;
+}
+
+.logo { width: 32px; height: 32px; flex: none; }
+
+.bar-text { min-width: 0; flex: 1; }
+
+h1 { margin: 0; font-size: 15px; font-weight: 600; }
+
+.status {
+    margin: 0;
+    font-size: 13px;
+    color: var(--text-secondary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.status.bad { color: var(--bad); }
+
+.clips {
+    display: flex;
+    gap: 6px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    overflow-x: auto;
+    max-width: 50%;
+}
+.clips li {
+    flex: none;
+    padding: 3px 10px;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--accent) 18%, transparent);
+    color: var(--accent);
+    font-size: 13px;
+    white-space: nowrap;
+}
+
+.stage { position: relative; flex: 1; min-height: 0; }
+
+.stage iframe { display: block; width: 100%; height: 100%; border: 0; background: var(--background); }
+
+.notice {
+    max-width: 520px;
+    margin: 12vh auto 0;
+    padding: 0 16px;
+    text-align: center;
+}
+.notice.bad .lead { color: var(--bad); }
+
+.lead { font-size: 16px; }
+.hint { font-size: 13px; color: var(--text-secondary); }
+
+progress { width: 100%; accent-color: var(--accent); }
+
+.spinner {
+    width: 28px;
+    height: 28px;
+    margin: 0 auto 8px;
+    border: 3px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.9s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+@media (prefers-reduced-motion: reduce) {
+    .spinner { animation-duration: 3s; }
+}

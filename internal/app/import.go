@@ -2,7 +2,8 @@ package app
 
 // Importing sounds by drag and drop onto a folder on the Sound library page:
 // a Myinstants sound (its name or link icon), any link to a sound file or a
-// page with one sound, or sound files from Explorer. Links are downloaded
+// page with one sound, or sound files from Explorer. Videos and other audio
+// files open in the editor in the browser (edit.go). Links are downloaded
 // in the background (package importer). The new sound is saved under its
 // page's name; a card under the folder lets the user rename it, preview it
 // or discard it, and warns when the same sound is already in the library.
@@ -20,6 +21,7 @@ import (
 	"time"
 
 	"github.com/motivated2die/resound/internal/audio"
+	"github.com/motivated2die/resound/internal/editbridge"
 	"github.com/motivated2die/resound/internal/importer"
 	"github.com/motivated2die/resound/internal/library"
 	"github.com/motivated2die/resound/internal/logx"
@@ -46,6 +48,7 @@ type importState int
 
 const (
 	importRunning   importState = iota // downloading
+	importEditing                      // a file is open in the editor; its clips become imports of their own
 	importNaming                       // saved; the card asks for a name
 	importDone                         // kept: the folder shows a note
 	importDiscarded                    // deleted again: the folder shows a note
@@ -61,6 +64,10 @@ type soundImport struct {
 	err   string // failed: what to tell the user; naming: a rename problem
 	dup   string // naming: the same sound is already in the library
 
+	src            string // editing: the file's name
+	token, editURL string // editing: the file's token and the edit page's address
+	opened         bool   // editing: the page has loaded the file
+
 	path, name, ext string // the saved file
 	voice           uint64 // its preview, while playing
 }
@@ -70,6 +77,7 @@ type importsState struct {
 	jobs    []*soundImport
 	seq     int
 	fetcher *importer.Fetcher
+	bridge  *editbridge.Bridge // to the edit page, once a file was opened in the editor
 	ctx     context.Context
 	cancel  context.CancelFunc
 	warn    string // a drop that went nowhere, shown at the top of the page
@@ -81,11 +89,28 @@ func (s *importsState) init() {
 	s.ctx, s.cancel = context.WithCancel(context.Background())
 }
 
-// clearFinished forgets everything but running downloads (the panel
-// reopened). A sound still waiting for its name keeps the name it has.
+// clearFinished forgets everything but running downloads and files open
+// in the editor (the panel reopened). A sound still waiting for its name
+// keeps the name it has.
 func (s *importsState) clearFinished() {
-	s.jobs = slices.DeleteFunc(s.jobs, func(j *soundImport) bool { return j.state != importRunning })
+	s.jobs = slices.DeleteFunc(s.jobs, func(j *soundImport) bool { return j.state != importRunning && j.state != importEditing })
 	s.warn = ""
+}
+
+// add numbers a new job and lists it. Beyond maxImportsShown, the oldest
+// jobs are forgotten, except files open in the editor.
+func (s *importsState) add(job *soundImport) *soundImport {
+	s.seq++
+	job.id = s.seq
+	s.jobs = append(s.jobs, job)
+	for excess := len(s.jobs) - maxImportsShown; excess > 0; excess-- {
+		i := slices.IndexFunc(s.jobs, func(j *soundImport) bool { return j.state != importEditing })
+		if i < 0 || i == len(s.jobs)-1 {
+			break
+		}
+		s.jobs = slices.Delete(s.jobs, i, i+1)
+	}
+	return job
 }
 
 func (s *importsState) remove(job *soundImport) {
@@ -102,6 +127,10 @@ func (a *App) onDropAnywhere(d ui.DropData) {
 	a.setImportWarn("")
 	if len(d.Paths) > 0 {
 		a.addFolders(d.Paths)
+		if slices.ContainsFunc(d.Paths, editable) && len(a.cfg.Folders) > 0 {
+			a.setImportWarn("Drop videos and other audio files onto one of the folders below to cut a sound from them.")
+			a.render()
+		}
 		return
 	}
 	if len(d.Links) > 0 {
@@ -121,7 +150,7 @@ func (a *App) dropOnFolder(dir string) func(ui.DropData) {
 		for _, link := range d.Links {
 			a.importLink(dir, link)
 		}
-		var folders, sounds []string
+		var folders, sounds, edits []string
 		skipped := 0
 		for _, p := range d.Paths {
 			info, err := os.Stat(p)
@@ -130,8 +159,10 @@ func (a *App) dropOnFolder(dir string) func(ui.DropData) {
 				skipped++
 			case info.IsDir():
 				folders = append(folders, p)
-			case slices.Contains(audio.SupportedExtensions, strings.ToLower(filepath.Ext(p))):
+			case playable(p):
 				sounds = append(sounds, p)
+			case editable(p):
+				edits = append(edits, p)
 			default:
 				skipped++
 			}
@@ -141,8 +172,11 @@ func (a *App) dropOnFolder(dir string) func(ui.DropData) {
 		}
 		if len(sounds) > 0 {
 			a.copySounds(dir, sounds, skipped)
-		} else if skipped > 0 && len(folders) == 0 {
-			a.setImportWarn("Only MP3, WAV, FLAC and OGG files can be added.")
+		} else if skipped > 0 && len(folders) == 0 && len(edits) == 0 {
+			a.setImportWarn("Only sound files and videos can be added.")
+		}
+		if len(edits) > 0 {
+			a.editFiles(dir, edits)
 		}
 		a.render()
 	}
@@ -156,12 +190,7 @@ func (a *App) importLink(dir, link string) {
 		a.setImportWarn("That is not a web link to a sound.")
 		return
 	}
-	s.seq++
-	job := &soundImport{id: s.seq, dir: dir, host: u.Hostname()}
-	s.jobs = append(s.jobs, job)
-	if n := len(s.jobs); n > maxImportsShown {
-		s.jobs = slices.Delete(s.jobs, 0, n-maxImportsShown)
-	}
+	job := s.add(&soundImport{dir: dir, host: u.Hostname()})
 	logx.Printf("import: downloading %s into %s", redactQuery(u), dir)
 	go func() {
 		saved, err := s.fetcher.Fetch(s.ctx, u.String(), dir)
@@ -460,7 +489,7 @@ func (a *App) copySounds(dir string, files []string, skipped int) {
 				parts = append(parts, plural(failed, "file")+" could not be copied (see log).")
 			}
 			if skipped > 0 {
-				parts = append(parts, plural(skipped, "file")+" skipped: not MP3, WAV, FLAC or OGG.")
+				parts = append(parts, plural(skipped, "file")+" skipped: not a sound or a video.")
 			}
 			a.setLibNote(strings.Join(parts, " "), true)
 			a.rescan()
@@ -480,6 +509,11 @@ func (a *App) folderImport(dir string) (note string, active bool) {
 		switch job.state {
 		case importRunning:
 			note, active = "Downloading…", true
+		case importEditing:
+			note, active = "Opening the editor…", true
+			if job.opened {
+				note = "Editing in your browser…"
+			}
 		case importNaming:
 			note, active = "Name the new sound", true
 		case importDone:
@@ -502,6 +536,8 @@ func (a *App) importRows(dir string) []ui.Row {
 		switch job.state {
 		case importFailed:
 			rows = append(rows, ui.Paragraph(job.err, ui.ToneBad))
+		case importEditing:
+			rows = append(rows, a.editRows(job)...)
 		case importNaming:
 			j := job
 			fieldID := fmt.Sprintf("import-name-%d", j.id)

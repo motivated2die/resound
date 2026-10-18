@@ -14,7 +14,8 @@ var src = os.DirFS(filepath.Join("..", "..", "webapp", "src"))
 // The app must not load anything from the internet: no URLs in our own
 // files (vendored libraries only mention them in comments, and the emoji
 // picker's default data URL is overridden by data-source). Links the user
-// follows (<a href="https://…">) are fine: they load nothing.
+// follows (<a href="https://…">) are fine: they load nothing. The one
+// exception is the editor the edit page embeds (TestEditPagePrivate).
 func TestWebSelfContained(t *testing.T) {
 	url := regexp.MustCompile(`(https?:)?//[a-z0-9-]+(\.[a-z0-9-]+)+[/"'\s)]`)
 	link := regexp.MustCompile(`<a [^>]*href="https://[^"]*"`)
@@ -33,7 +34,8 @@ func TestWebSelfContained(t *testing.T) {
 			if strings.HasSuffix(path, ".html") {
 				line = link.ReplaceAllString(line, "<a")
 			}
-			if m := url.FindString(line); m != "" && !strings.Contains(line, "www.w3.org/2000/svg") {
+			if m := url.FindString(line); m != "" && !strings.Contains(line, "www.w3.org/2000/svg") &&
+				!(editorFiles[path] && strings.HasPrefix(m, editorOrigin)) {
 				t.Errorf("%s:%d references %q", path, i+1, m)
 			}
 		}
@@ -56,6 +58,58 @@ func TestWebSelfContained(t *testing.T) {
 		first := regexp.MustCompile(`<script[^>]*>`).FindString(string(data))
 		if !strings.Contains(first, `src="js/rtc.js"`) {
 			t.Errorf("%s must load js/rtc.js as its first script, not %q", page, first)
+		}
+	}
+}
+
+// The editor the edit page embeds, and the edit page's files, the only ones
+// that may name it.
+const editorOrigin = "https://audiocutter.online"
+
+var editorFiles = map[string]bool{"edit.html": true, "js/edit.js": true}
+
+// The edit page hands the user's files between Resound (on 127.0.0.1) and
+// the editor. Its host must learn nothing about them: the page's policy
+// lets it reach Resound and frame the editor only, never its own host,
+// and the site-wide policy (which would apply on top) is dropped for it.
+func TestEditPagePrivate(t *testing.T) {
+	page, err := fs.ReadFile(src, "edit.html")
+	if err != nil {
+		t.Fatal(err)
+	}
+	m := regexp.MustCompile(`<meta http-equiv="Content-Security-Policy" content="([^"]*)">`).FindSubmatch(page)
+	if m == nil {
+		t.Fatal("edit.html has no Content-Security-Policy <meta> tag")
+	}
+	directives := map[string]string{}
+	for _, d := range strings.Split(string(m[1]), ";") {
+		name, value, _ := strings.Cut(strings.TrimSpace(d), " ")
+		directives[name] = value
+	}
+	for name, want := range map[string]string{
+		"default-src": "'none'",
+		"connect-src": "http://127.0.0.1:*",
+		"frame-src":   editorOrigin,
+		"form-action": "'none'",
+	} {
+		if got := directives[name]; got != want {
+			t.Errorf("edit.html: %s is %q, want %q", name, got, want)
+		}
+	}
+	if strings.Contains(string(page), `src="js/rtc.js"`) || strings.Contains(string(page), `rel="manifest"`) {
+		t.Error("edit.html must not load the remote's connection or the app manifest")
+	}
+
+	headers, err := fs.ReadFile(src, "_headers")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, path := range []string{"/edit", "/edit.html"} {
+		block := regexp.MustCompile(`(?m)^` + regexp.QuoteMeta(path) + `
+((?:[ 	]+.*
+?)*)`).FindSubmatch(headers)
+		if block == nil || !strings.Contains(string(block[1]), "! Content-Security-Policy") {
+			t.Errorf("_headers must drop the site-wide Content-Security-Policy for %s", path)
 		}
 	}
 }

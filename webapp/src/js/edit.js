@@ -1,0 +1,221 @@
+// The edit page: Resound opens it in a browser window with a file it can't
+// play (a video, or audio in another format), dropped onto a library folder.
+// It reads the file from Resound on this PC, embeds the editor
+// (audiocutter.online) with the file loaded, and sends every clip the user
+// adds back to Resound, which saves it into the folder.
+//
+// Resound serves the file on 127.0.0.1 (internal/editbridge); the port and
+// a token come in the fragment, which the browser never sends anywhere. The
+// page talks to nothing but Resound and the editor (its Content-Security-
+// Policy allows nothing else, not even this site), so the host never learns
+// about the file or the clips. The window title never names the file: it
+// ends up in the browser's history.
+'use strict';
+
+(() => {
+    const EDITOR = 'https://audiocutter.online';
+    const STORE = 'resound.edit';
+
+    const $ = (id) => document.getElementById(id);
+    const status = $('status');
+    const notice = $('notice');
+
+    // --- where Resound is -------------------------------------------------------
+
+    // The fragment is moved into this tab's session storage and out of the
+    // address bar (and so out of history); a reload finds it there.
+    function readParams() {
+        const hash = new URLSearchParams(location.hash.slice(1));
+        let params = null;
+        if (hash.get('v') === '1' && /^\d{1,5}$/.test(hash.get('p') || '') && /^[0-9a-f]{32}$/.test(hash.get('t') || '')) {
+            params = { port: hash.get('p'), token: hash.get('t') };
+            try { sessionStorage.setItem(STORE, JSON.stringify(params)); } catch { /* private mode: reloads lose it */ }
+            history.replaceState(null, '', location.pathname);
+        } else {
+            try { params = JSON.parse(sessionStorage.getItem(STORE) || 'null'); } catch { params = null; }
+        }
+        return params;
+    }
+
+    const params = readParams();
+    if (!params) {
+        fail('This page opens from Resound. In the Resound panel, drop a video or another audio file onto a folder on the Sound library page.');
+        return;
+    }
+    const base = `http://127.0.0.1:${params.port}/v1/${params.token}`;
+
+    // --- talking to Resound -----------------------------------------------------
+
+    class ResoundError extends Error {}
+
+    // resound fetches from Resound; a refusal carries Resound's own message.
+    async function resound(path, init) {
+        let res;
+        try {
+            res = await fetch(base + path, { cache: 'no-store', ...init });
+        } catch {
+            throw new ResoundError(await unreachableMessage());
+        }
+        if (!res.ok) {
+            let msg = `Resound answered ${res.status}.`;
+            try { msg = (await res.json()).error || msg; } catch { /* not JSON */ }
+            throw new ResoundError(msg);
+        }
+        return res;
+    }
+
+    // A failed request can't tell a closed Resound from a browser that
+    // blocks this page from reaching it; the permission, if readable, can.
+    async function unreachableMessage() {
+        for (const name of ['loopback-network', 'local-network-access', 'local-network']) {
+            try {
+                if ((await navigator.permissions.query({ name })).state === 'denied') {
+                    return 'Your browser blocks this page from reaching Resound on this PC. Open the site settings of getresound.app ' +
+                        '(the icon at the left of the address bar, or in the title bar), allow access to apps on this device, and reload.';
+                }
+            } catch { /* this browser doesn't know the name */ }
+        }
+        return "Can't reach Resound: it was closed, or editing this file was stopped in its panel. Drop the file onto a folder again to open a new editor.";
+    }
+
+    // download reads the file with progress; the editor gets it as a File,
+    // so it knows its name and type.
+    async function download(info) {
+        const res = await resound('/source');
+        const total = info.size || Number(res.headers.get('Content-Length')) || 0;
+        const progress = $('progress');
+        progress.hidden = total === 0;
+        const reader = res.body.getReader();
+        const chunks = [];
+        let got = 0;
+        for (;;) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            chunks.push(value);
+            got += value.length;
+            if (total) progress.value = got / total;
+        }
+        return new File(chunks, info.filename, { type: info.type || '' });
+    }
+
+    // --- the editor ---------------------------------------------------------------
+
+    let editor = null;
+    let sent = false;
+    let info = null;
+
+    function openEditor(file) {
+        editor = document.createElement('iframe');
+        editor.title = 'Audio editor';
+        editor.allow = 'autoplay; clipboard-write; fullscreen';
+        editor.referrerPolicy = 'no-referrer';
+        editor.src = EDITOR + '/import/';
+        notice.replaceWith(editor);
+
+        // The import page waits 30 s for the file after saying it's ready;
+        // the file is loaded already, so it goes at once.
+        window.addEventListener('message', (event) => {
+            if (event.origin !== EDITOR || event.source !== editor.contentWindow) return;
+            const msg = event.data;
+            if (!msg || typeof msg !== 'object' || msg.source !== 'audiocutter') return;
+            switch (msg.type) {
+            case 'ready':
+                if (!sent) {
+                    sent = true;
+                    editor.contentWindow.postMessage({ type: 'session', manifest: manifest(file) }, EDITOR);
+                    setStatus(`Saving clips into “${info.folder}”. Select the part you want and press “Add to Resound”.`);
+                }
+                break;
+            case 'result':
+                addClip(msg.audio);
+                break;
+            case 'error':
+                setStatus('The editor refused the file: ' + (msg.issues || []).join('; '), true);
+                break;
+            }
+        });
+    }
+
+    // manifest is the editor's project: the one file, whole, with the
+    // clips posted back to this window.
+    function manifest(file) {
+        return {
+            version: 2,
+            project: {
+                files: [{ id: 'source', file }],
+                fragments: [{ id: 'clip', fileId: 'source' }],
+            },
+            session: {
+                ui: {
+                    title: 'Cut a sound for Resound',
+                    instruction: 'Select the part you want, then press “Add to Resound”. You can add as many clips as you like.',
+                    submitLabel: 'Add to Resound',
+                    accentColor: '#50dea8',
+                },
+                output: { mode: 'postmessage', format: info.format || 'mp3', targetOrigin: location.origin },
+            },
+        };
+    }
+
+    // addClip sends a clip from the editor to Resound. Clips are sent one
+    // after another, in the order they were added.
+    let queue = Promise.resolve();
+    function addClip(audio) {
+        if (!(audio instanceof Blob) || audio.size === 0) {
+            setStatus('The editor sent an empty clip.', true);
+            return;
+        }
+        queue = queue.then(async () => {
+            setStatus('Adding the clip to Resound…');
+            try {
+                const res = await resound('/result', {
+                    method: 'POST',
+                    headers: { 'Content-Type': audio.type || 'audio/mpeg' },
+                    body: audio,
+                });
+                const { name } = await res.json();
+                const li = document.createElement('li');
+                li.textContent = '✓ ' + name;
+                $('clips').append(li);
+                setStatus(`Added “${name}” to “${info.folder}”. Name it in the Resound panel, or cut another clip.`);
+            } catch (e) {
+                setStatus(e instanceof ResoundError ? e.message : 'The clip could not be sent to Resound.', true);
+            }
+        });
+    }
+
+    // --- page state -----------------------------------------------------------------
+
+    function setStatus(text, bad = false) {
+        status.textContent = text;
+        status.classList.toggle('bad', bad);
+        status.title = text;
+    }
+
+    function fail(text) {
+        setStatus(text, true);
+        notice.classList.add('bad');
+        $('spinner').hidden = true;
+        $('progress').hidden = true;
+        $('notice-hint').hidden = true;
+        $('notice-text').textContent = text;
+    }
+
+    // Tell Resound when the window goes away; a reload comes back within
+    // its grace period and keeps the file open.
+    window.addEventListener('pagehide', () => {
+        fetch(base + '/close', { method: 'POST', keepalive: true }).catch(() => {});
+    });
+
+    (async () => {
+        try {
+            info = await (await resound('')).json();
+            $('notice-text').textContent = `Loading “${info.filename}” from Resound…`;
+            setStatus(`Loading “${info.filename}”…`);
+            const file = await download(info);
+            openEditor(file);
+        } catch (e) {
+            fail(e instanceof ResoundError ? e.message : 'Something went wrong: ' + e.message);
+        }
+    })();
+})();

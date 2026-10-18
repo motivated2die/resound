@@ -321,6 +321,9 @@ func (a *App) quit() {
 	a.cancelCableDownload()
 	a.cancelUpdate()
 	a.imports.cancel()
+	if a.imports.bridge != nil {
+		a.imports.bridge.Close() // pages still open say that Resound is gone
+	}
 	a.stopSoundsZip()
 	if a.srv != nil {
 		a.srv.Close() // before the UI thread stops answering server calls

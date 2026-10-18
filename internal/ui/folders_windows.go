@@ -32,6 +32,9 @@ type FolderSpec struct {
 	OnClick func()
 	// OnDrop receives files and links dropped on the field.
 	OnDrop func(DropData)
+	// DropHint, if set, says what a drop of the dragged things would do,
+	// in place of "Drop to add here"; "" keeps that.
+	DropHint func(DropData) string
 }
 
 type folderDropRow struct{ s FolderSpec }
@@ -131,6 +134,11 @@ func (f folderDropRow) paint(c *canvas, r rect, st rowState) {
 	switch {
 	case st.drop:
 		detail, detailCol = "Drop to add here", colAccent
+		if f.s.DropHint != nil && st.dragged != nil {
+			if hint := f.s.DropHint(*st.dragged); hint != "" {
+				detail = hint
+			}
+		}
 	case f.s.Note != "":
 		detail, detailCol = f.s.Note, colAccent
 	}

@@ -5,10 +5,12 @@ import "testing"
 // TestLibraryRowsRender paints the library page's rows: the import guide,
 // a folder with nested subfolders (one being imported into, one with
 // something dragged over it, one showing "Added"), the name field of an
-// imported sound with its buttons, and the home page's section link.
+// imported sound with its buttons, a file open in the editor, a video
+// dragged over a folder, and the home page's section link.
 // RESOUND_RENDER_DIR saves a PNG.
 func TestLibraryRowsRender(t *testing.T) {
 	dropped := false
+	var hinted []string
 	rows := []Row{
 		HeaderTool("Sound library", func() {}, IconRefresh, "Refresh", func() {}),
 		SectionLink("Sound library", "import sounds", "Download sounds", func() {}),
@@ -27,18 +29,33 @@ func TestLibraryRowsRender(t *testing.T) {
 		GroupEnd(),
 		FolderDrop(FolderSpec{Name: "Games", Detail: "7 sounds", Note: "Added “Mario jump”", Depth: 1, OnDrop: func(DropData) {}}),
 		FolderDrop(FolderSpec{Name: "Classics", Detail: "Empty", Depth: 1, OnDrop: func(DropData) {}}),
+		GroupStart(),
+		FolderDrop(FolderSpec{Name: "Clips", Detail: "3 sounds", Note: "Editing in your browser…", Depth: 1, Active: true, OnDrop: func(DropData) {}}),
+		Paragraph("“Funny moment.mp4” is open in the editor in your browser. Cut the part you want and press “Add to Resound”: each clip is saved here.", ToneMuted),
+		Buttons(Action{Label: "Show editor", Icon: IconExternalLink}, Action{Label: "Stop editing"}),
+		GroupEnd(),
+		FolderDrop(FolderSpec{Name: "Videos", Detail: "Empty", Depth: 1, OnDrop: func(DropData) {}, DropHint: func(d DropData) string {
+			hinted = d.Paths
+			return "Drop to cut in the editor"
+		}}),
 	}
+	dragged := DropData{Paths: []string{`D:\Funny moment.mp4`}}
 	states := map[int]rowState{
 		0:  {hover: 1, press: -1, open: -1},
 		1:  {hover: 0, press: -1, open: -1},
 		5:  {hover: 1, press: -1, open: -1},
 		15: {hover: -1, press: -1, open: -1, drop: true},
+		22: {hover: -1, press: -1, open: -1, drop: true, dragged: &dragged},
 	}
 	for _, scale := range []float64{1, 1.5} {
 		img := renderRows(t, rows, scale, states)
 		if scale == 1.5 {
 			savePNG(t, img, "library-rows")
 		}
+	}
+
+	if len(hinted) != 1 {
+		t.Errorf("DropHint got %v, want the dragged video", hinted)
 	}
 
 	d, ok := rows[5].(dropper)

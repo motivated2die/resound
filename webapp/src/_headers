@@ -9,3 +9,15 @@
 
 /sw.js
   Cache-Control: no-cache
+
+# The edit page talks to Resound on 127.0.0.1 and embeds the editor
+# (audiocutter.online). Its own, narrower policy is in a <meta> tag
+# (edit.html): it can't reach this host at all. Two policies would both
+# apply, so the site-wide one is dropped here; X-Frame-Options takes over
+# frame-ancestors, which a <meta> policy can't set.
+/edit
+  ! Content-Security-Policy
+  X-Frame-Options: DENY
+/edit.html
+  ! Content-Security-Policy
+  X-Frame-Options: DENY

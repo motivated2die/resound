@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!--
+        This page passes a file from Resound on this PC to the editor and the
+        clips back, all inside the browser. It may talk to Resound (127.0.0.1)
+        and embed the editor, and nothing else: not even its own host, so the
+        host never learns about the file. _headers drops the site-wide policy
+        for this page in favour of this one.
+    -->
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; connect-src http://127.0.0.1:*; frame-src https://audiocutter.online; base-uri 'none'; form-action 'none'">
+    <meta name="referrer" content="no-referrer">
+    <meta name="robots" content="noindex">
+    <meta name="theme-color" content="#1c1d22">
+    <link rel="icon" href="/assets/favicon.ico" sizes="any">
+    <title>Resound · Cut a sound</title>
+    <link rel="stylesheet" href="css/edit.css">
+    <script src="js/edit.js" defer></script>
+</head>
+<body>
+    <header class="bar">
+        <img src="assets/resound-192.png" alt="" class="logo">
+        <div class="bar-text">
+            <h1>Resound</h1>
+            <p id="status" class="status" role="status" aria-live="polite">Connecting to Resound…</p>
+        </div>
+        <ul id="clips" class="clips" aria-label="Clips added to Resound"></ul>
+    </header>
+
+    <main id="stage" class="stage">
+        <!-- Before the editor: connecting, loading the file, or what went wrong -->
+        <section id="notice" class="notice">
+            <div id="spinner" class="spinner" aria-hidden="true"></div>
+            <p id="notice-text" class="lead">Connecting to Resound…</p>
+            <p id="notice-hint" class="hint">
+                Your browser may ask whether this page may access apps on this device.
+                Allow it: that's how the file gets from Resound into this window.
+                getresound.app never receives the file: it goes from Resound straight to the editor in this window.
+            </p>
+            <progress id="progress" max="1" value="0" hidden></progress>
+        </section>
+    </main>
+</body>
+</html>

@@ -549,7 +549,7 @@ func (a *App) libraryPage() []ui.Row {
 	if len(a.cfg.Folders) > 0 {
 		rows = append(rows,
 			ui.Section("Import sounds"),
-			ui.ImportGuide("Find a sound on a button site and drag its name onto a folder below. Resound downloads it there. Sound files from Explorer work too.", "drag its name"),
+			ui.ImportGuide("Find a sound on a button site and drag its name onto a folder below. Resound downloads it there. Sound files from Explorer work too; videos open in an editor to cut a clip.", "drag its name"),
 			ui.Buttons(
 				ui.Action{Label: "Myinstants", OnClick: a.openSite(myinstantsURL)},
 				ui.Action{Label: "Sound Buttons World", OnClick: a.openSite(soundButtonsWorldURL)},
@@ -612,7 +612,7 @@ func (a *App) folderRows() []ui.Row {
 			Name: filepath.Base(f), Detail: detail, Tip: f, Note: note, Active: active,
 			ActionIcon: ui.IconTrash, ActionTip: "Remove from the library (the folder and its files stay on disk)",
 			OnAction: func() { a.removing = folder; a.render() },
-			OnClick:  open(f), OnDrop: a.dropOnFolder(f),
+			OnClick:  open(f), OnDrop: a.dropOnFolder(f), DropHint: dropHint,
 		}), a.importRows(f))...)
 		if a.removing == folder {
 			rows = append(rows,
@@ -631,7 +631,7 @@ func (a *App) folderRows() []ui.Row {
 			note, active := a.folderImport(sub.Path)
 			rows = append(rows, a.importGroup(active, ui.FolderDrop(ui.FolderSpec{
 				Name: filepath.Base(sub.Path), Detail: detail, Tip: sub.Path, Depth: sub.Depth,
-				Note: note, Active: active, OnClick: open(sub.Path), OnDrop: a.dropOnFolder(sub.Path),
+				Note: note, Active: active, OnClick: open(sub.Path), OnDrop: a.dropOnFolder(sub.Path), DropHint: dropHint,
 			}), a.importRows(sub.Path))...)
 		}
 	}

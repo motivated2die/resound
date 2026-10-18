@@ -24,6 +24,22 @@ You can also drop:
 
 A folder dropped anywhere else on the page becomes a new library folder.
 
+## Cut a sound from a video
+
+Drop a video (MP4, MKV, WEBM, MOV and others) or audio Resound can't play as it is (M4A, AAC, OPUS, WMA, AIFF and others) onto a folder. While you drag it over the folder, the folder reads **Drop to cut in the editor**.
+
+1. A browser window opens with the file loaded in an audio editor ([audiocutter.online](https://audiocutter.online)).
+2. Select the part you want and press **Add to Resound**. The clip is saved into the folder as an MP3, and the usual card opens in the panel to name it.
+3. Cut as many clips as you like; each **Add to Resound** saves one more. Close the window when you're done, or press **Stop editing** under the folder in the panel.
+
+The editor's own **Download file** button still works too: drag the downloaded file from your browser's download list onto a folder.
+
+:::note The first time
+Your browser may ask whether `getresound.app` may access apps on this device. Allow it: that's how the file gets from Resound into the editor window. The file goes from Resound straight to the editor; `getresound.app` never receives it.
+:::
+
+If the window says it can't reach Resound, check that Resound is running, then drop the file onto the folder again. If you blocked the browser's question, open the site settings for `getresound.app` (the icon at the left of the address bar, or in the window's title bar), allow access to apps on this device, and reload the window.
+
 ## Already in your library?
 
 Resound checks every new sound against your library. If you have it already, the card says where. You can still keep it, or discard it.
@@ -34,7 +50,7 @@ Resound checks every new sound against your library. If you have it already, the
 |---|---|---|
 | No sound file found at this link | Search and category pages hold many sounds without a direct link | Drag a single sound's name, or open its own page and drag the address from there |
 | This page has several sounds | Resound only takes a page with exactly one sound | Drag the one sound's name or link |
-| Not a supported sound format | Not MP3, WAV, FLAC or OGG, or the file is damaged | Convert it, or look for another copy |
+| Not a supported sound format | Not MP3, WAV, FLAC or OGG, or the file is damaged | Download it in your browser and drop the file onto a folder to [cut it in the editor](#cut-a-sound-from-a-video) |
 | The sound file is too large | Over 25 MB | Shorten it, or copy the file in from Explorer |
 | Links to this PC or the local network are not downloaded | Resound only downloads from the internet | Copy the file into the folder in Explorer |
 | Drop the sound onto one of the folders | It landed beside the folder fields | Drop it right onto a folder |

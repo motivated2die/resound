@@ -502,7 +502,9 @@ func (p *Popup) paint() {
 		if p.dd != nil && p.dd.row == i {
 			st.open = p.dd.seg
 		}
-		st.drop = i == p.dropRow
+		if st.drop = i == p.dropRow; st.drop {
+			st.dragged = &p.dragData
+		}
 		s.row.paint(c, r, st)
 	}
 	// Scroll indicator.

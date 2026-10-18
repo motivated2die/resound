@@ -169,7 +169,7 @@ func (f *Fetcher) Fetch(ctx context.Context, link, dir string) (Saved, error) {
 		found.ext = ext
 	}
 	defer body.Close()
-	return f.save(body, found.ext, SanitizeName(found.Name), dir)
+	return Save(body, found.ext, SanitizeName(found.Name), dir, MaxSoundBytes, f.Check)
 }
 
 // found is Found plus the extension, once the sound's response is known.
@@ -291,9 +291,12 @@ func (f *Fetcher) supported(ext string) bool {
 	return false
 }
 
-// save writes the sound to a temporary file in dir, checks it, and moves it
-// to its final, unique name.
-func (f *Fetcher) save(body io.Reader, ext, name, dir string) (Saved, error) {
+// Save writes a sound to a temporary file in dir, checks it with check
+// (nil skips the check), and moves it to name+ext there, made unique. A
+// sound over limit bytes gives ErrTooLarge, an empty one ErrNoSound.
+// Downloads and sounds cut in the editor (package editbridge) are saved
+// this way.
+func Save(body io.Reader, ext, name, dir string, limit int64, check func(string) error) (Saved, error) {
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return Saved{}, err
 	}
@@ -310,20 +313,20 @@ func (f *Fetcher) save(body io.Reader, ext, name, dir string) (Saved, error) {
 			os.Remove(tmpPath)
 		}
 	}()
-	n, err := io.Copy(tmp, io.LimitReader(body, MaxSoundBytes+1))
+	n, err := io.Copy(tmp, io.LimitReader(body, limit+1))
 	if cerr := tmp.Close(); err == nil {
 		err = cerr
 	}
 	switch {
 	case err != nil:
 		return Saved{}, fmt.Errorf("downloading: %w", unwrapURLError(err))
-	case n > MaxSoundBytes:
+	case n > limit:
 		return Saved{}, ErrTooLarge
 	case n == 0:
 		return Saved{}, ErrNoSound
 	}
-	if f.Check != nil {
-		if err := f.Check(tmpPath); err != nil {
+	if check != nil {
+		if err := check(tmpPath); err != nil {
 			return Saved{}, fmt.Errorf("%w: the file could not be read", ErrUnsupported)
 		}
 	}
