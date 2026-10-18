@@ -22,6 +22,7 @@ func (a *App) refreshDevices(verbose bool) {
 			logx.Printf("output: %q default=%v id=%s", d.Name, d.Default, d.ID)
 		}
 	}
+	a.rematchOutputs()
 }
 
 func (a *App) openOutputs() {
@@ -76,6 +77,7 @@ func (a *App) setOutput(role, id string, enabled bool) {
 
 func (a *App) selectMonitor(id string) {
 	a.cfg.MonitorDeviceID = id
+	a.cfg.MonitorDeviceName = deviceName(id, outputEndpoints(a.devices))
 	a.save()
 	a.setOutput(audio.RoleMonitor, id, true)
 	a.render()
@@ -85,8 +87,9 @@ func (a *App) selectMonitor(id string) {
 // which also ends an own routing.
 func (a *App) selectCable(id string) {
 	a.cfg.CableDeviceID = id
+	a.cfg.CableDeviceName = deviceName(id, outputEndpoints(a.devices))
 	if id == "" && a.cfg.AppsMicDeviceID != "" {
-		a.cfg.AppsMicDeviceID = ""
+		a.cfg.AppsMicDeviceID, a.cfg.AppsMicDeviceName = "", ""
 		a.refreshRouting(true) // the automatic mic may have skipped it
 	}
 	a.save()
@@ -120,6 +123,7 @@ func (a *App) appsMic() *routing.Input {
 // routing; the flow shows it and measures what arrives there.
 func (a *App) selectAppsMic(id string) {
 	a.cfg.AppsMicDeviceID = id
+	a.cfg.AppsMicDeviceName = deviceName(id, inputEndpoints(a.route.Inputs))
 	a.save()
 	a.refreshRouting(true)
 	a.render()
@@ -137,6 +141,10 @@ func (a *App) restartOutputs() {
 func (a *App) refreshRouting(verbose bool) {
 	st, err := routing.Check(a.cfg.MicDeviceID, a.cfg.AppsMicDeviceID)
 	a.route, a.routeErr = st, err
+	if err == nil && a.rematchInputs() {
+		st, err = routing.Check(a.cfg.MicDeviceID, a.cfg.AppsMicDeviceID)
+		a.route, a.routeErr = st, err
+	}
 	if err != nil {
 		logx.Printf("routing check: %v", err)
 		return
@@ -162,6 +170,7 @@ func (a *App) selectMic(id string) {
 		a.releaseMic() // don't leave the old mic muted
 	}
 	a.cfg.MicDeviceID = id
+	a.cfg.MicDeviceName = deviceName(id, inputEndpoints(a.route.Inputs))
 	a.save()
 	a.refreshRouting(true)
 	a.render()
