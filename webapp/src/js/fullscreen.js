@@ -1,14 +1,21 @@
 // Fullscreen in a browser tab. The installed app on Android opens
 // fullscreen by itself (manifest.json), and iPhones have no fullscreen for
-// pages; there the setting is hidden. Elsewhere "Fullscreen" (on by
-// default) enters fullscreen with the next tap, since browsers only allow it
-// in answer to one, and again after the app was in the background.
+// pages; there the setting is hidden. Elsewhere "Fullscreen" enters
+// fullscreen with the next tap, since browsers only allow it in answer to
+// one, and again after the app was in the background. It is on by default
+// on phones and tablets only (platform.js): on a computer, clicking into the
+// window would fill the screen with it.
 const fullscreenManager = (() => {
-    const SETTING_KEY = 'autoFullscreenEnabled';
-    let isEnabled = true;
+    const SETTING_KEY = 'fullscreen'; // stored once chosen (persistence.js)
+    let isEnabled = false;
     let active = false; // init found fullscreen useful here
 
     const settings = () => (typeof state !== 'undefined' && state.settings) ? state.settings : null;
+
+    const chosen = () => {
+        const value = settings()?.[SETTING_KEY];
+        return typeof value === 'boolean' ? value : window.platform.mobile;
+    };
 
     // applicable reports whether the page can go fullscreen and isn't already.
     const applicable = () => {
@@ -58,9 +65,15 @@ const fullscreenManager = (() => {
         requestFullscreen();
     };
 
+    // After "Reset all settings": back to this device's default.
+    const reset = () => {
+        isEnabled = chosen();
+        updateToggleUI();
+        if (!isEnabled) exitFullscreen();
+    };
+
     const init = () => {
-        const s = settings();
-        isEnabled = !s || s[SETTING_KEY] !== false;
+        isEnabled = chosen();
         active = applicable();
         const container = document.getElementById('fullscreen-toggle-container');
         if (!active) {
@@ -73,7 +86,7 @@ const fullscreenManager = (() => {
         document.addEventListener('pointerdown', handleInteraction, { capture: true, passive: true });
     };
 
-    const publicInterface = { init, setEnabled, isEnabled: () => isEnabled };
+    const publicInterface = { init, reset, setEnabled, isEnabled: () => isEnabled };
     window.fullscreenManager = publicInterface;
     return publicInterface;
 })();

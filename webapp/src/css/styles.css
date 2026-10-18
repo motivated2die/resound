@@ -78,6 +78,18 @@
   /* Base height */
   --header-height: 80px;
   --tabs-height: 50px; /* slim: swiping is the main way between tabs */
+  /* What the top bar covers. Android hides the status bar (fullscreen), so
+     the top inset is only the camera's strip and the bar shares it. */
+  --top-chrome: max(var(--top-bar-height), env(safe-area-inset-top, 0px));
+  --top-bar-inset: 0px;
+}
+
+/* iPhones and iPads always show the status bar (js/platform.js): the bar
+   sits below it and its colour fills the status bar's area. In landscape
+   the iPhone hides the status bar and the inset is 0. */
+html.ios {
+  --top-chrome: calc(var(--top-bar-height) + env(safe-area-inset-top, 0px));
+  --top-bar-inset: env(safe-area-inset-top, 0px);
 }
 
 /* --- Base & Reset --- */
@@ -121,7 +133,7 @@ body {
   flex-direction: column;
   height: 100%;
   /* Fill body's 100vh */
-  padding-top: max(var(--top-bar-height), env(safe-area-inset-top));
+  padding-top: var(--top-chrome);
   position: relative;
   /* Keep relative positioning */
   /* Ensure no bottom padding here */
@@ -188,10 +200,8 @@ body {
   justify-content: space-between;
   align-items: center;
   /* Vertically center content */
-  padding: 0 10px;
-  /* Standard horizontal padding only */
-  /* --- CHANGED: Height is dynamic, minimum of base height, max of inset --- */
-  height: max(var(--top-bar-height), env(safe-area-inset-top));
+  padding: var(--top-bar-inset) 10px 0;
+  height: var(--top-chrome);
   background-color: var(--v-secondary-darken1);
   border-bottom: 1px solid rgba(255, 255, 255, 0.1);
   transition: background-color var(--transition-speed) ease;
@@ -2305,7 +2315,7 @@ emoji-picker section#favorites {
    is css/connection-help.css. The tabs and the bottom bar stay. */
 .connection-help {
   position: absolute;
-  top: max(var(--top-bar-height), env(safe-area-inset-top));
+  top: var(--top-chrome);
   left: 0;
   right: 0;
   bottom: calc(var(--tabs-height) + var(--header-height));

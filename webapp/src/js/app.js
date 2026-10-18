@@ -569,7 +569,7 @@ function setupEventListeners() {
         if (window.fullscreenManager) {
             console.log("App ready: Fullscreen Manager found.");
             if (autoFullscreenToggle) {
-                autoFullscreenToggle.checked = state.settings?.autoFullscreenEnabled ?? false;
+                autoFullscreenToggle.checked = window.fullscreenManager.isEnabled();
                 // Listener is attached within fullscreenManager.init()
             } else {
                 console.error("App ready, Auto Fullscreen toggle button not found!");
@@ -902,11 +902,7 @@ async function resetAllSettings() {
     state.settings = persistence.load(); // Reload settings into global state
 
     // Update UI elements tied to settings
-    if (window.fullscreenManager && typeof state.settings.autoFullscreenEnabled !== 'undefined') {
-        const fsToggle = document.getElementById('auto-fullscreen-toggle');
-        if (fsToggle) fsToggle.checked = state.settings.autoFullscreenEnabled;
-        fullscreenManager.setEnabled(state.settings.autoFullscreenEnabled);
-    }
+    if (window.fullscreenManager) fullscreenManager.reset();
 
     // Reload tabs and sounds completely
     console.log("Reloading tabs after resetting all settings.");
@@ -922,11 +918,7 @@ async function resetAllSettings() {
 function openAppSettingsModal() {
     if (window.fullscreenManager) {
         const toggle = document.getElementById('auto-fullscreen-toggle');
-        if (toggle && state.settings && typeof state.settings.autoFullscreenEnabled !== 'undefined') {
-             toggle.checked = state.settings.autoFullscreenEnabled;
-        } else if (toggle) {
-             toggle.checked = false; // Default if setting missing
-        }
+        if (toggle) toggle.checked = fullscreenManager.isEnabled();
     }
     disarmAllResetButtons(); // never open with a button still armed
 

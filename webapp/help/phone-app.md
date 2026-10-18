@@ -49,7 +49,7 @@ The gear at the top opens the app's settings:
 | Setting | What it does |
 |---|---|
 | Keep Screen On | The screen doesn't turn off while the app is open (on by default) |
-| Fullscreen | Hides the browser's bars; the installed app is fullscreen anyway |
+| Fullscreen | Hides the browser's bars with your next tap (on by default on phones and tablets, off on computers); the installed app is fullscreen anyway |
 | Vibrate on Tap | A short vibration on play and stop (Android) |
 | Menu Buttons on the Left | Moves the top bar's buttons to the left |
 | Reset | Page colours, Page layout, or All colours and layouts. Hold until it fills, then tap to confirm. Applies to all devices |
