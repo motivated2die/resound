@@ -26,7 +26,17 @@ Favorites, volumes, colors and emoji stay with a sound when you rename it or mov
 
 Click the trash button next to a library folder, then **Remove**. The folder and its files stay on disk. Its sounds' settings are kept for 30 days, in case you add the folder back.
 
-Click a folder in the list to open it in Explorer.
+## See and manage the sounds in a folder
+
+Click a folder on the Sound library page to list its sounds below it; click it again to close the list. Sounds in its subfolders are listed under each subfolder. To open the folder in Explorer, point at it and click **Show in Explorer**, which appears in place of its sound count.
+
+Next to each sound:
+
+- the **scissors** open it in the [audio editor](audio-editor.md#trim-a-sound-in-your-library) in your browser. Select the part to keep and press **Save to Resound**: the trimmed sound replaces the file, in its own format, and keeps its favorite, volume, color and emoji. Its length and loudness are measured again.
+- the **pencil** renames it. Type the new name and press <kbd>Enter</kbd> or **Rename**; <kbd>Esc</kbd> or **Cancel** keeps the old one. The sound keeps its settings.
+- the **trash** moves it to the Recycle Bin, after asking. Its settings are kept for 30 days: restore the file from the Recycle Bin and they come back.
+
+A sound that is playing stops first, since Windows can't change a file in use.
 
 ## Reading new sounds
 

@@ -28,10 +28,18 @@ type FolderSpec struct {
 	ActionIcon Icon
 	ActionTip  string
 	OnAction   func()
-	// OnClick runs for a click on the field, e.g. to open the folder.
+	// OnClick runs for a click on the field, e.g. to show its sounds.
 	OnClick func()
+	// Expanded shows the folder open (its sound list follows it).
+	Expanded bool
+	// OnOpen, if set, adds a small "Show in Explorer" button that takes the
+	// place of Detail and Note while the pointer is over the row.
+	OnOpen func()
 	// OnDrop receives files and links dropped on the field.
 	OnDrop func(DropData)
+	// DropHint, if set, says what a drop of the dragged things would do,
+	// in place of "Drop to add here"; "" keeps that.
+	DropHint func(DropData) string
 }
 
 type folderDropRow struct{ s FolderSpec }
@@ -53,24 +61,40 @@ func (f folderDropRow) height() int {
 	return 42
 }
 
-// geometry returns the dashed field and the action button (empty without
-// an action). The button is square and exactly as tall as the field.
-func (f folderDropRow) geometry(c *canvas, r rect) (box, action rect) {
+// folderOpenLabel is the hover button's label (OnOpen).
+const folderOpenLabel = "Show in Explorer"
+
+// geometry returns the dashed field, the action button (empty without an
+// action) and the "Show in Explorer" button inside the field's right end
+// (empty without OnOpen). The action button is square and exactly as tall
+// as the field.
+func (f folderDropRow) geometry(c *canvas, r rect) (box, action, open rect) {
 	in := inset(c, r)
 	box = rect{in.Left + c.px(folderIndentL*min(f.s.Depth, folderMaxIndent)), r.Top + c.px(3), in.Right, r.Bottom - c.px(3)}
 	if f.s.ActionIcon != "" {
 		action = rect{in.Right - box.h(), box.Top, in.Right, box.Bottom}
 		box.Right = action.Left - c.px(6)
 	}
-	return box, action
+	if f.s.OnOpen != nil {
+		h := min(c.px(24), box.h()-c.px(8))
+		w := c.textWidth(folderOpenLabel, fontCaption) + c.px(8+14+6+10)
+		top := box.Top + (box.h()-h)/2
+		open = rect{box.Right - c.px(5) - w, top, box.Right - c.px(5), top + h}
+	}
+	return box, action, open
 }
 
+// The field (segment 0) leaves out the "Show in Explorer" button (2):
+// segments are hit-tested in order, and the button lies inside the field.
 func (f folderDropRow) segments(c *canvas, r rect) []rect {
-	box, action := f.geometry(c, r)
-	if f.s.OnClick == nil {
+	box, action, open := f.geometry(c, r)
+	switch {
+	case f.s.OnClick == nil:
 		box = rect{}
+	case open.w() > 0:
+		box.Right = open.Left
 	}
-	return []rect{box, action}
+	return []rect{box, action, open}
 }
 
 func (f folderDropRow) click(seg int) {
@@ -79,6 +103,8 @@ func (f folderDropRow) click(seg int) {
 		f.s.OnClick()
 	case seg == 1 && f.s.OnAction != nil:
 		f.s.OnAction()
+	case seg == 2 && f.s.OnOpen != nil:
+		f.s.OnOpen()
 	}
 }
 
@@ -91,21 +117,26 @@ func (f folderDropRow) tip(_ *canvas, _ rect, seg int) string {
 		return f.s.Tip
 	case 1:
 		return f.s.ActionTip
+	case 2:
+		return "Open the folder in Explorer"
 	}
 	return ""
 }
 
 func (f folderDropRow) paint(c *canvas, r rect, st rowState) {
-	box, action := f.geometry(c, r)
+	box, action, open := f.geometry(c, r)
+	// The pointer over the row shows the Explorer button; over the field
+	// or that button, the field lights up.
+	showOpen := open.w() > 0 && st.hover >= 0 && !st.drop
 	border := colControl
 	switch {
 	case st.drop:
 		c.roundRect(box, c.px(10), mix(colBackground, colAccent, 0.16))
 		border = colAccent
-	case st.press == 0:
+	case st.press == 0 || st.press == 2:
 		c.roundRect(box, c.px(10), colRowPress)
 		border = colMuted
-	case st.hover == 0:
+	case st.hover == 0 || st.hover == 2:
 		c.roundRect(box, c.px(10), colRowHover)
 		border = colMuted
 	case f.s.Active:
@@ -118,6 +149,9 @@ func (f folderDropRow) paint(c *canvas, r rect, st rowState) {
 		font = fontBody
 	}
 	icon, iconCol := IconFolder, colMuted
+	if f.s.Expanded {
+		icon = IconFolderOpen
+	}
 	switch {
 	case st.drop:
 		icon, iconCol = IconDownload, colAccent
@@ -131,6 +165,11 @@ func (f folderDropRow) paint(c *canvas, r rect, st rowState) {
 	switch {
 	case st.drop:
 		detail, detailCol = "Drop to add here", colAccent
+		if f.s.DropHint != nil && st.dragged != nil {
+			if hint := f.s.DropHint(*st.dragged); hint != "" {
+				detail = hint
+			}
+		}
 	case f.s.Note != "":
 		detail, detailCol = f.s.Note, colAccent
 	}
@@ -141,8 +180,21 @@ func (f folderDropRow) paint(c *canvas, r rect, st rowState) {
 	}
 	detailW := min(c.textWidth(detail, fontCaption)+c.px(2), maxW)
 	nameRight := box.Right - pad - detailW - c.px(8)
+	if showOpen {
+		nameRight = open.Left - c.px(8)
+		bg, fg := colControl, colMuted
+		if st.hover == 2 {
+			bg, fg = colRowPress, colText
+		}
+		c.roundRect(open, open.h()/2, bg)
+		ic := rect{open.Left + c.px(8), open.Top, open.Left + c.px(8+14), open.Bottom}
+		c.icon(IconExternalLink, ic, 14, fg)
+		c.text(folderOpenLabel, rect{ic.Right + c.px(6), open.Top, open.Right - c.px(8), open.Bottom}, fontCaption, fg, dtLeft)
+	}
 	c.text(f.s.Name, rect{iconBox.Right + c.px(8), box.Top, nameRight, box.Bottom}, font, colText, dtLeft)
-	c.text(detail, rect{box.Right - pad - detailW, box.Top, box.Right - pad, box.Bottom}, fontCaption, detailCol, dtRight)
+	if !showOpen {
+		c.text(detail, rect{box.Right - pad - detailW, box.Top, box.Right - pad, box.Bottom}, fontCaption, detailCol, dtRight)
+	}
 
 	if f.s.ActionIcon != "" {
 		paintButton(c, action, "", f.s.ActionIcon, ButtonNormal, false, st.hover == 1, st.press == 1)

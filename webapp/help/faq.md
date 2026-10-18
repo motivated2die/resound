@@ -26,11 +26,11 @@ Yes, to play sounds to your own speakers only, for example at a party or on stre
 
 ## Which files can I play?
 
-MP3, WAV, FLAC and OGG, of any length, songs included. Convert other formats (M4A, AAC, WMA) first. Long music may be cut by Discord's filters: [Sounds cut out in Discord](discord.md).
+MP3, WAV, FLAC and OGG, of any length, songs included. Other formats (M4A, AAC, OPUS, WMA, …) and videos open in [the audio editor](audio-editor.md) when you drop them onto a folder: cut the part you want, and it's saved as a sound. Long music may be cut by Discord's filters: [Sounds cut out in Discord](discord.md).
 
 ## Does Resound record me or send anything?
 
-No. Your sounds, settings and library stay on your PC. The phone talks to the PC directly over your network, encrypted. Resound only goes online to check for updates (on GitHub), to download VB-Cable when you ask for it, and to download sounds you drag in. Details: [privacy policy](https://github.com/motivated2die/resound/blob/main/PRIVACY.md).
+No. Your sounds, settings and library stay on your PC. The phone talks to the PC directly over your network, encrypted. Resound only goes online to check for updates (on GitHub), to download VB-Cable when you ask for it, and to download sounds you drag in. [The audio editor](audio-editor.md#privacy) loads from audiocutter.online and works on your file in your browser, without uploading it. Details: [privacy policy](https://github.com/motivated2die/resound/blob/main/PRIVACY.md).
 
 ## Which Windows settings does Resound change?
 

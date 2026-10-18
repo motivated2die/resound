@@ -487,6 +487,7 @@ h1 { font-size: clamp(32px, 5vw, 52px); line-height: 1.1; font-weight: 700; lett
     -webkit-mask: var(--picon) center / contain no-repeat;
     mask: var(--picon) center / contain no-repeat;
 }
+.picon[data-picon="check"] { --picon: url("../assets/panel-icons/check.svg"); }
 .picon[data-picon="chevron-right"] { --picon: url("../assets/panel-icons/chevron-right.svg"); }
 .picon[data-picon="external-link"] { --picon: url("../assets/panel-icons/external-link.svg"); }
 .picon[data-picon="help-circle"] { --picon: url("../assets/panel-icons/help-circle.svg"); }
@@ -498,6 +499,7 @@ h1 { font-size: clamp(32px, 5vw, 52px); line-height: 1.1; font-weight: 700; lett
 .picon[data-picon="player-stop"] { --picon: url("../assets/panel-icons/player-stop.svg"); }
 .picon[data-picon="power"] { --picon: url("../assets/panel-icons/power.svg"); }
 .picon[data-picon="refresh"] { --picon: url("../assets/panel-icons/refresh.svg"); }
+.picon[data-picon="scissors"] { --picon: url("../assets/panel-icons/scissors.svg"); }
 .picon[data-picon="settings"] { --picon: url("../assets/panel-icons/settings.svg"); }
 .picon[data-picon="x"] { --picon: url("../assets/panel-icons/x.svg"); }
 
@@ -762,6 +764,125 @@ h1 { font-size: clamp(32px, 5vw, 52px); line-height: 1.1; font-weight: 700; lett
 .ovl-callout strong { color: var(--text); }
 .ovl-status { min-height: 1.6em; margin-top: 14px; color: var(--accent); font-size: 15px; font-weight: 600; }
 .ovl-status.bad { color: var(--berry); }
+
+/* --- Audio editor (index.html #editor) ---
+   A framed card like the overlay's, the picture on the left: a small editor
+   whose selection closes in on the loud part of a clip, a playhead runs
+   through it, "Add to Resound" is pressed and the clip lands in a folder.
+   7 s, on repeat, CSS only; with reduced motion, its end, still. */
+@property --edv-l { syntax: "<percentage>"; inherits: true; initial-value: 0%; }
+@property --edv-r { syntax: "<percentage>"; inherits: true; initial-value: 0%; }
+@property --edv-p { syntax: "<number>"; inherits: true; initial-value: 0; }
+.ed-section { overflow-x: clip; }
+.ed-card {
+    display: grid;
+    grid-template-columns: 340px minmax(0, 34em);
+    grid-template-areas: "visual copy";
+    justify-content: center;
+    column-gap: 80px;
+    align-items: center;
+    padding: 48px 40px 44px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 22px;
+    background:
+        radial-gradient(ellipse 420px 300px at 24% 50%, rgba(var(--accent-rgb), 0.07), transparent 70%), /* behind the picture */
+        linear-gradient(180deg, rgba(255, 255, 255, 0.025), rgba(255, 255, 255, 0.01));
+}
+.ed-visual { grid-area: visual; padding-bottom: 24px; -webkit-user-select: none; user-select: none; }
+.ed-copy { grid-area: copy; }
+.ed-copy .section-lead { margin-bottom: 18px; max-width: 30em; }
+.ed-points { display: grid; gap: 8px; margin: 0 0 22px; padding: 0; list-style: none; color: var(--muted); font-size: 15px; }
+.ed-points li { position: relative; padding-left: 18px; }
+.ed-points li::before { content: ""; position: absolute; left: 0; top: 0.62em; width: 6px; height: 6px; border-radius: 50%; background: var(--accent); }
+.ed-points strong { color: var(--text); }
+.ed-more { font-weight: 600; }
+.ed-more span { display: inline-block; transition: transform 0.2s ease; }
+.ed-more:hover span { transform: translateX(3px); }
+
+/* The little editor. --edv-l/--edv-r: the selection's edges (from the
+   left and right); --edv-p: the playhead's way through it (0–1). */
+.edv {
+    position: relative;
+    padding: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 14px;
+    background: var(--surface);
+    box-shadow: 0 18px 50px rgba(0, 0, 0, 0.35);
+    animation: edv-trim 7s ease-in-out infinite;
+}
+.edv-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 10px; color: var(--muted); font-size: 12px; }
+.edv-file { display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px 3px 8px; border-radius: 999px; background: var(--raised); color: var(--text); }
+.edv-file .picon { font-size: 13px; color: var(--accent); }
+.edv-time { font-variant-numeric: tabular-nums; }
+.edv-wave { position: relative; height: 84px; overflow: hidden; border-radius: 8px; background: #202127; }
+.edv-bars { position: absolute; inset: 0; width: 100%; height: 100%; fill: none; stroke: #4a4d57; stroke-width: 3; stroke-linecap: round; }
+.edv-bars path { vector-effect: non-scaling-stroke; }
+.edv-bars-on { stroke: var(--accent); clip-path: inset(0 var(--edv-r) 0 var(--edv-l)); }
+.edv-sel { position: absolute; top: 0; bottom: 0; left: var(--edv-l); right: var(--edv-r); border-inline: 2px solid var(--accent); background: rgba(var(--accent-rgb), 0.14); }
+.edv-sel i { position: absolute; top: 50%; width: 8px; height: 22px; margin-top: -11px; border-radius: 4px; background: var(--accent); }
+.edv-sel i:first-child { left: -5px; }
+.edv-sel i:last-child { right: -5px; }
+.edv-head {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: calc(var(--edv-l) + var(--edv-p) * (100% - var(--edv-l) - var(--edv-r)));
+    width: 2px;
+    background: #fff;
+    box-shadow: 0 0 8px rgba(255, 255, 255, 0.6);
+    opacity: 0;
+    animation: edv-head 7s linear infinite;
+}
+.edv-foot { display: flex; align-items: center; justify-content: space-between; margin-top: 10px; }
+.edv-play { display: inline-grid; place-items: center; width: 30px; height: 30px; border-radius: 50%; background: var(--control); color: var(--text); }
+.edv-play .picon { font-size: 14px; }
+.edv-add { padding: 6px 12px; border-radius: 8px; background: var(--accent); color: var(--on-accent); font-size: 12px; font-weight: 600; animation: edv-add 7s ease infinite; }
+.edv-toast {
+    position: absolute;
+    right: -14px;
+    bottom: -38px; /* just below the card, clear of its button */
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px 6px 10px;
+    border-radius: 999px;
+    background: var(--accent);
+    color: var(--on-accent);
+    font-size: 12px;
+    font-weight: 600;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+    opacity: 0;
+    animation: edv-toast 7s ease infinite;
+}
+.edv-toast .picon { font-size: 14px; }
+/* 0–10 %: the whole clip selected; to 30 %: the selection closes in on the
+   loud part; 32–66 %: it plays; 68 %: "Add to Resound"; 74–92 %: "Added";
+   then the selection opens up again for the next round. */
+@keyframes edv-trim {
+    0%, 10% { --edv-l: 0%; --edv-r: 0%; }
+    30%, 90% { --edv-l: 28.5%; --edv-r: 37%; }
+    100% { --edv-l: 0%; --edv-r: 0%; }
+}
+@keyframes edv-head {
+    0%, 32% { --edv-p: 0; opacity: 0; }
+    34% { opacity: 1; }
+    64% { opacity: 1; }
+    66%, 100% { --edv-p: 1; opacity: 0; }
+}
+@keyframes edv-add {
+    0%, 67%, 74%, 100% { transform: none; filter: none; }
+    70% { transform: scale(0.93); filter: brightness(1.15); }
+}
+@keyframes edv-toast {
+    0%, 72% { opacity: 0; transform: translateY(8px) scale(0.96); }
+    76%, 90% { opacity: 1; transform: none; }
+    96%, 100% { opacity: 0; transform: translateY(-4px); }
+}
+@media (prefers-reduced-motion: reduce) {
+    .edv, .edv-head, .edv-add, .edv-toast { animation: none; }
+    .edv { --edv-l: 28.5%; --edv-r: 37%; }
+    .edv-toast { opacity: 1; }
+}
 kbd {
     display: inline-block;
     min-width: 1.9em;
@@ -1104,6 +1225,7 @@ h3 { font-size: 18px; line-height: 1.3; margin-bottom: 6px; }
     /* Tablets: narrower, with room kept for the picture's highlight. */
     .ovl-card { grid-template-columns: 190px minmax(0, 1fr); column-gap: 48px; padding: 40px 40px 36px 28px; }
     .ovl-visual { width: 170px; }
+    .ed-card { grid-template-columns: 280px minmax(0, 1fr); column-gap: 44px; padding: 40px 36px 40px 28px; }
     .flow { flex-direction: column; align-items: center; }
     .flow-node { width: 100%; max-width: 320px; }
     .flow-link { min-height: 70px; width: 100%; max-width: 320px; flex-direction: row; gap: 12px; }
@@ -1130,6 +1252,12 @@ h3 { font-size: 18px; line-height: 1.3; margin-bottom: 6px; }
     .ovl-action { align-self: center; }
     .ovl-callout { width: 100%; flex-direction: column; align-items: flex-start; gap: 12px; padding: 14px; font-size: 14px; }
     .ovl-status { font-size: 14px; }
+    /* The editor as a band too: the text, then the picture below it. */
+    .ed-section { background: linear-gradient(180deg, rgba(255, 255, 255, 0.035), rgba(255, 255, 255, 0.015)); border-top: 1px solid rgba(255, 255, 255, 0.05); border-bottom: 1px solid rgba(255, 255, 255, 0.05); }
+    .ed-card { grid-template-columns: minmax(0, 1fr); grid-template-areas: "copy" "visual"; row-gap: 28px; padding: 0; border: 0; border-radius: 0; background: none; }
+    .ed-visual { max-width: 380px; padding-bottom: 36px; }
+    .edv-toast { right: 10px; }
+    .ed-points { font-size: 14px; }
     .steps, .features, .how-grid { grid-template-columns: 1fr; }
     .section { padding: 44px 0; }
     .lead { font-size: 17px; }

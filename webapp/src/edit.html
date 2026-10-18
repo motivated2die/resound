@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!--
+        This page passes a file from Resound on this PC to the editor and the
+        clips back, all inside the browser. It may talk to Resound (127.0.0.1)
+        and embed the editor, and nothing else: not even its own host, so the
+        host never learns about the file. _headers drops the site-wide policy
+        for this page in favour of this one.
+    -->
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; connect-src http://127.0.0.1:*; frame-src https://audiocutter.online; base-uri 'none'; form-action 'none'">
+    <meta name="referrer" content="no-referrer">
+    <meta name="robots" content="noindex">
+    <meta name="theme-color" content="#1c1d22">
+    <link rel="icon" href="/assets/favicon.ico" sizes="any">
+    <title>Resound · Cut a sound</title>
+    <link rel="stylesheet" href="css/edit.css">
+    <link rel="stylesheet" href="css/scrollbar.css">
+    <script src="js/edit.js" defer></script>
+</head>
+<body>
+    <header class="bar">
+        <img src="assets/resound-192.png" alt="" class="logo">
+        <div class="bar-text">
+            <h1>Resound</h1>
+            <p id="status" class="status" role="status" aria-live="polite">Opening the editor…</p>
+        </div>
+        <ul id="clips" class="clips" aria-label="Clips added to Resound"></ul>
+    </header>
+
+    <main id="stage" class="stage">
+        <!-- First, once per browser: what the editor is, and the user's OK.
+             Nothing reaches Resound (and the browser asks nothing) before it. -->
+        <section id="consent" class="notice consent" aria-labelledby="consent-title" hidden>
+            <p class="eyebrow">External editor</p>
+            <h2 id="consent-title">Cut sounds with audiocutter.online</h2>
+            <p class="lead">
+                Resound's editor is <strong>audiocutter.online</strong>, a third-party audio editor (not
+                made by Resound), embedded in this window. When you continue, it loads from audiocutter.online and works
+                on your file locally, in your browser: the file isn't uploaded, and getresound.app never
+                receives it.
+            </p>
+            <p class="hint">
+                Your browser may then ask whether this page may access apps on this device. Allow it: that's
+                how the file gets from Resound into this window. You're asked here only once on this device.
+            </p>
+            <div class="actions">
+                <a class="btn btn-secondary" href="/help/audio-editor" target="_blank" rel="noopener">More info</a>
+                <button id="accept" class="btn btn-primary" type="button">Accept and open the editor</button>
+            </div>
+        </section>
+
+        <!-- Then: connecting, loading the file, or what went wrong -->
+        <section id="notice" class="notice" hidden>
+            <div id="spinner" class="spinner" aria-hidden="true"></div>
+            <p id="notice-text" class="lead">Connecting to Resound…</p>
+            <p id="notice-hint" class="hint">
+                If your browser asks whether this page may access apps on this device, allow it.
+            </p>
+            <progress id="progress" max="1" value="0" hidden></progress>
+        </section>
+    </main>
+</body>
+</html>

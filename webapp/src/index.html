@@ -29,6 +29,7 @@
                 <a href="#features">Features</a>
                 <a href="#overlay">In game</a>
                 <a href="#desktop">On your PC</a>
+                <a href="#editor">Editor</a>
                 <a href="#how">How it works</a>
                 <a href="#news">News</a>
             </nav>
@@ -422,6 +423,52 @@
                         </div>
                     </div>
                     <p class="dp-legend" data-dp="legend"><i></i><span>Talking: your voice goes into voice chat</span></p>
+                </div>
+            </div>
+        </section>
+
+        <!-- The audio editor: a framed card like the overlay's, with a small
+             animated editor (CSS only): the selection closes in on the loud
+             part, the playhead runs through it, the clip lands in a folder. -->
+        <section class="section ed-section" id="editor" aria-labelledby="editor-title">
+            <div class="wrap">
+                <div class="ed-card">
+                    <div class="ed-visual" aria-hidden="true">
+                        <div class="edv">
+                            <div class="edv-top">
+                                <span class="edv-file"><span class="picon" data-picon="scissors"></span>Funny moment.mp4</span>
+                                <span class="edv-time">0:01.2 – 0:02.4</span>
+                            </div>
+                            <div class="edv-wave">
+                                <svg class="edv-bars" viewBox="0 0 256 64" preserveAspectRatio="none">
+                                    <path d="M2.0 27.0V37.0M6.0 26.4V37.6M10.0 24.0V40.0M14.0 25.2V38.8M18.0 23.0V41.0M22.0 23.4V40.6M26.0 24.6V39.4M30.0 23.3V40.7M34.0 25.6V38.4M38.0 25.2V38.8M42.0 27.2V36.8M46.0 28.0V36.0M50.0 28.4V35.6M54.0 28.8V35.2M58.0 30.2V33.8M62.0 30.4V33.6M66.0 30.1V33.9M70.0 29.6V34.4M74.0 29.3V34.7M78.0 9.5V54.5M82.0 4.0V60.0M86.0 13.5V50.5M90.0 6.1V57.9M94.0 11.9V52.1M98.0 13.7V50.3M102.0 14.4V49.6M106.0 13.3V50.7M110.0 9.6V54.4M114.0 15.5V48.5M118.0 13.0V51.0M122.0 13.4V50.6M126.0 16.1V47.9M130.0 15.6V48.4M134.0 19.6V44.4M138.0 20.3V43.7M142.0 20.1V43.9M146.0 18.3V45.7M150.0 20.6V43.4M154.0 22.0V42.0M158.0 21.7V42.3M162.0 23.0V41.0M166.0 24.1V39.9M170.0 23.2V40.8M174.0 24.5V39.5M178.0 26.6V37.4M182.0 26.5V37.5M186.0 27.2V36.8M190.0 26.8V37.2M194.0 27.0V37.0M198.0 27.5V36.5M202.0 25.3V38.7M206.0 26.7V37.3M210.0 25.0V39.0M214.0 23.0V41.0M218.0 24.5V39.5M222.0 22.8V41.2M226.0 24.4V39.6M230.0 22.1V41.9M234.0 22.3V41.7M238.0 23.7V40.3M242.0 23.7V40.3M246.0 26.2V37.8M250.0 26.1V37.9M254.0 27.0V37.0"/>
+                                </svg>
+                                <!-- The same bars in the accent, shown only inside the selection -->
+                                <svg class="edv-bars edv-bars-on" viewBox="0 0 256 64" preserveAspectRatio="none">
+                                    <path d="M2.0 27.0V37.0M6.0 26.4V37.6M10.0 24.0V40.0M14.0 25.2V38.8M18.0 23.0V41.0M22.0 23.4V40.6M26.0 24.6V39.4M30.0 23.3V40.7M34.0 25.6V38.4M38.0 25.2V38.8M42.0 27.2V36.8M46.0 28.0V36.0M50.0 28.4V35.6M54.0 28.8V35.2M58.0 30.2V33.8M62.0 30.4V33.6M66.0 30.1V33.9M70.0 29.6V34.4M74.0 29.3V34.7M78.0 9.5V54.5M82.0 4.0V60.0M86.0 13.5V50.5M90.0 6.1V57.9M94.0 11.9V52.1M98.0 13.7V50.3M102.0 14.4V49.6M106.0 13.3V50.7M110.0 9.6V54.4M114.0 15.5V48.5M118.0 13.0V51.0M122.0 13.4V50.6M126.0 16.1V47.9M130.0 15.6V48.4M134.0 19.6V44.4M138.0 20.3V43.7M142.0 20.1V43.9M146.0 18.3V45.7M150.0 20.6V43.4M154.0 22.0V42.0M158.0 21.7V42.3M162.0 23.0V41.0M166.0 24.1V39.9M170.0 23.2V40.8M174.0 24.5V39.5M178.0 26.6V37.4M182.0 26.5V37.5M186.0 27.2V36.8M190.0 26.8V37.2M194.0 27.0V37.0M198.0 27.5V36.5M202.0 25.3V38.7M206.0 26.7V37.3M210.0 25.0V39.0M214.0 23.0V41.0M218.0 24.5V39.5M222.0 22.8V41.2M226.0 24.4V39.6M230.0 22.1V41.9M234.0 22.3V41.7M238.0 23.7V40.3M242.0 23.7V40.3M246.0 26.2V37.8M250.0 26.1V37.9M254.0 27.0V37.0"/>
+                                </svg>
+                                <span class="edv-sel"><i></i><i></i></span>
+                                <span class="edv-head"></span>
+                            </div>
+                            <div class="edv-foot">
+                                <span class="edv-play"><span class="picon" data-picon="player-play"></span></span>
+                                <span class="edv-add">Add to Resound</span>
+                            </div>
+                            <span class="edv-toast"><span class="picon" data-picon="check"></span>Added to Sounds</span>
+                        </div>
+                    </div>
+
+                    <div class="ed-copy">
+                        <p class="eyebrow">Audio editor</p>
+                        <h2 id="editor-title" class="section-title">Cut the perfect sound from any clip.</h2>
+                        <p class="section-lead">Drop a video or any audio file onto a folder in Resound, pick the moment you want, and it's on your soundboard. Every sound you already have trims the same way.</p>
+                        <ul class="ed-points">
+                            <li><strong>Videos and more formats:</strong> MP4, MKV, WEBM, MOV, AVI and more, plus M4A, AAC, OPUS, WMA and AIFF audio.</li>
+                            <li><strong>As many clips as you like</strong> from one file, each saved straight into the folder, lossless.</li>
+                            <li><strong>Private:</strong> the editor, <a href="https://audiocutter.online" rel="noopener">audiocutter.online</a>, works on your files in your browser. Nothing is uploaded.</li>
+                        </ul>
+                        <a class="ed-more" href="/help/audio-editor">Learn more about the editor <span aria-hidden="true">→</span></a>
+                    </div>
                 </div>
             </div>
         </section>

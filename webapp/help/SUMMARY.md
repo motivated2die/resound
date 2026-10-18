@@ -15,6 +15,7 @@
 - [The Resound panel](panel.md)
 - [Sound folders and tabs](sound-library.md)
 - [Import sounds from websites](import-sounds.md)
+- [The audio editor](audio-editor.md)
 - [The phone app](phone-app.md)
 - [Volume and loudness](volume.md)
 - [Push-to-talk, pause and stop keys](push-to-talk.md)
