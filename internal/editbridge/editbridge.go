@@ -34,8 +34,12 @@ const (
 	// MaxSourceBytes limits the file handed to the editor, which reads it
 	// into the browser's memory whole.
 	MaxSourceBytes = 1 << 30
-	// Format is the format clips come back in; Resound plays MP3.
-	Format = "mp3"
+	// Format is the format clips come back in. The editor renders at the
+	// sample rate it guesses from the file's first bytes, which for videos
+	// can be any MP3 rate down to 8 kHz; Resound's MP3 decoder reads only
+	// MPEG-1 (32 kHz and up), FLAC every rate. FLAC is lossless too, so a
+	// clip isn't encoded lossily a second time.
+	Format = "flac"
 	// closeGrace is how long a page that went away (closed, or reloading)
 	// has to come back before its file counts as closed.
 	closeGrace = 10 * time.Second

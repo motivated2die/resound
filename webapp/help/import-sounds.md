@@ -29,8 +29,12 @@ A folder dropped anywhere else on the page becomes a new library folder.
 Drop a video (MP4, MKV, WEBM, MOV and others) or audio Resound can't play as it is (M4A, AAC, OPUS, WMA, AIFF and others) onto a folder. While you drag it over the folder, the folder reads **Drop to cut in the editor**.
 
 1. A browser window opens with the file loaded in an audio editor ([audiocutter.online](https://audiocutter.online)).
-2. Select the part you want and press **Add to Resound**. The clip is saved into the folder as an MP3, and the usual card opens in the panel to name it.
+2. Select the part you want and press **Add to Resound**. The clip is saved into the folder (as a FLAC file, without losing quality), and the usual card opens in the panel to name it.
 3. Cut as many clips as you like; each **Add to Resound** saves one more. Close the window when you're done, or press **Stop editing** under the folder in the panel.
+
+While you edit, <kbd>Esc</kbd> works in the editor and leaves the panel on the Sound library page. To close the panel, use its close button; it opens on the same page again.
+
+The editor uses a video's first audio track. To cut from another one (a second language, a commentary track), save that track as a file of its own first, for example with a video converter.
 
 The editor's own **Download file** button still works too: drag the downloaded file from your browser's download list onto a folder.
 

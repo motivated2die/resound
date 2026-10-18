@@ -27,8 +27,8 @@ const (
 	// maxEdits is how many files one drop opens in the editor: each gets a
 	// browser window.
 	maxEdits = 3
-	// maxClipBytes limits a clip coming back from the editor (an MP3:
-	// about 100 minutes at 128 kbit/s).
+	// maxClipBytes limits a clip coming back from the editor (FLAC: about
+	// 10 minutes of 24-bit stereo at 48 kHz).
 	maxClipBytes = 100 << 20
 )
 

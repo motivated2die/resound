@@ -287,12 +287,17 @@ func (a *App) onPanelOpen() {
 // recording a key, or goes back a page as the back button would, up to the
 // home page. It returns false where the panel should close: on the home
 // page and in the guided setup (which keeps its step). Closing keeps the
-// page, so the tray icon reopens it where the user was.
+// page, so the tray icon reopens it where the user was. While a file is
+// open in the editor, Esc leaves the library page alone.
 func (a *App) onEscape() bool {
 	switch {
 	case a.ptt.capturing:
 		a.ptt.capturing = false
 		a.render()
+	case a.page == pageLibrary && a.imports.editing():
+		// Esc pressed in the editor's browser window reaches the panel too
+		// (escape_windows.go): the library page stays, with its editing
+		// card, until the user leaves it on purpose.
 	case a.page == pageHome || a.page == pageWizard:
 		return false
 	case a.page == pageSettings:

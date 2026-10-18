@@ -74,3 +74,19 @@ func TestImportsKeepEditing(t *testing.T) {
 		t.Errorf("clearFinished kept %d jobs", len(s.jobs))
 	}
 }
+
+// Esc pressed while cutting in the browser reaches the panel too: with a
+// file open in the editor, the library page neither goes back nor closes.
+func TestEscapeKeepsLibraryWhileEditing(t *testing.T) {
+	a := &App{page: pageLibrary}
+	a.imports.add(&soundImport{state: importEditing})
+	if !a.onEscape() {
+		t.Error("Esc would close the panel while a file is open in the editor")
+	}
+	if a.page != pageLibrary {
+		t.Errorf("Esc left the library page for page %d", a.page)
+	}
+	if (&App{page: pageHome}).onEscape() {
+		t.Error("Esc on the home page should still close the panel")
+	}
+}

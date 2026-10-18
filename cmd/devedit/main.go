@@ -10,6 +10,7 @@
 package main
 
 import (
+	"bytes"
 	"flag"
 	"fmt"
 	"io"
@@ -42,9 +43,19 @@ func main() {
 		Origins: []string{u.Scheme + "://" + u.Host},
 		OnOpen:  func(string) { log.Print("the page has the file") },
 		OnResult: func(j editbridge.Job, body io.Reader) (string, error) {
-			saved, err := importer.Save(body, "."+editbridge.Format, "Clip", j.Dir, 100<<20, audio.CheckFile)
+			data, err := io.ReadAll(io.LimitReader(body, 100<<20))
 			if err != nil {
-				log.Printf("clip refused: %v", err)
+				return "", err
+			}
+			saved, err := importer.Save(bytes.NewReader(data), "."+editbridge.Format, "Clip", j.Dir, 100<<20, audio.CheckFile)
+			if err != nil {
+				// Kept for a look with ffprobe.
+				kept, _ := os.CreateTemp(j.Dir, "refused-*.bin")
+				if kept != nil {
+					kept.Write(data)
+					kept.Close()
+					log.Printf("clip refused: %v (kept as %s)", err, kept.Name())
+				}
 				return "", err
 			}
 			log.Printf("clip saved: %s", saved.Path)

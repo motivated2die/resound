@@ -14,6 +14,16 @@
 
 (() => {
     const EDITOR = 'https://audiocutter.online';
+    // The editor's colours can't be styled from here (another origin), and
+    // its session takes only an accent. Its controls all use one blue,
+    // Tailwind's blue-600 (#155dfc, as of Oct 2026); turning the whole
+    // frame's hue by HUE makes that a teal green (#008b70, white text at
+    // 4.3:1), and greys and black stay as they are. The accent is that same
+    // blue, so "Add to Resound" turns the same green as the editor's other
+    // buttons; the logo is drawn turned back by HUE, so it ends up in its
+    // own colours. Red warnings turn magenta.
+    const HUE = -60;
+    const ACCENT = '#155dfc';
     const STORE = 'resound.edit';
 
     const $ = (id) => document.getElementById(id);
@@ -110,7 +120,9 @@
         editor.allow = 'autoplay; clipboard-write; fullscreen';
         editor.referrerPolicy = 'no-referrer';
         editor.src = EDITOR + '/import/';
+        editor.style.filter = `hue-rotate(${HUE}deg)`;
         notice.replaceWith(editor);
+        document.body.classList.add('editing'); // the editor's banner carries the logo and title now
 
         // The import page waits 30 s for the file after saying it's ready;
         // the file is loaded already, so it goes at once.
@@ -150,11 +162,27 @@
                     title: 'Cut a sound for Resound',
                     instruction: 'Select the part you want, then press “Add to Resound”. You can add as many clips as you like.',
                     submitLabel: 'Add to Resound',
-                    accentColor: '#50dea8',
+                    accentColor: ACCENT,
+                    logoUrl: logoData(),
                 },
-                output: { mode: 'postmessage', format: info.format || 'mp3', targetOrigin: location.origin },
+                output: { mode: 'postmessage', format: info.format || 'flac', targetOrigin: location.origin },
             },
         };
+    }
+
+    // logoData is the Resound logo as a data: URL, drawn from the copy this
+    // page has loaded already. The editor shows it in its banner; a link to
+    // the logo on this site would make the editor fetch it from the host
+    // every time someone cuts a sound.
+    function logoData() {
+        const img = document.querySelector('.logo');
+        if (!img || !img.complete || !img.naturalWidth) return undefined;
+        const canvas = document.createElement('canvas');
+        canvas.width = canvas.height = 48; // the banner shows it 24 px high
+        const ctx = canvas.getContext('2d');
+        ctx.filter = `hue-rotate(${-HUE}deg)`; // the frame turns it back
+        ctx.drawImage(img, 0, 0, 48, 48);
+        return canvas.toDataURL('image/png');
     }
 
     // addClip sends a clip from the editor to Resound. Clips are sent one
@@ -174,14 +202,26 @@
                     body: audio,
                 });
                 const { name } = await res.json();
-                const li = document.createElement('li');
-                li.textContent = '✓ ' + name;
-                $('clips').append(li);
+                showClip(name);
                 setStatus(`Added “${name}” to “${info.folder}”. Name it in the Resound panel, or cut another clip.`);
             } catch (e) {
                 setStatus(e instanceof ResoundError ? e.message : 'The clip could not be sent to Resound.', true);
             }
         });
+    }
+
+    // showClip adds a saved clip's chip to the bar. The newest is
+    // highlighted and scrolled into view; older ones slide out to the left.
+    function showClip(name) {
+        const clips = $('clips');
+        clips.querySelector('.latest')?.classList.remove('latest');
+        const li = document.createElement('li');
+        li.className = 'latest';
+        li.textContent = '✓ ' + name;
+        li.title = name;
+        clips.append(li);
+        clips.classList.toggle('overflowing', clips.scrollWidth > clips.clientWidth);
+        clips.scrollTo({ left: clips.scrollWidth, behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
     }
 
     // --- page state -----------------------------------------------------------------

@@ -97,6 +97,11 @@ func (s *importsState) clearFinished() {
 	s.warn = ""
 }
 
+// editing reports whether a file is open in the editor.
+func (s *importsState) editing() bool {
+	return slices.ContainsFunc(s.jobs, func(j *soundImport) bool { return j.state == importEditing })
+}
+
 // add numbers a new job and lists it. Beyond maxImportsShown, the oldest
 // jobs are forgotten, except files open in the editor.
 func (s *importsState) add(job *soundImport) *soundImport {

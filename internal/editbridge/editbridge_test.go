@@ -63,7 +63,7 @@ func TestInfoAndSource(t *testing.T) {
 	if err := json.Unmarshal(rec.Body.Bytes(), &info); err != nil {
 		t.Fatal(err)
 	}
-	if info.Filename != "Funny clip.mp4" || info.Folder != "Memes" || info.Type != "video/mp4" || info.Format != "mp3" || info.Size != 18 {
+	if info.Filename != "Funny clip.mp4" || info.Folder != "Memes" || info.Type != "video/mp4" || info.Format != "flac" || info.Size != 18 {
 		t.Errorf("info = %+v", info)
 	}
 	select {

@@ -36,6 +36,12 @@ body {
 
 .logo { width: 32px; height: 32px; flex: none; }
 
+/* While editing, the editor's banner shows the logo, title and button:
+   this bar shrinks to a status line with the clips added so far. */
+.editing .bar { min-height: 0; padding: 4px 16px; }
+.editing .bar .logo,
+.editing h1 { display: none; }
+
 .bar-text { min-width: 0; flex: 1; }
 
 h1 { margin: 0; font-size: 15px; font-weight: 600; }
@@ -50,6 +56,9 @@ h1 { margin: 0; font-size: 15px; font-weight: 600; }
 }
 .status.bad { color: var(--bad); }
 
+/* The clips added so far, newest on the right and highlighted (edit.js
+   scrolls to it). No scrollbar: it would make the bar taller; older chips
+   fade out at the left edge once they don't all fit. */
 .clips {
     display: flex;
     gap: 6px;
@@ -57,16 +66,31 @@ h1 { margin: 0; font-size: 15px; font-weight: 600; }
     padding: 0;
     list-style: none;
     overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-width: none;
     max-width: 50%;
 }
+.clips.overflowing {
+    -webkit-mask-image: linear-gradient(to right, transparent, #000 24px);
+    mask-image: linear-gradient(to right, transparent, #000 24px);
+}
+.clips::-webkit-scrollbar { display: none; }
 .clips li {
     flex: none;
+    max-width: 240px;
+    overflow: hidden;
+    text-overflow: ellipsis;
     padding: 3px 10px;
     border-radius: 999px;
-    background: color-mix(in srgb, var(--accent) 18%, transparent);
-    color: var(--accent);
+    background: color-mix(in srgb, var(--accent) 12%, transparent);
+    color: color-mix(in srgb, var(--accent) 70%, var(--text-secondary));
     font-size: 13px;
     white-space: nowrap;
+}
+.clips li.latest {
+    background: var(--accent);
+    color: var(--on-accent);
+    font-weight: 600;
 }
 
 .stage { position: relative; flex: 1; min-height: 0; }
