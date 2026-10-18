@@ -22,9 +22,10 @@ const persistence = (() => {
     const LEGACY_DONE_KEY = 'resoundLegacySettingsImported';
     const DEFAULT_LAYOUT = 'grid-3';
 
+    // fullscreen is only stored once chosen; until then the device decides
+    // (fullscreen.js).
     const getDefaultSettings = () => ({
         version: CURRENT_VERSION,
-        autoFullscreenEnabled: true,
         keepScreenOn: true,
         haptics: true,
         swapButtonPosition: false,
@@ -50,19 +51,24 @@ const persistence = (() => {
         const defaults = getDefaultSettings();
         const stored = readJSON(STORAGE_KEY);
         if (stored && typeof stored === 'object' && stored.version === CURRENT_VERSION) {
-            return {
+            const settings = {
                 ...defaults,
                 ...stored,
                 soundSettings: stored.soundSettings || {},
                 tabLayouts: stored.tabLayouts || {},
                 layoutOrders: stored.layoutOrders || {},
             };
+            // autoFullscreenEnabled was saved as true by default everywhere,
+            // so only false was a choice. Without it the device decides.
+            if (settings.autoFullscreenEnabled === false && settings.fullscreen === undefined) settings.fullscreen = false;
+            delete settings.autoFullscreenEnabled;
+            return settings;
         }
         // First start after the update: keep this phone's device preferences.
         for (const key of LEGACY_KEYS) {
             const old = readJSON(key);
             if (old && typeof old === 'object') {
-                if (typeof old.autoFullscreenEnabled === 'boolean') defaults.autoFullscreenEnabled = old.autoFullscreenEnabled;
+                if (old.autoFullscreenEnabled === false) defaults.fullscreen = false;
                 if (typeof old.swapButtonPosition === 'boolean') defaults.swapButtonPosition = old.swapButtonPosition;
                 break;
             }
