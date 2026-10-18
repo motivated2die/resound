@@ -25,6 +25,7 @@ import (
 
 	"github.com/motivated2die/resound/internal/logx"
 	"github.com/motivated2die/resound/internal/ui"
+	"github.com/motivated2die/resound/internal/update"
 )
 
 const (
@@ -143,6 +144,14 @@ func Ensure(version, dataDir string) (exit bool, err error) {
 	}
 
 	previous := installedVersion(dataDir)
+	if isDowngrade(previous, version, target) && !confirmDowngrade(previous, version) {
+		logx.Printf("install: v%s is older than the installed v%s; starting that instead", version, previous)
+		// A running instance opens its panel (single instance).
+		if err := exec.Command(target).Start(); err != nil {
+			return false, fmt.Errorf("starting the installed copy: %w", err)
+		}
+		return true, nil
+	}
 	logx.Printf("install: v%s to %s (installed: %q)", version, target, previous)
 	if !ui.SignalQuitRunningInstance(defaultStopTimeout) {
 		logx.Printf("install: the running copy did not exit in time; replacing it anyway")
@@ -171,6 +180,30 @@ func Ensure(version, dataDir string) (exit bool, err error) {
 		return false, fmt.Errorf("starting the installed copy: %w", err)
 	}
 	return true, nil
+}
+
+// isDowngrade reports whether installing version would replace a newer
+// installed copy (one that is still there).
+func isDowngrade(installed, version, target string) bool {
+	if !update.Newer(installed, version) {
+		return false
+	}
+	_, err := os.Stat(target)
+	return err == nil
+}
+
+// confirmDowngrade warns that an older version is about to replace the
+// installed one. Starting the installed copy is the default, also when the
+// dialog is closed; true means install the older version anyway.
+func confirmDowngrade(installed, version string) bool {
+	return ui.Confirm(ui.DialogSpec{
+		Title: "Resound v" + installed + " is already installed",
+		Message: "This is the older version v" + version + ". Installing it replaces the newer one, " +
+			"and it may not work with the settings v" + installed + " saved.",
+		Confirm: "Install v" + version + " anyway",
+		Cancel:  "Start v" + installed,
+		Danger:  true,
+	})
 }
 
 func logRegistration(target, version string) {

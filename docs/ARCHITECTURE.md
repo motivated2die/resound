@@ -402,7 +402,7 @@ The phone remote is a web app on an HTTPS host (`webapp/`, built by `cmd/webapp`
 | `library.json` | Sound index: records with stable IDs, fingerprints, lengths, settings, phone layouts, tombstones |
 | `sounds.json.migrated` | Per-sound settings of earlier versions, kept after migration |
 | `remote.json` | Paired devices, the device secret their keys derive from, the connection's certificate |
-| `installed_version.txt` | Version of the installed copy |
+| `installed_version.txt` | Version of the installed copy; an older exe started later asks before replacing it (starting the installed copy is the default) |
 | `update\` | A downloaded update, only until the updated copy has started |
 | `vbcable-install.json` | A VB-Cable install waiting for the Windows restart (removed after it) |
 | `vbcable\` | The downloaded VB-Cable pack, only while its setup runs |
