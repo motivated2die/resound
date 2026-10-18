@@ -19,15 +19,18 @@ var (
 	file   *os.File
 )
 
-// Init opens <dir>/debug.log (truncated when it exceeds 2 MB) and returns a
-// function that closes it.
+// Init opens <dir>/debug.log and returns a function that closes it. A log
+// over 2 MB moves to debug.old.log first (replacing the one there), so the
+// end of the previous run — a crash, say — survives the next start.
 func Init(dir string) (func(), error) {
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return func() {}, err
 	}
 	path := filepath.Join(dir, "debug.log")
 	if fi, err := os.Stat(path); err == nil && fi.Size() > 2<<20 {
-		_ = os.Remove(path)
+		if os.Rename(path, filepath.Join(dir, "debug.old.log")) != nil {
+			_ = os.Remove(path)
+		}
 	}
 	f, err := os.OpenFile(path, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o644)
 	if err != nil {

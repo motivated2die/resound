@@ -11,19 +11,24 @@ import (
 const AppName = "Resound"
 
 // Config is the persisted host configuration. Device IDs are WASAPI endpoint
-// IDs (stable across renames), never friendly names.
+// IDs (stable across renames). Each chosen device's friendly name is kept
+// too (the *DeviceName fields): some virtual devices, like Voicemeeter's,
+// get new IDs at every Windows start, and their name then finds them again.
 type Config struct {
 	// MonitorDeviceID is the output the user hears. "" = system default.
-	MonitorDeviceID string `json:"monitorDeviceId"`
+	MonitorDeviceID   string `json:"monitorDeviceId"`
+	MonitorDeviceName string `json:"monitorDeviceName,omitempty"`
 	// CableDeviceID is the output others hear. "" = automatic: VB-Cable's
 	// "CABLE Input" when it is installed, else none. Another device is an
 	// advanced choice, e.g. a virtual mixer's input.
-	CableDeviceID string `json:"cableDeviceId"`
+	CableDeviceID   string `json:"cableDeviceId"`
+	CableDeviceName string `json:"cableDeviceName,omitempty"`
 	// AppsMicDeviceID is, with such an own routing, the recording device
 	// others' apps use as their microphone (e.g. "Voicemeeter Out B1"),
 	// where the user's mixer combines the voice and the sounds. Resound
 	// only shows it and measures it. Cleared when going back to VB-Cable.
-	AppsMicDeviceID string `json:"appsMicDeviceId,omitempty"`
+	AppsMicDeviceID   string `json:"appsMicDeviceId,omitempty"`
+	AppsMicDeviceName string `json:"appsMicDeviceName,omitempty"`
 	// Volumes in percent, 0-100, on the loudness curve (audio.Gain).
 	MonitorVolume int `json:"monitorVolume"`
 	CableVolume   int `json:"cableVolume"`
@@ -32,7 +37,8 @@ type Config struct {
 	VolumeScale int `json:"volumeScale,omitempty"`
 	// MicDeviceID is the user's real microphone (capture endpoint ID).
 	// "" = pick the default recording device automatically.
-	MicDeviceID string `json:"micDeviceId"`
+	MicDeviceID   string `json:"micDeviceId"`
+	MicDeviceName string `json:"micDeviceName,omitempty"`
 	// MuteMicWhilePlaying mutes the microphone while sounds play, so the
 	// voice does not mix with the sound on the cable. Off for new configs
 	// since 0.13 (it confused many); saved configs keep their choice.

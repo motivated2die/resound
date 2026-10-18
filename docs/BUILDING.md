@@ -162,6 +162,7 @@ To try the import in the panel: quit the installed Resound, run the dev build (`
 - **Log:** `%LOCALAPPDATA%\Resound\debug.log` (panel → Settings → Diagnostics → Open log).
   - `startup: …` lines mark each startup phase.
   - Fatal Go errors and panics, with stack traces, are written there too (`debug.SetCrashOutput`).
+  - Crashes Go can't report (a native crash on a Windows thread, a hang, Task Manager) show at the next start as `previous run: …` lines, with what Windows' Application event log recorded for that process (faulting module, exception code).
   - The elevated helpers (`routing helper: …`, `firewall helper: …`) log to the same file.
 
 | Symptom | Look at |

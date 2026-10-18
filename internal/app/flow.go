@@ -186,6 +186,9 @@ func (a *App) recheckRouting() {
 			}
 			before := a.routeKey()
 			a.route, a.routeErr = st, err
+			if err == nil && a.rematchInputs() {
+				a.refreshRouting(false) // a chosen device came back with a new ID
+			}
 			if a.routeKey() != before {
 				a.refreshDevices(false)
 				a.syncCableOutput() // VB-Cable appeared or went

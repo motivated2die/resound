@@ -186,6 +186,8 @@ func Run() int {
 	if mutex != 0 {
 		defer windows.CloseHandle(mutex)
 	}
+	// Notes how the previous run ended if not cleanly, and marks this one.
+	endSession := logx.StartSession(config.Dir(), Version)
 
 	a := &App{cfg: config.Load(), engine: audio.NewEngine(), portable: portable}
 	a.migrateSetupStep()
@@ -212,6 +214,7 @@ func Run() int {
 	if err != nil {
 		logx.Printf("fatal: %v", err)
 		ui.ShowError(0, "Resound", "Could not create the tray icon:\n"+err.Error())
+		endSession() // logged; not a crash to report next time
 		return 1
 	}
 	if a.logo, err = ui.NewImage(assets.LogoPNG); err != nil {
@@ -229,6 +232,7 @@ func Run() int {
 	a.tray.OnEndSession = func() {
 		logx.Printf("Windows is ending the session")
 		a.prepareForShutdown()
+		endSession() // Windows may end the process before Run returns
 	}
 
 	// Step markers make the last successful phase visible in the log.
@@ -267,6 +271,7 @@ func Run() int {
 	a.releasePlayback() // never leave the mic muted or a key held behind
 	a.releaseAllPTT()
 	a.save()
+	endSession()
 	logx.Printf("exited")
 	return 0
 }
