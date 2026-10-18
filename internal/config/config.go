@@ -34,8 +34,14 @@ type Config struct {
 	// "" = pick the default recording device automatically.
 	MicDeviceID string `json:"micDeviceId"`
 	// MuteMicWhilePlaying mutes the microphone while sounds play, so the
-	// voice does not mix with the sound on the cable.
+	// voice does not mix with the sound on the cable. Off for new configs
+	// since 0.13 (it confused many); saved configs keep their choice.
 	MuteMicWhilePlaying bool `json:"muteMicWhilePlaying"`
+	// MuteMicMinSeconds: with MuteMicWhilePlaying, the mic is muted only
+	// while a sound longer than this plays (or one of unknown length);
+	// shorter ones leave it open. 0 = for every sound. Configs from before
+	// it get the default, 5.
+	MuteMicMinSeconds float64 `json:"muteMicMinSeconds"`
 	// PushToTalkKeys is the game's push-to-talk key combination (Windows
 	// virtual-key codes; 4-6 are mouse buttons 3-5). Empty = not used.
 	PushToTalkKeys []uint16 `json:"pushToTalkKeys"`
@@ -90,7 +96,7 @@ type Config struct {
 
 // Default returns the configuration used on first start.
 func Default() Config {
-	return Config{MonitorVolume: 80, CableVolume: 100, VolumeScale: 1, ServerPort: 8080, PushToTalkWhilePlaying: true, MuteMicWhilePlaying: true}
+	return Config{MonitorVolume: 80, CableVolume: 100, VolumeScale: 1, ServerPort: 8080, PushToTalkWhilePlaying: true, MuteMicMinSeconds: 5}
 }
 
 // Dir returns %LOCALAPPDATA%\Resound.
@@ -118,6 +124,10 @@ func Load() Config {
 	if cfg.ServerPort <= 0 || cfg.ServerPort > 65535 {
 		cfg.ServerPort = 8080
 	}
+	if cfg.MuteMicMinSeconds < 1 { // below a second reads "always"
+		cfg.MuteMicMinSeconds = 0
+	}
+	cfg.MuteMicMinSeconds = min(cfg.MuteMicMinSeconds, 600)
 	cfg.MonitorVolume = clamp(cfg.MonitorVolume)
 	cfg.CableVolume = clamp(cfg.CableVolume)
 	return cfg

@@ -15,7 +15,7 @@ If you plugged in another headset, choose it under **Your microphone** and conne
 ## Muted
 
 - **Muted** on the line: the microphone is muted in Windows or with your headset's mute button. Unmute it there.
-- **Muted for sounds**: that's on purpose while sounds play; your mic is back when they end. You can turn it off: [mic mute](push-to-talk.md#mute-your-microphone-while-sounds-play).
+- **Muted for sounds**: that's on purpose while a long sound plays; your mic is back when it ends. You can turn it off or change which sounds mute it: [mic mute](push-to-talk.md#mute-your-microphone-while-sounds-play).
 
 ## The bar doesn't move: Windows' privacy settings
 

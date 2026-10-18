@@ -4,7 +4,7 @@ The Resound app runs in your phone's browser and can be installed from there, no
 
 ## Pair with the QR code
 
-1. On the PC, open the panel and click **Phone remote** (or go to the guided setup's last step).
+1. On the PC, open the panel and click **Remote App** (or go to the guided setup's last step).
 2. Scan the QR code with your phone's camera and open the link. The Resound app opens and pairs with the PC by itself.
 3. That's it: your sound folders appear as tabs.
 
@@ -32,11 +32,11 @@ iOS keeps the installed app separate from Safari. Open Resound from your home sc
 ## More devices
 
 - **Several phones or tablets:** pair each one the same way. They share favorites, colors and layouts, which are stored on the PC.
-- **This PC:** the button next to **Phone remote** on the home page opens the app in a phone-sized window on the PC, for example on a second or touch screen.
+- **This PC:** the button next to **Remote App** on the home page opens the app in a phone-sized window on the PC, for example on a second or touch screen.
 - **Several PCs:** pair with each. In the app, Settings → **Switch PC** lists them; ✕ forgets one.
 
 ## Sign out devices
 
-The PC's Phone remote page lists every paired device, such as “Chrome on Android”, with when it was last used. **Remove** signs out just that device; **Sign out all devices** signs out every one. A signed-out device is disconnected at once and has to scan a code again.
+The PC's Remote App page lists every paired device, such as “Chrome on Android”, with when it was last used. **Remove** signs out just that device; **Sign out all devices** signs out every one. A signed-out device is disconnected at once and has to scan a code again.
 
 Not connecting? See [The phone can't connect](phone-cant-connect.md).

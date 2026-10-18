@@ -146,6 +146,10 @@ type Prepared struct {
 	sources  map[*Output]*Source
 }
 
+// Length is the sound's length as known before it plays: the library's
+// (SoundRef.Length), else the decoder's estimate; 0 when neither knows.
+func (p *Prepared) Length() time.Duration { return p.length }
+
 // Close releases the sources that were not started.
 func (p *Prepared) Close() {
 	p.mu.Lock()

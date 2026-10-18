@@ -14,15 +14,24 @@
 
 (() => {
     const EDITOR = 'https://audiocutter.online';
-    // The editor's colours can't be styled from here (another origin), and
-    // its session takes only an accent. Its controls all use one blue,
-    // Tailwind's blue-600 (#155dfc, as of Oct 2026); turning the whole
-    // frame's hue by HUE makes that a teal green (#008b70, white text at
-    // 4.3:1), and greys and black stay as they are. The accent is that same
-    // blue, so "Add to Resound" turns the same green as the editor's other
-    // buttons; the logo is drawn turned back by HUE, so it ends up in its
-    // own colours. Red warnings turn magenta.
-    const HUE = -60;
+    // The editor's colours can't be styled from here (another origin; nor
+    // can an SVG filter reach into it), and its session takes only an
+    // accent. A CSS filter on the frame can: LOOK, in three steps.
+    //  1. Its controls all use one blue, Tailwind's blue-600 (#155dfc, as of
+    //     Oct 2026): turning the hue by HUE makes that a teal green.
+    //  2. Its greys are neutral, Resound's lean a little blue: invert, a
+    //     little sepia (turned by 19°), invert back tints the dark greys
+    //     cool and fades out towards black and white, which stay as they are.
+    //  3. Contrast takes the darks a step further down, as Resound's are.
+    // Fitted (Oct 2026) so its page, #262626, becomes #1c1c21 (Resound's
+    // background is #1c1d22), its panels and borders follow a few steps
+    // lighter, and its blue ends up #00876e (hue 169°, white text at 4.4:1),
+    // the green that hue-rotate(-60deg) alone gave (#008b70). The accent is
+    // that same blue, so "Add to Resound" matches the editor's other
+    // buttons; the logo is drawn turned back by HUE, so it ends up close to
+    // its own colours. Red warnings turn purple.
+    const HUE = -72;
+    const LOOK = `hue-rotate(${HUE}deg) invert(1) sepia(0.064) hue-rotate(19deg) invert(1) contrast(1.072)`;
     const ACCENT = '#155dfc';
     const STORE = 'resound.edit';
     // The user's OK to load the editor (once per browser): set by the
@@ -123,7 +132,7 @@
         editor.allow = 'autoplay; clipboard-write; fullscreen';
         editor.referrerPolicy = 'no-referrer';
         editor.src = EDITOR + '/import/';
-        editor.style.filter = `hue-rotate(${HUE}deg)`;
+        editor.style.filter = LOOK;
         // Its own scrolling would only reveal empty space (edit.css); it must
         // be set before the frame loads.
         editor.setAttribute('scrolling', 'no');

@@ -10,7 +10,7 @@ The soundboard itself needs Windows 10 or 11 (64-bit). The remote runs on any ph
 
 ## Do I need a phone?
 
-No. The app also runs on the PC itself, in a window of its own: the button next to **Phone remote** on the home page. In games, the [in-game overlay](overlay.md) plays your favorites with one key.
+No. The app also runs on the PC itself, in a window of its own: the button next to **Remote App** on the home page. In games, the [in-game overlay](overlay.md) plays your favorites with one key.
 
 ## Does the phone need internet?
 

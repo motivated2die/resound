@@ -169,10 +169,10 @@ To try the import in the panel: quit the installed Resound, run the dev build (`
 | Exits right after start | End of `debug.log` (crash trace), or start the debug build from a terminal |
 | No sound / output "Error" | `… output open` lines, Settings → Diagnostics; "Restart outputs" after unplugging |
 | Others don't hear the voice | Settings → Audio & voice chat: a broken mic pipe ("Not routed"); `input: … listen=… target=…` lines |
-| Phone can't connect | `app: reachable at …` and `app: device … connected` lines; Phone remote → "Allow phones through the firewall"; same Wi-Fi, not a guest network |
+| Phone can't connect | `app: reachable at …` and `app: device … connected` lines; Remote App → "Allow phones through the firewall"; same Wi-Fi, not a guest network |
 | Game ignores push-to-talk | `push-to-talk down/up` lines; games running as admin don't see input from normal apps |
 | Pause/stop key does nothing | `hotkeys: watching …` at start, `hotkey: …` lines when pressed; inside a game running as admin, Resound sees no keys |
-| UDP port 8080 busy | Phone remote page shows the error; change `serverPort` in `config.json` |
+| UDP port 8080 busy | Remote App page shows the error; change `serverPort` in `config.json` |
 
 ## Release checklist
 

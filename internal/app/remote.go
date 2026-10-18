@@ -212,7 +212,7 @@ func (a *App) resetRemote() {
 	a.render()
 }
 
-// pairedDeviceRows list the paired devices on the Phone remote page, each
+// pairedDeviceRows list the paired devices on the Remote App page, each
 // with a small Remove button that signs out just that one. None: no rows.
 func (a *App) pairedDeviceRows() []ui.Row {
 	connected := a.srv.Connected()
