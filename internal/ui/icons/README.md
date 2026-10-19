@@ -12,7 +12,7 @@ SVG files in this folder are embedded into the exe (`go:embed icons/*.svg` in `.
 
 Then use it by file name, `ui.Icon("player-play")`, or add a constant next to the others in `icon.go`, and rebuild. `go test ./internal/ui` renders every icon here at several sizes and checks the constants point at existing files.
 
-Browse: [tabler.io/icons](https://tabler.io/icons) · [fontawesome.com (free)](https://fontawesome.com/search?ic=free). The script pins Tabler 3.34.0 and Font Awesome Free 6.7.2.
+Browse: [tabler.io/icons](https://tabler.io/icons) · [fontawesome.com (free)](https://fontawesome.com/search?ic=free). The script pins Tabler 3.49.0 and Font Awesome Free 6.7.2.
 
 ## Where icons can go
 

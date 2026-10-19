@@ -546,9 +546,10 @@ type BrandUpdate struct {
 
 // Brand is the home page header: the app logo, a letter-spaced title with
 // the version after it (may be empty) and a status line. logo and update
-// may be nil. progress, if set, is read on every paint and drawn as a thin
-// bar under the status line (0..1; negative = none), so Popup.Repaint
-// animates it without rebuilding the rows.
+// may be nil. progress, if set, is read on every paint and drawn as a thin,
+// short bar between the title and the status line (0..1; negative = none),
+// so Popup.Repaint animates it without rebuilding the rows. The status
+// stays put whether the bar shows or not.
 func Brand(logo *Image, title, version, subtitle string, progress func() float64, update *BrandUpdate) Row {
 	return brandRow{logo, title, version, subtitle, progress, update}
 }
@@ -557,9 +558,10 @@ const (
 	brandLogoL  = 36
 	brandDotL   = 4 // radius of the update dot
 	brandBadgeH = 24
+	brandBarL   = 2 // the progress bar's top, below the middle of the row
 )
 
-func (brandRow) height() int { return 58 }
+func (brandRow) height() int { return 59 }
 
 // titleBand is the upper half of the text area, where the title sits.
 func (b brandRow) titleBand(c *canvas, r rect) rect {
@@ -632,13 +634,14 @@ func (b brandRow) paint(c *canvas, r rect, st rowState) {
 		vx := band.Left + titleW + c.px(6)
 		c.text(b.version, rect{vx, band.Top + c.px(3), band.Right, band.Bottom}, fontCaption, colCaption, dtLeft)
 	}
-	c.text(b.subtitle, rect{left, mid + c.px(3), in.Right, r.Bottom - c.px(6)}, fontCaption, colCaption, dtLeft)
+	c.text(b.subtitle, rect{left, mid + c.px(4), in.Right, r.Bottom - c.px(6)}, fontCaption, colCaption, dtLeft)
 	if b.progress == nil {
 		return
 	}
 	if p := b.progress(); p >= 0 {
 		h := max(2, c.px(3))
-		bar := rect{left, r.Bottom - c.px(5), in.Right, r.Bottom - c.px(5) + h}
+		top := mid + c.px(brandBarL)
+		bar := rect{left, top, left + (in.Right-left)/2, top + h}
 		c.roundRect(bar, h, colControl)
 		if fill := int32(float64(bar.w()) * min(p, 1)); fill > 0 {
 			c.roundRect(rect{bar.Left, bar.Top, bar.Left + max(fill, h), bar.Bottom}, h, colAccent)

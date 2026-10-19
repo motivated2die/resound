@@ -100,8 +100,9 @@ func (a *App) issues() []issue {
 	return out
 }
 
-// homePage is everyday use: problems first, then the library, the output
-// and volumes, and the phone. Everything else is under Settings.
+// homePage is everyday use: problems first, then the library and the web
+// app side by side, then the output and volumes. Everything else is under
+// Settings.
 func (a *App) homePage() []ui.Row {
 	issues := a.issues()
 	status := "Ready"
@@ -122,31 +123,15 @@ func (a *App) homePage() []ui.Row {
 		rows = append(rows, ui.Nav(is.label, is.detail, is.tone, func() { a.openPage(p) }))
 	}
 
-	// Adding folders lives on the library page; home only refreshes.
-	libDetail, libTone := a.librarySummary()
-	var refresh func()
-	if len(a.cfg.Folders) > 0 {
-		refresh = a.refreshLibrary
-	}
-	rows = append(rows,
-		ui.SectionLink("Sound library", "import sounds",
-			"Import sound buttons from websites into your folders, on the Sound library page",
-			func() { a.openPage(pageLibrary) }),
-		ui.NavTool(ui.IconRefresh, "Refresh the library: picks up new, renamed and edited files", refresh,
-			"Folders", libDetail, libTone, func() { a.openPage(pageLibrary) }),
-	)
+	rows = append(rows, a.homeCards())
 	if a.libNote != "" {
 		rows = append(rows, ui.Paragraph(a.libNote, ui.ToneGood))
 	}
 
-	rows = append(rows, ui.Spacer(6))
+	rows = append(rows, ui.Spacer(12)) // sets the cards apart from the flow
 	rows = append(rows, a.flowRows()...)
 
-	remoteDetail, remoteTone := a.remoteSummary()
 	rows = append(rows,
-		ui.Section("Sound buttons"),
-		ui.NavTool(ui.IconExternalLink, "Open the app in a window on this PC", a.openRemoteHereAction(),
-			"Remote App", remoteDetail, remoteTone, func() { a.openPage(pageRemote) }),
 		ui.Flex(),
 		ui.Separator(),
 		ui.Buttons(
@@ -157,6 +142,34 @@ func (a *App) homePage() []ui.Row {
 		ui.Spacer(4),
 	)
 	return rows
+}
+
+// homeCards are the sound library and the web app side by side. Adding
+// folders and importing sounds live on the library page; home only
+// refreshes.
+func (a *App) homeCards() ui.Row {
+	libDetail, libTone := a.librarySummary()
+	var refresh func()
+	if len(a.cfg.Folders) > 0 {
+		refresh = a.refreshLibrary
+	}
+	remoteDetail, remoteTone := a.remoteSummary()
+	return ui.PageCards(
+		ui.PageCard{
+			Section: "Sound library", Title: "Folders",
+			Detail: libDetail, Tone: libTone, Art: ui.IconFileMusic,
+			OnClick: func() { a.openPage(pageLibrary) }, Action: "Import sounds",
+			Tool: ui.IconRefresh, ToolTip: "Refresh the library: picks up new, renamed and edited files",
+			ToolAction: "Refresh library", OnTool: refresh,
+		},
+		ui.PageCard{
+			Section: "Remote", Title: "Web app",
+			Detail: remoteDetail, Tone: remoteTone, Art: ui.IconLayoutDash,
+			OnClick: func() { a.openPage(pageRemote) }, Action: "Pair new device",
+			Tool: ui.IconExternalLink, ToolTip: "Open the app in a window on this PC",
+			ToolAction: "Open remote", OnTool: a.openRemoteHereAction(),
+		},
+	)
 }
 
 // openHelp opens the help center (setup guides, features, troubleshooting)

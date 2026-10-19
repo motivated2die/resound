@@ -26,7 +26,7 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
-$TablerVersion = '3.34.0'      # MIT
+$TablerVersion = '3.49.0'      # MIT
 $FontAwesomeVersion = '6.7.2'  # Free icons: CC BY 4.0
 
 $dir = Join-Path $PSScriptRoot '..\internal\ui\icons'
