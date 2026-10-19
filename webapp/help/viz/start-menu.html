@@ -1,0 +1,110 @@
+<!-- Opening Resound again: the pointer clicks Start, "res" is typed, the
+     best match is Resound; it starts in the tray, and a click on its icon
+     opens the panel. One 11 s loop, all in help.css (.vs-*); without motion,
+     the search result. A Windows 11 desktop, cropped at both sides on
+     narrow screens. -->
+<div class="vs" role="img" aria-label="The Windows Start menu. The pointer clicks Start, res is typed into the search box, and Resound appears as the best match. A click on it starts Resound: its icon appears in the tray next to the clock, and a click on the icon opens the Resound panel.">
+    <svg viewBox="0 0 520 300" aria-hidden="true">
+        <defs>
+            <radialGradient id="vs-wall" cx="0.4" cy="0.1" r="0.9">
+                <stop offset="0" stop-color="#2c3b45"/>
+                <stop offset="1" stop-color="#1d2228"/>
+            </radialGradient>
+        </defs>
+        <rect width="520" height="300" fill="url(#vs-wall)"/>
+
+        <!-- The taskbar -->
+        <rect class="vz-bar" y="252" width="520" height="48"/>
+        <line class="vz-bar-edge" x1="0" y1="252.5" x2="520" y2="252.5"/>
+        <rect class="vs-hover" x="138" y="264" width="24" height="24" rx="4"/>
+        <g class="vz-start">
+            <rect x="139" y="265" width="10" height="10" rx="1.5"/><rect x="151" y="265" width="10" height="10" rx="1.5"/>
+            <rect x="139" y="277" width="10" height="10" rx="1.5"/><rect x="151" y="277" width="10" height="10" rx="1.5"/>
+        </g>
+        <g class="vz-line"><circle cx="178" cy="274" r="5.5"/><path d="M182 278 l4.5 4.5"/></g>
+        <rect class="vz-app" x="199" y="265" width="22" height="22" rx="5" fill="#3b4a63"/>
+        <rect class="vz-app" x="229" y="265" width="22" height="22" rx="5" fill="#4a3b55"/>
+        <rect class="vz-app" x="259" y="265" width="22" height="22" rx="5" fill="#3b5548"/>
+
+        <path class="vz-line" d="M335 279 l5 -5 l5 5"/>
+        <image class="vs-tray" href="/assets/resound-192.png" x="354" y="266" width="20" height="20"/>
+        <text class="vz-small" x="390" y="273" text-anchor="middle">ENG</text>
+        <text class="vz-tiny" x="390" y="286" text-anchor="middle">US</text>
+        <g class="vz-line">
+            <path d="M408.5 275.5 a10.5 10.5 0 0 1 15 0"/><path d="M411.3 278.6 a6.5 6.5 0 0 1 9.4 0"/>
+            <circle class="vz-fill" cx="416" cy="282" r="1.6"/>
+        </g>
+        <path class="vz-fill" d="M430 273 h3 l5 -4 v14 l-5 -4 h-3 z"/>
+        <g class="vz-line"><path d="M441 272.5 a5 5 0 0 1 0 8"/><path d="M443.5 269.5 a9 9 0 0 1 0 14"/></g>
+        <text class="vz-small" x="510" y="272" text-anchor="end">2:32 PM</text>
+        <text class="vz-small" x="510" y="286" text-anchor="end">10/19/2026</text>
+
+        <!-- The Start menu -->
+        <g class="vs-menu">
+            <rect class="vz-menu" x="60" y="26" width="300" height="218" rx="10"/>
+            <rect class="vs-search" x="76" y="40" width="268" height="26" rx="13"/>
+            <g class="vz-line vz-thin"><circle cx="91" cy="52" r="4.5"/><path d="M94.5 55.5 l3.5 3.5"/></g>
+            <text class="vz-tiny vs-placeholder" x="105" y="56.5">Search for apps, settings, and documents</text>
+            <text class="vs-typed vs-t1" x="105" y="57">r</text>
+            <text class="vs-typed vs-t2" x="105" y="57">re</text>
+            <text class="vs-typed vs-t3" x="105" y="57">res</text>
+
+            <g class="vs-pinned">
+                <text class="vz-label" x="80" y="88">Pinned</text>
+                <rect class="vz-pill" x="304" y="79" width="40" height="13" rx="6.5"/>
+                <g class="vs-grid">
+                    <rect x="79" y="101" width="22" height="22" rx="5" fill="#3b4a63"/><rect x="127" y="101" width="22" height="22" rx="5" fill="#5a4a32"/>
+                    <rect x="175" y="101" width="22" height="22" rx="5" fill="#4a3b55"/><rect x="223" y="101" width="22" height="22" rx="5" fill="#3b5548"/>
+                    <rect x="271" y="101" width="22" height="22" rx="5" fill="#553b3f"/><rect x="319" y="101" width="22" height="22" rx="5" fill="#3b4f55"/>
+                    <rect x="79" y="149" width="22" height="22" rx="5" fill="#4f553b"/><rect x="127" y="149" width="22" height="22" rx="5" fill="#3b4a63"/>
+                    <rect x="175" y="149" width="22" height="22" rx="5" fill="#553b52"/><rect x="223" y="149" width="22" height="22" rx="5" fill="#5a4a32"/>
+                    <rect x="271" y="149" width="22" height="22" rx="5" fill="#3b5548"/><rect x="319" y="149" width="22" height="22" rx="5" fill="#4a3b55"/>
+                </g>
+                <g class="vz-bars">
+                    <rect x="76" y="128" width="28" height="4" rx="2"/><rect x="124" y="128" width="28" height="4" rx="2"/><rect x="172" y="128" width="28" height="4" rx="2"/>
+                    <rect x="220" y="128" width="28" height="4" rx="2"/><rect x="268" y="128" width="28" height="4" rx="2"/><rect x="316" y="128" width="28" height="4" rx="2"/>
+                    <rect x="76" y="176" width="28" height="4" rx="2"/><rect x="124" y="176" width="28" height="4" rx="2"/><rect x="172" y="176" width="28" height="4" rx="2"/>
+                    <rect x="220" y="176" width="28" height="4" rx="2"/><rect x="268" y="176" width="28" height="4" rx="2"/><rect x="316" y="176" width="28" height="4" rx="2"/>
+                </g>
+            </g>
+
+            <g class="vs-results">
+                <text class="vz-label" x="80" y="88">Best match</text>
+                <rect class="vs-match" x="72" y="96" width="176" height="40" rx="6"/>
+                <image href="/assets/resound-192.png" x="82" y="104" width="24" height="24"/>
+                <text class="vs-name" x="114" y="114">Resound</text>
+                <text class="vz-tiny" x="114" y="128">App</text>
+                <text class="vz-label" x="80" y="160">Settings</text>
+                <g class="vz-bars">
+                    <rect x="80" y="172" width="12" height="12" rx="3"/><rect x="100" y="175" width="96" height="5" rx="2.5"/>
+                    <rect x="80" y="194" width="12" height="12" rx="3"/><rect x="100" y="197" width="72" height="5" rx="2.5"/>
+                </g>
+                <rect class="vs-detail" x="258" y="96" width="90" height="136" rx="6"/>
+                <image href="/assets/resound-192.png" x="283" y="110" width="40" height="40"/>
+                <text class="vs-name" x="303" y="166" text-anchor="middle">Resound</text>
+                <text class="vz-tiny" x="303" y="179" text-anchor="middle">App</text>
+                <line class="vz-bar-edge" x1="268" y1="190" x2="338" y2="190"/>
+                <text class="vz-small" x="303" y="208" text-anchor="middle">Open</text>
+            </g>
+        </g>
+
+        <!-- The Resound panel, above the tray -->
+        <g class="vs-panel">
+            <rect class="vs-panel-box" x="340" y="96" width="172" height="148" rx="10"/>
+            <image href="/assets/resound-192.png" x="352" y="108" width="16" height="16"/>
+            <text class="vs-brand" x="374" y="120">RESOUND</text>
+            <rect class="vs-card" x="352" y="134" width="148" height="28" rx="6"/>
+            <rect class="vs-card" x="352" y="168" width="148" height="28" rx="6"/>
+            <rect class="vs-card" x="352" y="202" width="148" height="28" rx="6"/>
+            <g class="vz-bars">
+                <rect x="362" y="145" width="64" height="6" rx="3"/><rect x="362" y="179" width="84" height="6" rx="3"/><rect x="362" y="213" width="52" height="6" rx="3"/>
+            </g>
+            <rect class="vz-pill vs-on" x="472" y="142" width="18" height="12" rx="6"/>
+        </g>
+
+        <circle class="vz-ring vs-ring-start" cx="150" cy="276" r="10"/>
+        <circle class="vz-ring vs-ring-match" cx="160" cy="116" r="10"/>
+        <circle class="vz-ring vs-ring-tray" cx="364" cy="276" r="10"/>
+        <g class="vz-pointer vs-pointer"><path d="M0 0 V16 L4.5 12 L7.5 18.5 L10 17.4 L7 11 H12.5 Z"/></g>
+    </svg>
+</div>
