@@ -306,7 +306,7 @@
                     <p class="eyebrow">On your PC</p>
                     <h2 id="desktop-title" class="section-title">See where your sound goes. No more guesswork.</h2>
                     <p class="section-lead">Resound's PC controls draw your audio exactly as it flows: from your microphone and the soundboard to what you and your friends hear.</p>
-                    <ul class="desktop-points">
+                    <ul class="desktop-points" data-dp-points>
                         <li>
                             <span class="icon usp-icon" data-icon="graphic_eq" aria-hidden="true"></span>
                             <div><h3>Every connection at a glance</h3><p>Connections light up with the signal and live meters show you what your friends will hear you before you join a call.</p></div>
@@ -330,16 +330,39 @@
                         <div class="dp-brand">
                             <img src="assets/resound-192.png" alt="" width="48" height="48">
                             <div class="dp-brand-text">
-                                <div class="dp-name">RESOUND <span>v0.13.0</span></div>
+                                <div class="dp-name">RESOUND <span>v0.15.2</span></div>
+                                <div class="dp-progress" data-dp="progress"><i></i></div>
                                 <div class="dp-status" data-dp="status">Ready</div>
-                                <div class="dp-progress"><i data-dp="progress"></i></div>
                             </div>
                         </div>
 
-                        <div class="dp-caption"><span>Sound library</span><b>import sounds</b></div>
-                        <div class="dp-row">
-                            <span class="dp-tool"><span class="picon" data-picon="refresh"></span></span>
-                            <span class="dp-nav"><strong>Folders</strong><em>157 sounds · 5 tabs</em><span class="picon" data-picon="chevron-right"></span></span>
+                        <!-- A problem, as the home page lists it above everything else -->
+                        <div class="dp-issue">
+                            <span class="dp-nav"><strong>Voice chat</strong><em>VB-Cable missing</em><span class="picon" data-picon="chevron-right"></span></span>
+                        </div>
+
+                        <!-- The library and the web app as two cards (ui.PageCards) -->
+                        <div class="dp-cards">
+                            <div>
+                                <div class="dp-caption"><span>Sound library</span></div>
+                                <div class="dp-card">
+                                    <span class="picon dp-card-art" data-picon="file-music-filled"></span>
+                                    <strong>Folders</strong>
+                                    <span class="dp-card-tool"><span class="picon" data-picon="refresh"></span></span>
+                                    <em>157 sounds · 5 tabs</em>
+                                    <span class="picon dp-card-chevron" data-picon="chevron-right"></span>
+                                </div>
+                            </div>
+                            <div>
+                                <div class="dp-caption"><span>Remote</span></div>
+                                <div class="dp-card">
+                                    <span class="picon dp-card-art" data-picon="layout-dashboard-filled"></span>
+                                    <strong>Web app</strong>
+                                    <span class="dp-card-tool"><span class="picon" data-picon="external-link"></span></span>
+                                    <em>2 devices paired</em>
+                                    <span class="picon dp-card-chevron" data-picon="chevron-right"></span>
+                                </div>
+                            </div>
                         </div>
 
                         <div class="dp-caption"><span>Your microphone</span></div>
@@ -389,6 +412,7 @@
 
                             <div class="dp-badge dp-badge-held" data-dp="held"><span class="picon" data-picon="microphone-off"></span>Muted for sounds</div>
                             <div class="dp-badge dp-badge-good" data-dp="ptt"><span class="picon" data-picon="keyboard"></span>Holding PTT key</div>
+                            <div class="dp-badge dp-badge-warn" data-dp="missing"><span class="picon" data-picon="alert-triangle"></span>VB-Cable missing</div>
 
                             <div class="dp-caption dp-board-caption"><span>Soundboard</span></div>
                             <div class="dp-unit dp-board">
@@ -399,21 +423,15 @@
                             <div class="dp-caption dp-others-caption"><span>Others hear</span><span>73%</span></div>
                             <div class="dp-caption dp-you-caption"><span>You hear</span><span>52%</span></div>
                             <div class="dp-unit dp-others">
-                                <div class="dp-field dp-cable"><span class="picon" data-picon="microphone"></span><span class="picon dp-info" data-picon="info-circle"></span><strong>CABLE Output</strong></div>
+                                <div class="dp-field dp-cable"><span class="picon" data-picon="microphone"></span><span class="picon dp-info" data-picon="info-circle"></span><strong data-dp="cable-name">CABLE Output</strong></div>
                                 <div class="dp-meter"><i data-meter="others"></i></div>
                             </div>
                             <div class="dp-unit dp-you">
                                 <div class="dp-field"><span class="dp-ellipsis">Speakers (Realtek Audio)</span><span class="picon dp-chevron" data-picon="chevron-right"></span></div>
                                 <div class="dp-meter"><i data-meter="you"></i></div>
                             </div>
-                            <div class="dp-slider dp-others-slider" style="--value: 0.73"><i></i></div>
-                            <div class="dp-slider dp-you-slider" style="--value: 0.52"><i></i></div>
-                        </div>
-
-                        <div class="dp-caption"><span>Sound buttons</span></div>
-                        <div class="dp-row">
-                            <span class="dp-tool"><span class="picon" data-picon="external-link"></span></span>
-                            <span class="dp-nav"><strong>Remote App</strong><em>2 devices paired</em><span class="picon" data-picon="chevron-right"></span></span>
+                            <div class="dp-slider dp-others-slider" style="--value: 0.73"><i></i><span class="picon" data-picon="fa-solid-volume-high"></span></div>
+                            <div class="dp-slider dp-you-slider" style="--value: 0.52"><i></i><span class="picon" data-picon="fa-solid-volume-high"></span></div>
                         </div>
 
                         <div class="dp-footer">

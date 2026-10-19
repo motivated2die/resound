@@ -487,12 +487,16 @@ h1 { font-size: clamp(32px, 5vw, 52px); line-height: 1.1; font-weight: 700; lett
     -webkit-mask: var(--picon) center / contain no-repeat;
     mask: var(--picon) center / contain no-repeat;
 }
+.picon[data-picon="alert-triangle"] { --picon: url("../assets/panel-icons/alert-triangle.svg"); }
 .picon[data-picon="check"] { --picon: url("../assets/panel-icons/check.svg"); }
 .picon[data-picon="chevron-right"] { --picon: url("../assets/panel-icons/chevron-right.svg"); }
 .picon[data-picon="external-link"] { --picon: url("../assets/panel-icons/external-link.svg"); }
+.picon[data-picon="fa-solid-volume-high"] { --picon: url("../assets/panel-icons/fa-solid-volume-high.svg"); }
+.picon[data-picon="file-music-filled"] { --picon: url("../assets/panel-icons/file-music-filled.svg"); }
 .picon[data-picon="help-circle"] { --picon: url("../assets/panel-icons/help-circle.svg"); }
 .picon[data-picon="info-circle"] { --picon: url("../assets/panel-icons/info-circle.svg"); }
 .picon[data-picon="keyboard"] { --picon: url("../assets/panel-icons/keyboard.svg"); }
+.picon[data-picon="layout-dashboard-filled"] { --picon: url("../assets/panel-icons/layout-dashboard-filled.svg"); }
 .picon[data-picon="microphone"] { --picon: url("../assets/panel-icons/microphone.svg"); }
 .picon[data-picon="microphone-off"] { --picon: url("../assets/panel-icons/microphone-off.svg"); }
 .picon[data-picon="player-play"] { --picon: url("../assets/panel-icons/player-play.svg"); }
@@ -511,6 +515,15 @@ h1 { font-size: clamp(32px, 5vw, 52px); line-height: 1.1; font-weight: 700; lett
 .desktop-points li { display: flex; gap: 16px; align-items: flex-start; }
 .desktop-points .usp-icon { margin-top: 1px; }
 .desktop-points p { color: var(--muted); font-size: 15px; }
+/* While the panel's picture cycles, the point it shows stands out and its
+   icon's glow pulses (landing.js). */
+.desktop-points.cycling li { opacity: 0.55; transition: opacity 0.5s ease; }
+.desktop-points.cycling li.on { opacity: 1; }
+.desktop-points li.on .usp-icon { animation: dp-point-glow 1.8s ease-in-out infinite; }
+@keyframes dp-point-glow {
+    0%, 100% { filter: drop-shadow(0 0 10px rgba(var(--accent-rgb), 0.55)); }
+    50% { filter: drop-shadow(0 0 5px rgba(var(--accent-rgb), 0.95)) drop-shadow(0 0 18px rgba(var(--accent-rgb), 0.75)); }
+}
 
 /* A picture, not text, like the phone. */
 .desktop-visual {
@@ -583,9 +596,12 @@ h1 { font-size: clamp(32px, 5vw, 52px); line-height: 1.1; font-weight: 700; lett
 .dp-brand-text { flex: 1; min-width: 0; }
 .dp-name { font-size: 21px; font-weight: 600; letter-spacing: 0.16em; line-height: 1.2; }
 .dp-name span { font-size: 14px; letter-spacing: 0; color: var(--muted); margin-left: 2px; }
-.dp-status { font-size: 14px; color: var(--muted); margin: 3px 0 6px; }
-.dp-progress { height: 4px; border-radius: 2px; background: var(--divider); overflow: hidden; }
+/* The progress bar sits between the title and the status, half as wide;
+   its space stays when it hides, so the status never moves. */
+.dp-progress { width: 50%; height: 4px; margin: 5px 0 4px; border-radius: 2px; background: var(--dp-control); overflow: hidden; opacity: 0; transition: opacity 0.25s ease; }
+.dp-progress.on { opacity: 1; }
 .dp-progress i { display: block; height: 100%; width: 0; background: var(--accent); border-radius: 2px; }
+.dp-status { font-size: 14px; color: var(--muted); }
 
 .dp-caption {
     display: flex;
@@ -599,11 +615,8 @@ h1 { font-size: clamp(32px, 5vw, 52px); line-height: 1.1; font-weight: 700; lett
 }
 .dp-caption b { text-transform: none; font-size: 14px; color: var(--accent); }
 
-.dp-row { display: flex; gap: 10px; height: 42px; }
-.dp-tool { width: 42px; display: flex; align-items: center; justify-content: center; border-radius: 7px; background: var(--dp-field); }
-.dp-tool .picon { font-size: 19px; }
 .dp-nav {
-    flex: 1;
+    height: 42px;
     display: flex;
     align-items: center;
     gap: 10px;
@@ -615,6 +628,25 @@ h1 { font-size: clamp(32px, 5vw, 52px); line-height: 1.1; font-weight: 700; lett
 .dp-nav em { font-style: normal; font-size: 14px; color: var(--accent); }
 .dp-nav .picon { font-size: 16px; color: var(--muted); }
 
+/* A problem row at the top of the home page. It opens up while the picture
+   shows a problem, and the space under the legend closes by as much, so
+   the section keeps its height. */
+.dp-issue { height: 0; margin-top: 0; overflow: hidden; opacity: 0; transition: height 0.45s ease, margin-top 0.45s ease, opacity 0.3s ease; }
+.dp-issue em { color: var(--dp-warning); }
+.desktop-visual.warn .dp-issue { height: 42px; margin-top: 14px; opacity: 1; }
+
+/* The library and the web app: two cards in the flow's columns */
+.dp-cards { display: grid; grid-template-columns: 1fr 1fr; column-gap: 16px; }
+.dp-card { position: relative; height: 105px; border-radius: 15px; background: var(--dp-field); overflow: hidden; }
+.dp-card-art { position: absolute; right: 2px; top: 50%; font-size: 94px; margin-top: -47px; color: #24262d; }
+.dp-card strong, .dp-card em { position: absolute; left: 15px; height: 37px; line-height: 37px; white-space: nowrap; }
+.dp-card strong { top: 8px; font-weight: 600; }
+.dp-card em { right: 26px; bottom: 10px; overflow: hidden; text-overflow: ellipsis; font-style: normal; color: var(--accent); }
+.dp-card-tool { position: absolute; top: 8px; right: 8px; width: 37px; height: 37px; display: flex; align-items: center; justify-content: center; }
+.dp-card-tool .picon { font-size: 21px; }
+.dp-card-chevron { position: absolute; right: 9px; bottom: 21px; font-size: 16px; color: var(--muted); }
+.dp-cards + .dp-caption { margin-top: 23px; }
+
 /* The flow: 388 × 300, positions as the panel lays them out */
 .dp-flow { position: relative; height: 300px; }
 .dp-pipes { position: absolute; inset: 0; overflow: visible; }
@@ -623,6 +655,11 @@ h1 { font-size: clamp(32px, 5vw, 52px); line-height: 1.1; font-weight: 700; lett
 .dp-pipe use { stroke: none; }
 .dp-pipe.held { color: var(--muted); }
 .dp-pipe.held path { stroke-dasharray: 4 3; }
+/* Not in use: faint and dashed. Should be connected but isn't: the
+   badge's tone, dimmed. */
+.dp-pipe.off { color: var(--divider); }
+.dp-pipe.off path { stroke-dasharray: 5 4; }
+.dp-pipe.broken { color: #9c7f3c; }
 
 .dp-unit { position: absolute; border-radius: 9px; overflow: hidden; background: var(--dp-field); }
 .dp-meter { position: relative; height: 7px; background: var(--dp-meter); }
@@ -675,6 +712,7 @@ h1 { font-size: clamp(32px, 5vw, 52px); line-height: 1.1; font-weight: 700; lett
 .dp-badge.on { opacity: 1; }
 .dp-badge-held { top: 72px; color: var(--muted); }
 .dp-badge-good { top: 152px; color: var(--accent); }
+.dp-badge-warn { top: 148px; color: var(--dp-warning); }
 
 .dp-others-caption, .dp-you-caption { position: absolute; top: 200px; width: 186px; margin: 0; }
 .dp-others-caption { left: 0; }
@@ -685,6 +723,7 @@ h1 { font-size: clamp(32px, 5vw, 52px); line-height: 1.1; font-weight: 700; lett
 .dp-cable .picon { font-size: 19px; }
 .dp-cable .dp-info { font-size: 14px; color: var(--muted); margin-right: 6px; }
 .dp-cable strong { font-weight: 600; }
+.dp-others.missing .dp-cable { color: var(--muted); }
 .dp-you .dp-field { padding-left: 14px; }
 
 .dp-slider { position: absolute; top: 283px; width: 186px; height: 12px; border-radius: 6px; background: var(--dp-control); overflow: hidden; }
@@ -695,6 +734,7 @@ h1 { font-size: clamp(32px, 5vw, 52px); line-height: 1.1; font-weight: 700; lett
     background: linear-gradient(90deg, rgba(var(--accent-rgb), 0.25), var(--accent));
     border-right: 3px solid #fff;
 }
+.dp-slider .picon { position: absolute; right: 4px; top: 50%; margin-top: -6px; font-size: 12px; color: var(--muted); }
 .dp-others-slider { left: 0; }
 .dp-you-slider { left: 202px; }
 
@@ -715,7 +755,10 @@ h1 { font-size: clamp(32px, 5vw, 52px); line-height: 1.1; font-weight: 700; lett
 
 /* What the animation shows right now */
 .dp-legend { display: flex; align-items: center; gap: 8px; margin-top: 18px; font-size: 14px; color: var(--muted); min-height: 1.5em; }
-.dp-legend i { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 8px var(--accent); }
+.dp-legend i { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 8px var(--accent); transition: background 0.3s ease, box-shadow 0.3s ease; }
+.dp-legend { margin-bottom: 56px; transition: margin-bottom 0.45s ease; } /* the problem row's height, see .dp-issue */
+.desktop-visual.warn .dp-legend { margin-bottom: 0; }
+.desktop-visual.warn .dp-legend i { background: #f2c14e; box-shadow: 0 0 8px #f2c14e; } /* --dp-warning; the legend is outside .dp */
 
 /* --- In-game overlay (index.html #overlay, js/overlay-demo.js) ---
    One component in the app's sizes (internal/ui/overlay.go) times --u: the

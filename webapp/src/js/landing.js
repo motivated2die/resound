@@ -197,27 +197,37 @@
     // The picture of the desktop panel plays what the panel shows (internal/
     // app/flow.go): first someone talks, so the mic's pipe and "Others hear"
     // follow the voice; then a sound plays, so the mic is muted for it,
-    // push-to-talk is held, and the sound flows to both outputs. Meters jump
-    // up at once and fall smoothly, like the panel's.
+    // push-to-talk is held, and the sound flows to both outputs; then a
+    // problem: VB-Cable isn't installed, so the cable is marked, the pipes
+    // into it go unused and the home page lists it at the top. Meters jump
+    // up at once and fall smoothly, like the panel's. The point beside the
+    // picture that each phase shows stands out meanwhile.
     function animateDesktopPanel(panel) {
         if (!panel) return;
-        const TALK = 4.2, PLAY = 6.4;         // seconds per phase
+        const TALK = 4.2, PLAY = 6.4, WARN = 5.4; // seconds per phase
         const FALL = 0.05 / 0.033;            // meter fall per second (flowFall per flowTick)
         const IDLE = [0x4a, 0x4d, 0x57], ACCENT = [0x50, 0xde, 0xa8];
+        const PHASES = ['talk', 'play', 'warn']; // in the order of the points
 
-        const el = (name) => panel.parentElement.querySelector(`[data-dp="${name}"]`);
+        const visual = panel.parentElement;
+        const el = (name) => visual.querySelector(`[data-dp="${name}"]`);
         const meters = {};
         panel.querySelectorAll('[data-meter]').forEach((m) => { meters[m.dataset.meter] = { el: m, shown: 0 }; });
         const pipes = {};
         panel.querySelectorAll('[data-pipe]').forEach((p) => { pipes[p.dataset.pipe] = p; });
-        const status = el('status'), progress = el('progress'), muted = el('muted');
-        const held = el('held'), ptt = el('ptt'), legend = el('legend').querySelector('span');
+        const status = el('status'), progress = el('progress'), bar = progress.firstElementChild, muted = el('muted');
+        const held = el('held'), ptt = el('ptt'), missing = el('missing'), legend = el('legend').querySelector('span');
         const boardIcon = el('board-icon'), boardLabel = el('board-label');
+        const cableName = el('cable-name'), others = cableName.closest('.dp-unit');
+        const points = document.querySelector('[data-dp-points]');
+        const pointItems = points ? [...points.children] : [];
 
-        const setPipe = (name, level, isHeld) => {
+        // A pipe lit by level (0..1), or 'held', 'off' or 'broken'
+        // (ui.PipeState), drawn by its class.
+        const setPipe = (name, level, state = 'on') => {
             const p = pipes[name];
-            p.classList.toggle('held', isHeld);
-            if (isHeld) { p.style.color = ''; return; }
+            ['held', 'off', 'broken'].forEach((c) => p.classList.toggle(c, state === c));
+            if (state !== 'on') { p.style.color = ''; return; }
             const f = Math.min(1, level * 1.4);
             p.style.color = `rgb(${IDLE.map((c, i) => Math.round(c + (ACCENT[i] - c) * f)).join(',')})`;
         };
@@ -228,18 +238,27 @@
             return m.shown;
         };
         let phase = null;
-        const setPhase = (playing) => {
-            if (phase === playing) return;
-            phase = playing;
-            status.textContent = playing ? 'Playing' : 'Ready';
+        const setPhase = (next) => {
+            if (phase === next) return;
+            phase = next;
+            const playing = next === 'play', warn = next === 'warn';
+            status.textContent = { talk: 'Ready', play: 'Playing', warn: '1 thing needs attention' }[next];
+            progress.classList.toggle('on', playing);
             muted.classList.toggle('on', playing);
             held.classList.toggle('on', playing);
             ptt.classList.toggle('on', playing);
+            missing.classList.toggle('on', warn);
+            visual.classList.toggle('warn', warn);
+            others.classList.toggle('missing', warn);
+            cableName.textContent = warn ? 'Not installed' : 'CABLE Output';
             boardIcon.dataset.picon = playing ? 'player-stop' : 'player-play';
             boardLabel.textContent = playing ? 'Stop' : 'Test sound';
-            legend.textContent = playing
-                ? 'Playing a sound: your mic is muted and push-to-talk is held'
-                : 'Talking: your voice goes into voice chat';
+            legend.textContent = {
+                talk: 'Talking: your voice goes into voice chat',
+                play: 'Playing a sound: your mic is muted and push-to-talk is held',
+                warn: 'A problem: VB-Cable is missing. One click installs it',
+            }[next];
+            pointItems.forEach((li, i) => li.classList.toggle('on', PHASES[i] === next));
         };
 
         // Levels on the panel's 0..1 (decibel) scale. A voice: syllables in
@@ -256,29 +275,41 @@
         };
 
         const frame = (cycle, dt) => {
-            const playing = cycle >= TALK;
-            setPhase(playing);
-            if (!playing) {
+            const next = cycle < TALK ? 'talk' : cycle < TALK + PLAY ? 'play' : 'warn';
+            setPhase(next);
+            if (next === 'talk') {
                 const mic = setMeter('mic', voice(cycle), dt);
                 setMeter('sounds', 0, dt);
                 setMeter('others', mic * 0.93, dt);
                 setMeter('you', 0, dt);
-                setPipe('mic', mic, false);
-                setPipe('shared', mic, false);
-                setPipe('board', meters.sounds.shown, false);
-                setPipe('you', meters.you.shown, false);
-                progress.style.width = '0';
-            } else {
+                setPipe('mic', mic);
+                setPipe('shared', mic);
+                setPipe('board', meters.sounds.shown);
+                setPipe('you', meters.you.shown);
+                bar.style.width = '0';
+            } else if (next === 'play') {
                 const t = cycle - TALK;
                 const s = setMeter('sounds', sound(t, PLAY - t), dt);
                 setMeter('mic', 0, dt);
                 setMeter('others', s * 0.95, dt);
                 setMeter('you', s * 0.88, dt);
-                setPipe('mic', 0, true);
-                setPipe('shared', s, false);
-                setPipe('board', s, false);
-                setPipe('you', s, false);
-                progress.style.width = `${Math.min(100, (t / PLAY) * 100).toFixed(1)}%`;
+                setPipe('mic', 0, 'held');
+                setPipe('shared', s);
+                setPipe('board', s);
+                setPipe('you', s);
+                bar.style.width = `${Math.min(100, (t / PLAY) * 100).toFixed(1)}%`;
+            } else {
+                // The voice still reaches the mic's meter, but nothing gets
+                // to the cable: others hear nothing.
+                setMeter('mic', voice(cycle - TALK - PLAY), dt);
+                setMeter('sounds', 0, dt);
+                setMeter('others', 0, dt);
+                setMeter('you', 0, dt);
+                setPipe('mic', 0, 'off');
+                setPipe('board', 0, 'off');
+                setPipe('shared', 0, 'broken');
+                setPipe('you', meters.you.shown);
+                bar.style.width = '0';
             }
         };
 
@@ -286,16 +317,17 @@
         if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
             frame(TALK + 2.5, 1);
             ['sounds', 'others', 'you'].forEach((m) => setMeter(m, 0.72, 1));
-            ['board', 'shared', 'you'].forEach((p) => setPipe(p, 0.72, false));
+            ['board', 'shared', 'you'].forEach((p) => setPipe(p, 0.72));
             return;
         }
+        if (points) points.classList.add('cycling');
 
         // Runs only while the panel is on screen.
         let raf = 0, last = 0, cycle = 0;
         const tick = (now) => {
             const dt = last ? Math.min(0.1, (now - last) / 1000) : 0;
             last = now;
-            cycle = (cycle + dt) % (TALK + PLAY);
+            cycle = (cycle + dt) % (TALK + PLAY + WARN);
             frame(cycle, dt);
             raf = requestAnimationFrame(tick);
         };

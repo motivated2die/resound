@@ -165,6 +165,46 @@ func TestWebIcons(t *testing.T) {
 	}
 }
 
+// The landing page's picture of the desktop panel uses the panel's own
+// icons (assets/panel-icons), each with a --picon rule in landing.css.
+func TestPanelIcons(t *testing.T) {
+	css, err := fs.ReadFile(src, "css/landing.css")
+	if err != nil {
+		t.Fatal(err)
+	}
+	attr := regexp.MustCompile(`data-picon="([a-z0-9_-]+)"`)
+	assign := regexp.MustCompile(`dataset\.picon = (.*)`)
+	quoted := regexp.MustCompile(`'([a-z0-9_-]+)'`)
+	names := map[string]string{}
+	for _, path := range []string{"index.html", "js/landing.js"} {
+		data, err := fs.ReadFile(src, path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, line := range strings.Split(string(data), "\n") {
+			for _, m := range attr.FindAllStringSubmatch(line, -1) {
+				names[m[1]] = path
+			}
+			if m := assign.FindStringSubmatch(line); m != nil {
+				for _, m := range quoted.FindAllStringSubmatch(m[1], -1) {
+					names[m[1]] = path
+				}
+			}
+		}
+	}
+	if len(names) < 10 {
+		t.Fatalf("found only %d panel icon names: %v", len(names), names)
+	}
+	for name, path := range names {
+		if _, err := fs.Stat(src, "assets/panel-icons/"+name+".svg"); err != nil {
+			t.Errorf("%s uses panel icon %q, but assets/panel-icons/%s.svg is missing", path, name, name)
+		}
+		if !strings.Contains(string(css), `.picon[data-picon="`+name+`"]`) {
+			t.Errorf("%s uses panel icon %q, but css/landing.css has no rule for it", path, name)
+		}
+	}
+}
+
 // The build fills in the service worker, which lists every page and script
 // of the app, and adds the help center, which it must not list.
 func TestBuild(t *testing.T) {
