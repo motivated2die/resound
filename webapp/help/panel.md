@@ -16,9 +16,8 @@ From top to bottom:
 
 - **Status:** “Ready”, the number of things that need attention, or what's playing. **Update** appears here when a new version is out.
 - **Problems**, if there are any, such as a failed output or voice chat that isn't set up. Click one to get to its fix.
-- **Sound library:** your folders, a refresh button, and **import sounds**, which leads to [importing sounds](import-sounds.md).
+- **Sound library** and **Remote**, side by side. **Folders** leads to your folders and to [importing sounds](import-sounds.md); its top right button refreshes the library. **Web app** leads to pairing; its top right button opens the app in a window on this PC.
 - **The audio flow**, below.
-- **Remote App:** pairing, and a button that opens the app in a window on this PC.
 - **Help**, **Settings** and **Quit**. Quit stops Resound: sounds stop and the phone can't connect until you start it again.
 
 ## The audio flow

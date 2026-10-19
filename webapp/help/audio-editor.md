@@ -25,7 +25,7 @@ Right after you accept, your browser may ask whether `getresound.app` may **acce
 
 ## Cut sounds from a video
 
-1. On the PC, open Settings → **Sound library** (or click **import sounds** on the home page).
+1. On the PC, open Settings → **Sound library** (or click **Folders** on the home page).
 2. Drag a video or audio file from Explorer onto a folder. While it's over the folder, the folder reads **Drop to cut in the editor**.
 3. A browser window opens with the file loaded. In the panel, the folder reads **Editing in your browser…**.
 4. Select the part you want (drag across the waveform) and press **Add to Resound**. The clip is saved into the folder, and the usual card opens in the panel to name it, preview it or discard it.

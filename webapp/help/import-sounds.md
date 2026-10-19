@@ -4,7 +4,7 @@ Drag a sound from a sound button website onto one of your folders in the panel, 
 
 ## From Myinstants or Sound Buttons World
 
-1. On the PC, open Settings → **Sound library**, or click **import sounds** on the home page. You need at least one [sound folder](sound-library.md).
+1. On the PC, open Settings → **Sound library**, or click **Folders** on the home page. You need at least one [sound folder](sound-library.md).
 2. Click **Myinstants** or **Sound Buttons World**. The site opens in your browser; the panel stays open beside it.
 3. Find a sound and **drag its name** onto a folder in the panel. On Myinstants, the small link icon under a button works too.
 4. Resound downloads the sound and opens a card under the folder:
