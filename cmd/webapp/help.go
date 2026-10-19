@@ -76,6 +76,17 @@ type helpView struct {
 	*helpPage
 	Home     bool
 	Sections []helpSection
+	Site     string // site, for link previews
+	URL      string // the page's address there, its canonical URL
+}
+
+// helpPath is an article's path on the site: /help/ for the overview,
+// /help/<slug> for the others.
+func helpPath(slug string) string {
+	if slug == "index" {
+		return "/help/"
+	}
+	return "/help/" + slug
 }
 
 // buildHelp renders the help center from the folder fsys into files for
@@ -178,7 +189,8 @@ func buildHelp(fsys fs.FS) (map[string][]byte, error) {
 			return nil, fmt.Errorf("%s.md: %w", p.Slug, err)
 		}
 		var buf bytes.Buffer
-		if err := tmpl.Execute(&buf, helpView{helpPage: p, Home: p == home, Sections: sections}); err != nil {
+		view := helpView{helpPage: p, Home: p == home, Sections: sections, Site: site, URL: site + helpPath(p.Slug)}
+		if err := tmpl.Execute(&buf, view); err != nil {
 			return nil, fmt.Errorf("%s.md: %w", p.Slug, err)
 		}
 		out["help/"+p.Slug+".html"] = buf.Bytes()
@@ -356,10 +368,7 @@ func helpLink(dest string, from *helpPage, pages map[string]*helpPage) (string, 
 	if frag != "" && !to.ids[frag] {
 		return dest, fmt.Errorf("link %q: %s.md has no such heading", dest, slug)
 	}
-	url := "/help/" + slug
-	if slug == "index" {
-		url = "/help/"
-	}
+	url := helpPath(slug)
 	if frag != "" {
 		url += "#" + frag
 	}
