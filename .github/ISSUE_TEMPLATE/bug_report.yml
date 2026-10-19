@@ -1,0 +1,66 @@
+name: Bug report
+description: Something in Resound doesn't work as it should.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting! Please check the [help center](https://getresound.app/help/) first; many setup problems are covered there. One problem per issue, please. Security problems go through [SECURITY.md](https://github.com/motivated2die/resound/security/policy) instead.
+
+  - type: input
+    id: version
+    attributes:
+      label: Resound version
+      description: Settings → App & startup. Please check that the problem still happens with the [latest release](https://github.com/motivated2die/resound/releases/latest).
+      placeholder: e.g. 0.15.0
+    validations:
+      required: true
+
+  - type: input
+    id: windows
+    attributes:
+      label: Windows version
+      description: Press Win + R, type `winver`, press Enter.
+      placeholder: e.g. Windows 11 24H2
+    validations:
+      required: true
+
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: What you did, step by step, what you expected and what happened instead. Mention your voice chat app or game if it matters.
+      placeholder: |
+        1. Opened the phone app and tapped a sound
+        2. Expected: my friends hear it in Discord
+        3. Instead: only I hear it
+    validations:
+      required: true
+
+  - type: textarea
+    id: log
+    attributes:
+      label: Log
+      description: |
+        In Resound: Settings → Diagnostics → **Open log**, or open `%LOCALAPPDATA%\Resound\debug.log`. If Resound crashed or restarted, `debug.old.log` next to it helps too. Drag the file(s) into this box.
+
+        **Before you upload, read the log through.** It is posted publicly. It never contains keystrokes, pairing codes or keys, but it can contain your Windows user name (in folder paths), folder and sound names, audio device names, your PC's name and local network addresses. Replace anything you'd rather not share with `***`.
+      placeholder: Drop debug.log here
+    validations:
+      required: false
+
+  - type: textarea
+    id: more
+    attributes:
+      label: Anything else?
+      description: Screenshots, your audio setup (VB-Cable, Voicemeeter, headset), whether it happens every time.
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: privacy
+    attributes:
+      label: Privacy
+      options:
+        - label: I have checked the log and screenshots for personal information.
+          required: true

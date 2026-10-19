@@ -105,6 +105,12 @@ go test -race ./...      # same with the race detector (needs a C compiler on Wi
 
 `app`, `install` and the WASAPI code are only checked by vet and manual testing; see the checklist below. `ui` has tests for the slider and button-group logic and for icon rasterizing; painting is checked by hand.
 
+## Commits and dependencies
+
+**Commit messages** start with a type: `feat:` (new feature), `fix:` (bug fix), `ui:` (look and feel), `docs:`, `chore:` (build, dependencies, cleanup). They become the release notes, so write them for users: `fix: phone remote reconnects after the PC wakes up`.
+
+**Dependencies.** The project is pure Go without cgo; keep it that way. New Go modules and front-end libraries must have a license compatible with GPL-3.0 (MIT, BSD, Apache-2.0, …) and are listed in [THIRD_PARTY_NOTICES.md](../THIRD_PARTY_NOTICES.md). Front-end libraries are vendored under `webapp/src/vendor/` with their license file, not loaded from a CDN.
+
 ## Testing install and uninstall locally
 
 1. Build a release to a folder outside the repo, e.g. with `scripts\build-release.ps1`, and start it. It installs and the welcome notice appears.
