@@ -237,8 +237,8 @@ func TestBuild(t *testing.T) {
 			t.Errorf("help center: %v", err)
 		}
 	}
-	if strings.Contains(string(sw), "robots.txt") || strings.Contains(string(sw), "sitemap.xml") {
-		t.Errorf("sw.js caches robots.txt or sitemap.xml")
+	if strings.Contains(string(sw), "robots.txt") || strings.Contains(string(sw), "sitemap.xml") || strings.Contains(string(sw), linkPreview) {
+		t.Errorf("sw.js caches robots.txt, sitemap.xml or the link preview")
 	}
 }
 
@@ -276,10 +276,17 @@ func TestSearchEngines(t *testing.T) {
 		}
 	}
 	help, _ := os.ReadFile(filepath.Join(out, "help", "voice-chat.html"))
-	for _, want := range []string{`<link rel="canonical" href="` + site + `/help/voice-chat">`, `<meta property="og:image" content="` + site + `/assets/resound-512.png">`} {
+	for _, want := range []string{`<link rel="canonical" href="` + site + `/help/voice-chat">`, `<meta property="og:image" content="` + site + "/" + linkPreview + `">`} {
 		if !strings.Contains(string(help), want) {
 			t.Errorf("help/voice-chat.html has no %s", want)
 		}
+	}
+	index, _ := fs.ReadFile(src, "index.html")
+	if !strings.Contains(string(index), `<meta property="og:image" content="`+site+"/"+linkPreview+`">`) {
+		t.Errorf("index.html doesn't use %s as its link preview", linkPreview)
+	}
+	if _, err := os.Stat(filepath.Join(out, filepath.FromSlash(linkPreview))); err != nil {
+		t.Errorf("link preview: %v", err)
 	}
 }
 
