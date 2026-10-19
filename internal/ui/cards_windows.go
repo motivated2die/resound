@@ -167,14 +167,14 @@ func (cr pageCardsRow) paintCard(c *canvas, r rect, i int, st rowState) {
 	c.roundRect(box, radius, bg)
 
 	// The background icon, a shade darker than the tile, follows the tile's
-	// hover colour. Filled icons carry weight, so the shade is slight. It
-	// reaches past the right and bottom edges, clipped to the tile.
+	// hover colour. Filled icons carry weight, so the shade is slight. It is
+	// centred vertically and sits a little in from the right edge.
 	if card.Art != "" {
 		size := c.px(pageCardArtL)
-		art := rect{box.Right - size + c.px(10), box.Top + (box.h()-size)/2 + c.px(6), 0, 0}
+		art := rect{box.Right - size - c.px(13), box.Top + (box.h()-size)/2, 0, 0}
 		art.Right, art.Bottom = art.Left+size, art.Top+size
 		restore := c.clipRound(box, radius)
-		c.icon(card.Art, art, pageCardArtL, shade(bg, -4))
+		c.icon(card.Art, art, pageCardArtL, shade(bg, -6))
 		restore()
 	}
 
