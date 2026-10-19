@@ -36,6 +36,10 @@ const site = "https://getresound.app"
 // own pages (/app, /connect, /edit) are left out and marked noindex.
 var sitemapPages = []string{"index.html"}
 
+// linkPreview is the picture link previews show (og:image). The app never
+// shows it, so the service worker leaves it out.
+const linkPreview = "assets/preview.webp"
+
 func main() {
 	src := flag.String("src", "webapp/src", "the app's files")
 	help := flag.String("help", "webapp/help", "the help center's articles")
@@ -124,7 +128,7 @@ func precache(files map[string][]byte) (version, list string) {
 	var names []string
 	for name := range files {
 		base := path.Base(name)
-		if name == "sw.js" || name == "_headers" || name == "robots.txt" || base == "README.md" || strings.HasPrefix(base, "LICENSE") {
+		if name == "sw.js" || name == "_headers" || name == "robots.txt" || name == linkPreview || base == "README.md" || strings.HasPrefix(base, "LICENSE") {
 			continue
 		}
 		names = append(names, name)
