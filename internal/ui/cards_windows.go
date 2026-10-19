@@ -5,6 +5,8 @@ package ui
 // like a Nav: a click opens its page. It has a title in the top left, a
 // short status at the bottom with a chevron, an optional tool button in the
 // top right (such as refresh) and a large, faint icon behind the text.
+// While the card or its tool button is hovered, the status names what a
+// click does instead.
 
 // PageCard is one tile of a PageCards row.
 type PageCard struct {
@@ -14,10 +16,12 @@ type PageCard struct {
 	Tone    Tone   // Detail's colour
 	Art     Icon   // the faint icon in the background; "" for none
 	OnClick func() // opens the card's page
+	Action  string // the status while the card is hovered, e.g. "Import sounds"
 
-	Tool    Icon   // the top right button's icon; "" for none
-	ToolTip string // its tooltip
-	OnTool  func() // nil shows the button disabled
+	Tool       Icon   // the top right button's icon; "" for none
+	ToolTip    string // its tooltip
+	ToolAction string // the status while the tool is hovered, e.g. "Refresh library"
+	OnTool     func() // nil shows the button disabled
 }
 
 type pageCardsRow struct{ cards [2]PageCard }
@@ -25,14 +29,14 @@ type pageCardsRow struct{ cards [2]PageCard }
 // PageCards places two cards next to each other, each half the panel's width.
 func PageCards(left, right PageCard) Row { return pageCardsRow{[2]PageCard{left, right}} }
 
-// Logical sizes. A card is about three Nav tiles tall.
+// Logical sizes. A card is about two and a half Nav tiles tall.
 const (
 	pageCardCaptionL = 28 // like a Section row
-	pageCardHeightL  = 106
+	pageCardHeightL  = 85
 	pageCardGapL     = 8  // between the two cards
 	pageCardPadL     = 12 // inside a card, around the text
 	pageCardToolL    = 30 // the tool button, as big as a header's back button
-	pageCardArtL     = 92 // the background icon
+	pageCardArtL     = 76 // the background icon
 )
 
 // Segments are ordered tool first, so a click on the tool button doesn't
@@ -106,6 +110,9 @@ func (cr pageCardsRow) tip(c *canvas, r rect, seg int) string {
 	if seg%pageCardSegs == pageCardSegTool {
 		return card.ToolTip
 	}
+	if card.Action != "" {
+		return "" // the status shows the action now
+	}
 	if _, status := cr.textBoxes(c, r, i); c.textWidth(card.Detail, fontBody) > status.w() {
 		return card.Detail
 	}
@@ -160,13 +167,14 @@ func (cr pageCardsRow) paintCard(c *canvas, r rect, i int, st rowState) {
 	c.roundRect(box, radius, bg)
 
 	// The background icon, a shade darker than the tile, follows the tile's
-	// hover colour. It reaches past the right edge, clipped to the tile.
+	// hover colour. Filled icons carry weight, so the shade is slight. It
+	// reaches past the right and bottom edges, clipped to the tile.
 	if card.Art != "" {
 		size := c.px(pageCardArtL)
-		art := rect{box.Right - size + c.px(14), box.Top + (box.h()-size)/2 + c.px(8), 0, 0}
+		art := rect{box.Right - size + c.px(10), box.Top + (box.h()-size)/2 + c.px(6), 0, 0}
 		art.Right, art.Bottom = art.Left+size, art.Top+size
 		restore := c.clipRound(box, radius)
-		c.icon(card.Art, art, pageCardArtL, shade(bg, -9))
+		c.icon(card.Art, art, pageCardArtL, shade(bg, -4))
 		restore()
 	}
 
@@ -184,8 +192,15 @@ func (cr pageCardsRow) paintCard(c *canvas, r rect, i int, st rowState) {
 		c.icon(card.Tool, tool, 18, col)
 	}
 
+	detail, col := card.Detail, card.Tone.color()
+	switch {
+	case card.ToolAction != "" && card.OnTool != nil && (st.hover == toolSeg || st.press == toolSeg):
+		detail, col = card.ToolAction, colAccent
+	case card.Action != "" && (st.hover == boxSeg || st.press == boxSeg):
+		detail, col = card.Action, colAccent
+	}
 	title, status := cr.textBoxes(c, r, i)
 	c.text(card.Title, title, fontBold, colText, dtLeft)
-	c.text(card.Detail, status, fontBody, card.Tone.color(), dtLeft)
+	c.text(detail, status, fontBody, col, dtLeft)
 	c.icon(IconChevronRight, cr.chevron(c, r, i), 16, colMuted)
 }

@@ -53,22 +53,34 @@ func TestCardsClick(t *testing.T) {
 func TestCardsRender(t *testing.T) {
 	cards := PageCards(
 		PageCard{Section: "Sound library", Title: "Folders", Detail: "157 sounds · 4 tabs", Tone: ToneGood,
-			Art: IconPlaylist, OnClick: func() {}, Tool: IconRefresh, ToolTip: "Refresh", OnTool: func() {}},
+			Art: IconFileMusic, OnClick: func() {}, Action: "Import sounds",
+			Tool: IconRefresh, ToolTip: "Refresh", ToolAction: "Refresh library", OnTool: func() {}},
 		PageCard{Section: "Remote", Title: "Web app", Detail: "1 device paired", Tone: ToneGood,
-			Art: IconLayoutGrid, OnClick: func() {}, Tool: IconExternalLink, ToolTip: "Open", OnTool: func() {}},
+			Art: IconLayoutDash, OnClick: func() {}, Action: "Pair new device",
+			Tool: IconExternalLink, ToolTip: "Open", ToolAction: "Open remote", OnTool: func() {}},
 	)
-	rows := append([]Row{Brand(nil, "RESOUND", "v0.7.0", "Ready", nil, nil), cards, Spacer(6)}, testFlow().Rows()...)
+	playing := -1.0
+	progress := func() float64 { return playing }
+	rows := append([]Row{Brand(nil, "RESOUND", "v0.7.0", "Ready", progress, nil), cards, Spacer(12)}, testFlow().Rows()...)
 	for _, scale := range []float64{1, 1.5} {
 		for name, st := range map[string]rowState{
-			"":            {hover: -1, press: -1, open: -1},
-			"-hover":      {hover: pageCardSegBox, press: -1, open: -1},
-			"-hover-tool": {hover: pageCardSegs + pageCardSegTool, press: -1, open: -1},
+			"":                {hover: -1, press: -1, open: -1},
+			"-hover":          {hover: pageCardSegBox, press: -1, open: -1},
+			"-hover-lib-tool": {hover: pageCardSegTool, press: -1, open: -1},
+			"-hover-tool":     {hover: pageCardSegs + pageCardSegTool, press: -1, open: -1},
 		} {
-			img := renderRows(t, rows, scale, map[int]rowState{1: st})
-			if scale != 1 {
-				name += "@1.5x"
+			for _, p := range []float64{-1, 0.6} { // the status stays put with the bar
+				playing = p
+				img := renderRows(t, rows, scale, map[int]rowState{1: st})
+				n := name
+				if p >= 0 {
+					n += "-playing"
+				}
+				if scale != 1 {
+					n += "@1.5x"
+				}
+				savePNG(t, img, "home-cards"+n)
 			}
-			savePNG(t, img, "home-cards"+name)
 		}
 	}
 }

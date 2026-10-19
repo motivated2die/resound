@@ -128,7 +128,7 @@ func (a *App) homePage() []ui.Row {
 		rows = append(rows, ui.Paragraph(a.libNote, ui.ToneGood))
 	}
 
-	rows = append(rows, ui.Spacer(6))
+	rows = append(rows, ui.Spacer(12)) // sets the cards apart from the flow
 	rows = append(rows, a.flowRows()...)
 
 	rows = append(rows,
@@ -157,15 +157,17 @@ func (a *App) homeCards() ui.Row {
 	return ui.PageCards(
 		ui.PageCard{
 			Section: "Sound library", Title: "Folders",
-			Detail: libDetail, Tone: libTone, Art: ui.IconPlaylist,
-			OnClick: func() { a.openPage(pageLibrary) },
-			Tool:    ui.IconRefresh, ToolTip: "Refresh the library: picks up new, renamed and edited files", OnTool: refresh,
+			Detail: libDetail, Tone: libTone, Art: ui.IconFileMusic,
+			OnClick: func() { a.openPage(pageLibrary) }, Action: "Import sounds",
+			Tool: ui.IconRefresh, ToolTip: "Refresh the library: picks up new, renamed and edited files",
+			ToolAction: "Refresh library", OnTool: refresh,
 		},
 		ui.PageCard{
 			Section: "Remote", Title: "Web app",
-			Detail: remoteDetail, Tone: remoteTone, Art: ui.IconLayoutGrid,
-			OnClick: func() { a.openPage(pageRemote) },
-			Tool:    ui.IconExternalLink, ToolTip: "Open the app in a window on this PC", OnTool: a.openRemoteHereAction(),
+			Detail: remoteDetail, Tone: remoteTone, Art: ui.IconLayoutDash,
+			OnClick: func() { a.openPage(pageRemote) }, Action: "Pair new device",
+			Tool: ui.IconExternalLink, ToolTip: "Open the app in a window on this PC",
+			ToolAction: "Open remote", OnTool: a.openRemoteHereAction(),
 		},
 	)
 }
