@@ -676,5 +676,28 @@
             </p>
         </div>
     </footer>
+
+    <!-- After a click on a download button (landing.js): the next steps,
+         while the browser downloads. Closes with Esc, the button or a click
+         beside it. -->
+    <dialog class="next-steps" data-download-dialog aria-labelledby="next-steps-title">
+        <div class="next-steps-body">
+            <img src="assets/resound-192.png" alt="" width="48" height="48">
+            <h2 id="next-steps-title">Your download is on its way</h2>
+            <ol class="next-steps-list">
+                <li><strong>Open Resound.exe</strong> from your downloads. If Windows says "Windows protected your PC", choose <strong>More info</strong>, then <strong>Run anyway</strong>.</li>
+                <li><strong>Find it in the tray.</strong> Resound installs itself and starts next to the clock, often behind the <strong>^</strong> arrow.</li>
+                <li><strong>Follow the guided setup,</strong> then scan its code with your phone.</li>
+            </ol>
+            <div class="next-steps-actions">
+                <a class="btn btn-primary" href="/help/install">
+                    <span class="icon" data-icon="help" aria-hidden="true"></span>
+                    Installation guide
+                </a>
+                <button class="btn btn-secondary" type="button" data-dialog-close>Close</button>
+            </div>
+            <p class="cta-note">Nothing downloaded? <a href="https://github.com/motivated2die/resound/releases/latest/download/Resound.exe">Try again</a> or get it from the <a href="https://github.com/motivated2die/resound/releases/latest">release page</a>.</p>
+        </div>
+    </dialog>
 </body>
 </html>

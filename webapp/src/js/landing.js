@@ -55,6 +55,7 @@
             });
         }
 
+        setupDownloadDialog(document.querySelector('[data-download-dialog]'));
         animateDesktopPanel(document.querySelector('[data-desk-panel]'));
         animateRemote(document.querySelector('[data-remote]'));
 
@@ -69,6 +70,19 @@
             });
         });
     });
+
+    // The next steps after a download: the link still downloads as usual,
+    // and the dialog opens over the dimmed page. A click beside its card
+    // (on the backdrop, which belongs to the dialog itself) closes it.
+    function setupDownloadDialog(dialog) {
+        if (!dialog || typeof dialog.showModal !== 'function') return;
+        document.querySelectorAll('[data-download]').forEach((a) => {
+            a.addEventListener('click', () => { if (!dialog.open) dialog.showModal(); });
+        });
+        dialog.addEventListener('click', (e) => {
+            if (e.target === dialog || e.target.closest('[data-dialog-close]')) dialog.close();
+        });
+    }
 
     // The hero's picture of the remote and the PC it controls: its pads play
     // like sounds. Every few seconds a random one plays by itself; a tap plays
