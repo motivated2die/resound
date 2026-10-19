@@ -661,7 +661,7 @@ h1 { font-size: clamp(32px, 5vw, 52px); line-height: 1.1; font-weight: 700; lett
 .dp-pipe.off path { stroke-dasharray: 5 4; }
 .dp-pipe.broken { color: #9c7f3c; }
 
-.dp-unit { position: absolute; border-radius: 9px; overflow: hidden; background: var(--dp-field); }
+.dp-unit { position: absolute; border-radius: 9px; overflow: hidden; background: var(--dp-control); } /* dropdowns, the cable card and the button: colControl */
 .dp-meter { position: relative; height: 7px; background: var(--dp-meter); }
 /* Blocks like Windows' own meters: green, yellow over the last stretch, red
    at the top; the level clips the full-width bar. */
@@ -688,7 +688,7 @@ h1 { font-size: clamp(32px, 5vw, 52px); line-height: 1.1; font-weight: 700; lett
 
 .dp-mic { left: 0; right: 0; top: 0; }
 .dp-board-caption { position: absolute; left: 202px; right: 0; top: 62px; margin: 0; }
-.dp-board { left: 202px; right: 0; top: 84px; background: var(--dp-control); }
+.dp-board { left: 202px; right: 0; top: 84px; }
 .dp-button { height: 40px; display: flex; align-items: center; justify-content: center; gap: 8px; font-weight: 600; }
 .dp-button .picon { font-size: 17px; }
 
@@ -747,7 +747,7 @@ h1 { font-size: clamp(32px, 5vw, 52px); line-height: 1.1; font-weight: 700; lett
     justify-content: center;
     gap: 8px;
     border-radius: 7px;
-    background: var(--dp-field);
+    background: var(--dp-control);
     font-weight: 600;
 }
 .dp-action .picon { font-size: 18px; }
