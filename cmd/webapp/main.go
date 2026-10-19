@@ -2,7 +2,8 @@
 // (getresound.app, on Cloudflare Pages) that phones install and that connects
 // to the PC over WebRTC. It copies webapp/src and fills in the service
 // worker's version and file list, then renders the help center
-// (webapp/help, see help.go) into /help/, which the app doesn't cache.
+// (webapp/help, see help.go) into /help/, which the app doesn't cache, and
+// lists the pages for search engines in sitemap.xml.
 //
 //	go run ./cmd/webapp                  build into webapp/dist
 //	go run ./cmd/webapp -serve :8095     build, then serve it on localhost
@@ -26,6 +27,14 @@ import (
 	"slices"
 	"strings"
 )
+
+// site is where the website is deployed: canonical URLs, link previews and
+// the sitemap name it (robots.txt and index.html too, by hand).
+const site = "https://getresound.app"
+
+// sitemapPages are the pages of webapp/src for search engines; the app's
+// own pages (/app, /connect, /edit) are left out and marked noindex.
+var sitemapPages = []string{"index.html"}
 
 func main() {
 	src := flag.String("src", "webapp/src", "the app's files")
@@ -77,6 +86,7 @@ func build(src, helpDir, out string) error {
 		}
 		files[name] = data
 	}
+	files["sitemap.xml"] = sitemap(files)
 
 	if err := os.RemoveAll(out); err != nil {
 		return err
@@ -114,7 +124,7 @@ func precache(files map[string][]byte) (version, list string) {
 	var names []string
 	for name := range files {
 		base := path.Base(name)
-		if name == "sw.js" || name == "_headers" || base == "README.md" || strings.HasPrefix(base, "LICENSE") {
+		if name == "sw.js" || name == "_headers" || name == "robots.txt" || base == "README.md" || strings.HasPrefix(base, "LICENSE") {
 			continue
 		}
 		names = append(names, name)
@@ -141,6 +151,32 @@ func pageURL(name string) string {
 		return "/" + strings.TrimSuffix(name, ".html")
 	}
 	return "/" + name
+}
+
+// sitemap lists the landing page and every help center page, by their
+// canonical URLs.
+func sitemap(files map[string][]byte) []byte {
+	var urls []string
+	for _, name := range sitemapPages {
+		urls = append(urls, site+pageURL(name))
+	}
+	var help []string
+	for name := range files {
+		if slug, ok := strings.CutPrefix(name, "help/"); ok && strings.HasSuffix(slug, ".html") {
+			help = append(help, site+helpPath(strings.TrimSuffix(slug, ".html")))
+		}
+	}
+	slices.Sort(help)
+	urls = append(urls, help...)
+
+	var b strings.Builder
+	b.WriteString("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n")
+	b.WriteString("<urlset xmlns=\"http://www.sitemaps.org/schemas/sitemap/0.9\">\n")
+	for _, u := range urls {
+		fmt.Fprintf(&b, "  <url><loc>%s</loc></url>\n", u)
+	}
+	b.WriteString("</urlset>\n")
+	return []byte(b.String())
 }
 
 // shortURLs serves /app from app.html, like the hosts do.

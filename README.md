@@ -1,8 +1,24 @@
-# Resound
+<p align="center">
+  <img src="assets/resound.png" alt="Resound logo" width="96" height="96">
+</p>
 
-A soundboard for Windows that you control from your phone. It plays sounds to your own speakers and into a virtual audio cable at the same time, so your friends hear them in games and voice chat.
+<h1 align="center">Resound</h1>
 
-Resound lives in the system tray and is a single small program: no runtime to install, no admin rights needed.
+<p align="center">
+  A free soundboard for Windows that you control from your phone.
+</p>
+
+<p align="center">
+  <a href="https://github.com/motivated2die/resound/releases/latest"><b>Download</b></a> ·
+  <a href="https://getresound.app">Website</a> ·
+  <a href="https://getresound.app/help/">Help</a> ·
+  <a href="https://github.com/motivated2die/resound/issues/new?template=bug_report.yml">Report a bug</a> ·
+  <a href="https://github.com/motivated2die/resound/issues/new?template=feature_request.yml">Suggest a feature</a>
+</p>
+
+Resound plays sounds to your own speakers and into a virtual audio cable at the same time, so your friends hear them in games and voice chat. It lives in the system tray and is a single small program: no runtime to install, no admin rights needed.
+
+**Getting started:** download **Resound.exe** from the [latest release](https://github.com/motivated2die/resound/releases/latest), run it, and follow the guided setup. The [help center](https://getresound.app/help/) covers setup, voice chat apps and troubleshooting.
 
 ## Features
 
@@ -50,9 +66,9 @@ Releases are **not code-signed yet**. We intend to apply for free code signing t
 - **Approvers:** [motivated2die](https://github.com/motivated2die)
 - **Privacy:** see the [privacy policy](PRIVACY.md).
 
-## Contributing and building
+## Feedback and building
 
-Bug reports and pull requests are welcome; see [CONTRIBUTING.md](CONTRIBUTING.md). Security problems: [SECURITY.md](SECURITY.md).
+Bug reports and feature ideas are welcome as [issues](https://github.com/motivated2die/resound/issues/new/choose). Pull requests from outside contributors aren't accepted at the moment; see [CONTRIBUTING.md](CONTRIBUTING.md). Security problems: [SECURITY.md](SECURITY.md).
 
 - [docs/BUILDING.md](docs/BUILDING.md): setting up, building, testing and debugging.
 - [docs/RELEASING.md](docs/RELEASING.md): versions, tags and how a release is made.

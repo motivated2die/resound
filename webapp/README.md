@@ -28,11 +28,13 @@ Nothing here is embedded into `Resound.exe`.
 | `js/install.js` | The "Install app" pill in the top bar and its sheet: why, and how in this browser (one tap where Chromium offers it, steps elsewhere) |
 | `manifest.json`, `sw.js` | Installation and offline start; the build fills in the service worker's file list (the help center is left out) |
 | `_headers` | Response headers for Cloudflare Pages (CSP: nothing from other hosts) |
+| `robots.txt` | For search engines: everything may be crawled, and where the sitemap is. The build adds `sitemap.xml` (the landing page and every help article); the app's own pages are marked `noindex` instead of being blocked. Neither is cached by the app |
 | `vendor/` | Libraries, each with its license and a README naming the source |
 
 - **Look:** the colours in `css/styles.css` (`:root`) and `css/connect.css` match the desktop panel (`internal/ui/canvas_windows.go`): background `#1c1d22`, accent `#50dea8` with dark text `#102a20` on it, berry red `#f2416f`. Change them together.
 - **App icons:** `assets/resound-192.png`, `-512.png`, `resound-maskable-512.png` and `favicon.ico` are generated from the repo's `assets/` folder. Run `go run ./scripts/icons` after changing the logo.
 - **UI icons:** Material Symbols SVGs in `assets/icons/`, used as `<span class="icon" data-icon="name"></span>`; see `assets/icons/README.md` for adding one.
+- **Link previews and search:** `index.html` and the help center's `page.html` carry a canonical URL and Open Graph tags (title, description, the 512 px logo), which Discord and other apps show when a link is pasted. They need absolute URLs on `https://getresound.app` (`site` in `cmd/webapp`); check a change with a preview tool or by pasting the link into a private Discord channel after deploying.
 - **Nothing external.** Libraries live in `vendor/`, and the Content-Security-Policy blocks other hosts. Don't add CDN links; vendor the file instead. `go test ./cmd/webapp` fails on URLs in our own files and on icons without SVG or CSS rule.
 
 ## Help center (`help/`)

@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Help center
+    url: https://getresound.app/help/
+    about: Setup guides, troubleshooting and the FAQ.
+  - name: Report a security problem
+    url: https://github.com/motivated2die/resound/security/advisories/new
+    about: Privately, not as a public issue (see SECURITY.md).

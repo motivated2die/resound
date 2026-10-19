@@ -14,8 +14,10 @@ var src = os.DirFS(filepath.Join("..", "..", "webapp", "src"))
 // The app must not load anything from the internet: no URLs in our own
 // files (vendored libraries only mention them in comments, and the emoji
 // picker's default data URL is overridden by data-source). Links the user
-// follows (<a href="https://…">) are fine: they load nothing. The one
-// exception is the editor the edit page embeds (TestEditPagePrivate).
+// follows (<a href="https://…">) are fine: they load nothing. So are the
+// site's own absolute URLs (canonical links, link previews): they are the
+// same origin. The one exception is the editor the edit page embeds
+// (TestEditPagePrivate).
 func TestWebSelfContained(t *testing.T) {
 	url := regexp.MustCompile(`(https?:)?//[a-z0-9-]+(\.[a-z0-9-]+)+[/"'\s)]`)
 	link := regexp.MustCompile(`<a [^>]*href="https://[^"]*"`)
@@ -35,7 +37,7 @@ func TestWebSelfContained(t *testing.T) {
 				line = link.ReplaceAllString(line, "<a")
 			}
 			if m := url.FindString(line); m != "" && !strings.Contains(line, "www.w3.org/2000/svg") &&
-				!(editorFiles[path] && strings.HasPrefix(m, editorOrigin)) {
+				!strings.HasPrefix(m, site+"/") && !(editorFiles[path] && strings.HasPrefix(m, editorOrigin)) {
 				t.Errorf("%s:%d references %q", path, i+1, m)
 			}
 		}
@@ -233,6 +235,50 @@ func TestBuild(t *testing.T) {
 	for _, page := range []string{"help/index.html", "help/voice-chat.html", "help/help.css", "help/help.js", "help/search.json"} {
 		if _, err := os.Stat(filepath.Join(out, filepath.FromSlash(page))); err != nil {
 			t.Errorf("help center: %v", err)
+		}
+	}
+	if strings.Contains(string(sw), "robots.txt") || strings.Contains(string(sw), "sitemap.xml") {
+		t.Errorf("sw.js caches robots.txt or sitemap.xml")
+	}
+}
+
+// Search engines get the landing page and the help center: robots.txt
+// points to the sitemap, which lists them by their canonical URLs and
+// leaves out the app's own pages (marked noindex instead).
+func TestSearchEngines(t *testing.T) {
+	out := t.TempDir()
+	if err := build(filepath.Join("..", "..", "webapp", "src"), filepath.Join("..", "..", "webapp", "help"), out); err != nil {
+		t.Fatal(err)
+	}
+	robots, err := os.ReadFile(filepath.Join(out, "robots.txt"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(robots), "Sitemap: "+site+"/sitemap.xml\n") {
+		t.Errorf("robots.txt doesn't name %s/sitemap.xml", site)
+	}
+	sitemap, err := os.ReadFile(filepath.Join(out, "sitemap.xml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{site + "/", site + "/help/", site + "/help/voice-chat"} {
+		if !strings.Contains(string(sitemap), "<loc>"+want+"</loc>") {
+			t.Errorf("sitemap.xml doesn't list %s", want)
+		}
+	}
+	for _, page := range []string{"app.html", "connect.html", "edit.html"} {
+		if strings.Contains(string(sitemap), site+pageURL(page)+"<") {
+			t.Errorf("sitemap.xml lists %s", page)
+		}
+		data, _ := fs.ReadFile(src, page)
+		if !strings.Contains(string(data), `<meta name="robots" content="noindex">`) {
+			t.Errorf("%s is not marked noindex", page)
+		}
+	}
+	help, _ := os.ReadFile(filepath.Join(out, "help", "voice-chat.html"))
+	for _, want := range []string{`<link rel="canonical" href="` + site + `/help/voice-chat">`, `<meta property="og:image" content="` + site + `/assets/resound-512.png">`} {
+		if !strings.Contains(string(help), want) {
+			t.Errorf("help/voice-chat.html has no %s", want)
 		}
 	}
 }

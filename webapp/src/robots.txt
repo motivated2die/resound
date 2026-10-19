@@ -1,0 +1,7 @@
+# The landing page and the help center are for search engines. The app's
+# own pages (/app, /connect, /edit) carry a noindex tag instead of a
+# Disallow here: crawlers have to fetch a page to see that tag.
+User-agent: *
+Allow: /
+
+Sitemap: https://getresound.app/sitemap.xml
