@@ -8,6 +8,10 @@ Yes. Resound is free and open source software (GPL-3.0): no account, no subscrip
 
 The soundboard itself needs Windows 10 or 11 (64-bit). The remote runs on any phone, tablet or computer with a current browser: Android, iPhone, iPad, Mac, Windows.
 
+## Where is Resound after I install it?
+
+In the system tray next to the clock, often hidden behind the **^** arrow. Pin it to the taskbar, or start it again from the Start menu: see [Find Resound in the tray](install.md#find-resound-in-the-tray).
+
 ## Do I need a phone?
 
 No. The app also runs on the PC itself, in a window of its own: the button in the top right corner of **Web app** on the home page. In games, the [in-game overlay](overlay.md) plays your favorites with one key.

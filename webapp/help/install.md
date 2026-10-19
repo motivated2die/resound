@@ -20,11 +20,32 @@ To make sure the file is the published one, compare its SHA-256 with the one in 
 
 ## Find Resound in the tray
 
-Resound has no window on the taskbar. It runs in the background from its icon in the system tray, next to the clock. Click the icon to open the [panel](panel.md).
+Resound has no window on the taskbar. It runs in the background from its icon in the system tray, next to the clock. Click the icon to open the [panel](panel.md); right-click it for **Show panel** and **Quit**.
 
-:::tip Don't see the icon?
-Windows often hides new tray icons behind the **^** arrow next to the clock. Drag the Resound icon from there onto the taskbar to keep it in sight. Starting Resound again from the Start Menu also opens the panel.
+Windows usually hides new tray icons behind the **^** arrow (**Show hidden icons**). Pin Resound's icon so it stays in sight:
+
+:::viz tray-pin
+Click the **^** arrow next to the clock, then drag the Resound icon from the box that opens onto the taskbar and let go.
 :::
+
+1. Click the **^** arrow next to the clock.
+2. Drag the Resound icon out of the box onto the taskbar, next to the arrow.
+
+:::tip Prefer Settings?
+Windows 11: Settings → Personalization → Taskbar → **Other system tray icons**, turn on **Resound**. Windows 10: Settings → Personalization → Taskbar → **Select which icons appear on the taskbar**.
+:::
+
+## Open Resound again
+
+Closed the panel? Click the tray icon. Quit Resound, or can't find it in the tray? Start it from the Start menu:
+
+:::viz start-menu
+Press the <kbd>Windows</kbd> key or click **Start**, type **res** and open **Resound**. It starts in the tray; click its icon to open the panel. If Resound was still running, the panel opens right away.
+:::
+
+1. Press the <kbd>Windows</kbd> key and type **res**.
+2. Choose **Resound** (or press <kbd>Enter</kbd>).
+3. Click the Resound icon in the tray to open the panel.
 
 ## Start with Windows
 
