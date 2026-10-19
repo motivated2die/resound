@@ -33,10 +33,10 @@ func PageCards(left, right PageCard) Row { return pageCardsRow{[2]PageCard{left,
 const (
 	pageCardCaptionL = 28 // like a Section row
 	pageCardHeightL  = 85
-	pageCardGapL     = 8  // between the two cards
-	pageCardPadL     = 12 // inside a card, around the text
-	pageCardToolL    = 30 // the tool button, as big as a header's back button
-	pageCardArtL     = 76 // the background icon
+	pageCardGapL     = flowColGapL // between the two cards: the columns line up with the audio flow's
+	pageCardPadL     = 12          // inside a card, around the text
+	pageCardToolL    = 30          // the tool button, as big as a header's back button
+	pageCardArtL     = 76          // the background icon
 )
 
 // Segments are ordered tool first, so a click on the tool button doesn't
@@ -168,10 +168,10 @@ func (cr pageCardsRow) paintCard(c *canvas, r rect, i int, st rowState) {
 
 	// The background icon, a shade darker than the tile, follows the tile's
 	// hover colour. Filled icons carry weight, so the shade is slight. It is
-	// centred vertically and sits a little in from the right edge.
+	// centred vertically, close to the right edge.
 	if card.Art != "" {
 		size := c.px(pageCardArtL)
-		art := rect{box.Right - size - c.px(13), box.Top + (box.h()-size)/2, 0, 0}
+		art := rect{box.Right - size - c.px(2), box.Top + (box.h()-size)/2, 0, 0}
 		art.Right, art.Bottom = art.Left+size, art.Top+size
 		restore := c.clipRound(box, radius)
 		c.icon(card.Art, art, pageCardArtL, shade(bg, -6))
