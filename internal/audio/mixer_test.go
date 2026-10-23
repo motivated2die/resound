@@ -253,3 +253,25 @@ func TestMixerSetGainWhilePlaying(t *testing.T) {
 		t.Fatalf("after: %v", out[0])
 	}
 }
+
+// The soundboard's meter shows a sound with a custom volume relative to the
+// master volume: one turned down to 0% shows nothing, though it plays on.
+func TestMixerSoundsPeakFollowsCustomVolume(t *testing.T) {
+	for _, tc := range []struct {
+		gain, master, want float32
+	}{
+		{0, 0.5, 0}, {0.25, 0.5, 0.25}, {1, 0.5, 1}, {0, 0, 0},
+	} {
+		m := NewMixer("test", nil)
+		m.SetVolume(tc.master)
+		m.Add(1, NewStaticSource("t", 48000, []float32{0.5, 0.5, 0.5, 0.5}), tc.gain, true, time.Now())
+		out := make([]float32, 2)
+		m.Read(out)
+		if src, mix := m.takePeaks(); math.Abs(float64(src-tc.want)) > 1e-6 || mix != 0.5*tc.gain {
+			t.Errorf("gain %v, master %v: sounds peak %v (want %v), mix %v", tc.gain, tc.master, src, tc.want, mix)
+		}
+		if m.Active() != 1 {
+			t.Errorf("gain %v: a silent voice must keep playing", tc.gain)
+		}
+	}
+}

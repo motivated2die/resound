@@ -202,11 +202,19 @@ func (m *Mixer) Read(out []float32) {
 		// voice is silent for a moment (an underrun), never blocking.
 		n := v.src.mixInto(out, g)
 		v.pos += n
-		if p := v.src.takePeak(); v.absolute {
-			srcPeak = max(srcPeak, p) // a custom volume replaces the master: show the sound as it is
-		} else {
-			srcPeak = max(srcPeak, p*v.gain)
+		p := v.src.takePeak()
+		switch {
+		case !v.absolute:
+			p *= v.gain
+		case master > 0:
+			// A custom volume replaces the master: show how much louder or
+			// quieter it makes the sound, so one turned down to 0% shows
+			// nothing rather than the full sound.
+			p *= v.gain / master
+		case v.gain == 0:
+			p = 0
 		}
+		srcPeak = max(srcPeak, p)
 		if !v.started && n > 0 {
 			v.started = true
 			m.emit(Event{Kind: EventFirstBuffer, Output: m.role, VoiceID: v.id, Delay: now.Sub(v.queuedAt)})
