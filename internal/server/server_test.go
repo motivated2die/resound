@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -14,6 +15,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/motivated2die/resound/internal/audio"
 	"github.com/motivated2die/resound/internal/library"
 )
 
@@ -133,7 +135,7 @@ func TestAPI(t *testing.T) {
 	rec = do(t, h, "POST", "/api/sounds/"+jsonID(soundID)+"/volume", `{"sliderPosition":25}`, c)
 	var vol map[string]any
 	_ = json.Unmarshal(rec.Body.Bytes(), &vol)
-	if vol["localVolume"] != float64(75) || vol["remoteVolume"] != float64(150) || vol["sliderPosition"] != float64(25) {
+	if vol["localVolume"] != float64(59) || vol["remoteVolume"] != float64(150) || vol["sliderPosition"] != float64(25) {
 		t.Fatalf("volume: %s", rec.Body)
 	}
 
@@ -320,8 +322,8 @@ func TestVolumeAppliesToPlayingSound(t *testing.T) {
 	if rec := do(t, h, "POST", path, `{"sliderPosition":25}`, c); rec.Code != http.StatusOK {
 		t.Fatalf("volume: %d %s", rec.Code, rec.Body)
 	}
-	// +25 of 50 scales both defaults (50, 100) by 1.5.
-	if len(player.volume) != 2 || player.volume[0] == nil || *player.volume[0] != 75 || *player.volume[1] != 150 {
+	// +25 of 50 makes both defaults (50%, 100%) 1.5 times as loud: 59%, 150%.
+	if len(player.volume) != 2 || player.volume[0] == nil || *player.volume[0] != 59 || *player.volume[1] != 150 {
 		t.Fatalf("applied %v", player.volume)
 	}
 	do(t, h, "POST", path+"/reset", "", c)
@@ -330,19 +332,66 @@ func TestVolumeAppliesToPlayingSound(t *testing.T) {
 	}
 }
 
-// The cards show whether a custom volume is quieter or louder than the
-// default ("You hear", here 50) by the slider position's sign.
+// The cards and the sheet get back the slider position a custom volume was
+// set with, whatever the defaults. Below 10% the volumes are whole
+// percentages of a linear fade (6 dB from 1% to 2%), and above it one percent
+// can span two positions, so several positions give the same volume; the
+// slider then shows one of them.
 func TestSliderPosition(t *testing.T) {
 	vol := func(v int) *int { return &v }
-	for _, c := range []struct {
-		local *int
-		want  int
-	}{
-		{nil, 0}, {vol(50), 0}, {vol(25), -25}, {vol(0), -50}, {vol(75), 25}, {vol(100), 50}, {vol(200), 50},
-	} {
-		snd := library.Sound{SoundSettings: library.SoundSettings{LocalVolume: c.local}}
-		if got := sliderPosition(snd, 50); got != c.want {
-			t.Errorf("local volume %v: slider %d, want %d", c.local, got, c.want)
+	if got := sliderPosition(library.Sound{}, 50, 100); got != 0 {
+		t.Errorf("no custom volume: slider %d, want 0", got)
+	}
+	for _, defs := range [][2]int{{50, 100}, {100, 50}, {100, 100}, {30, 80}, {0, 100}, {100, 0}, {10, 10}} {
+		louder := max(defs[0], defs[1])
+		for pos := -50; pos <= 50; pos++ {
+			local, remote := scaleVolume(defs[0], pos), scaleVolume(defs[1], pos)
+			snd := library.Sound{SoundSettings: library.SoundSettings{LocalVolume: vol(local), RemoteVolume: vol(remote)}}
+			got := sliderPosition(snd, defs[0], defs[1])
+			custom := max(local, remote)
+			switch d := got - pos; {
+			case (pos < 0) != (got < 0) || scaleVolume(louder, got) != custom:
+				t.Errorf("defaults %v, slider %d → %d%%, %d%% → slider %d, which gives %d%%",
+					defs, pos, local, remote, got, scaleVolume(louder, got))
+			case custom >= 10 && (d < -2 || d > 2):
+				t.Errorf("defaults %v, slider %d → %d%%, %d%% → slider %d", defs, pos, local, remote, got)
+			}
+		}
+	}
+}
+
+// All the way left silences the sound on both outputs; anywhere else, both
+// outputs get louder or quieter by the same amount, as the sheet says ("for
+// you and for others alike"), whatever the two default volumes; within
+// 0.5 dB while both volumes are 10% or more, and within 3 dB in the fade
+// below (whole percentages, more than 36 dB below full scale) down to 3%.
+func TestSliderMovesBothOutputsAlike(t *testing.T) {
+	for _, defs := range [][2]int{{50, 100}, {100, 50}, {20, 100}, {100, 100}, {75, 35}} {
+		if l, r := scaleVolume(defs[0], -50), scaleVolume(defs[1], -50); l != 0 || r != 0 {
+			t.Errorf("defaults %v: -50 gives %d%%, %d%%, want silence on both", defs, l, r)
+		}
+		for pos := -49; pos <= 50; pos++ {
+			l, r := scaleVolume(defs[0], pos), scaleVolume(defs[1], pos)
+			if min(l, r) < 3 {
+				continue // 1% and 2% are 6 dB apart: below −46 dB, inaudible in voice chat
+			}
+			change := func(def, custom int) float64 {
+				return 20 * math.Log10(float64(audio.Gain(custom)/audio.Gain(def)))
+			}
+			limit := 0.5
+			if min(l, r) < 10 {
+				limit = 3
+			}
+			if cl, cr := change(defs[0], l), change(defs[1], r); math.Abs(cl-cr) > limit {
+				t.Errorf("defaults %v, slider %d: %.1f dB for you, %.1f dB for others", defs, pos, cl, cr)
+			}
+		}
+	}
+	// The old model multiplied the percentages: with these defaults, −40
+	// was 12 dB quieter for the user but 32 dB for others.
+	for _, def := range []int{75, 100} {
+		if got := 20 * math.Log10(float64(audio.Gain(scaleVolume(def, -40))/audio.Gain(def))); math.Abs(got+32) > 1 {
+			t.Errorf("default %d%%, slider -40: %.1f dB, want -32 dB", def, got)
 		}
 	}
 }

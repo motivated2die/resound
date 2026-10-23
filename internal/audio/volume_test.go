@@ -53,3 +53,16 @@ func TestFromLinear(t *testing.T) {
 		t.Errorf("FromLinear(50) = %d, want 85", FromLinear(50))
 	}
 }
+
+// Percent finds every percentage again from its gain, and silence stays
+// silence.
+func TestPercentInvertsGain(t *testing.T) {
+	for p := 0; p <= 200; p++ {
+		if got := Percent(Gain(p)); got != p {
+			t.Errorf("Percent(Gain(%d)) = %d", p, got)
+		}
+	}
+	if Percent(0) != 0 || Percent(-1) != 0 || Percent(5) != 200 {
+		t.Error("Percent must stay within 0..200")
+	}
+}
