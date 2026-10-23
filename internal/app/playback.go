@@ -484,6 +484,8 @@ func (a *App) setVolume(role string, v int, done bool) {
 }
 
 func (a *App) applyVolumes() {
+	a.monitorVolume.Store(int32(a.cfg.MonitorVolume))
+	a.cableVolume.Store(int32(a.cfg.CableVolume))
 	a.engine.SetVolume(audio.RoleMonitor, audio.Gain(a.cfg.MonitorVolume))
 	a.engine.SetVolume(audio.RoleCable, audio.Gain(a.cfg.CableVolume))
 }

@@ -90,6 +90,12 @@ type App struct {
 
 	lib     *library.Library
 	indexer *library.Indexer
+
+	// monitorVolume and cableVolume mirror the default volumes for the
+	// phone's volume requests (applyVolumes), which must never see zeros
+	// from a busy UI thread.
+	monitorVolume, cableVolume atomic.Int32
+
 	// normalize mirrors !cfg.NoNormalize for plays on HTTP goroutines.
 	normalize   atomic.Bool
 	overlay     overlayState // the in-game overlay (overlay.go)

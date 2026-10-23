@@ -92,13 +92,7 @@ func (a *App) playSound(soundID uint64, preview bool) (server.Started, error) {
 	if err != nil {
 		return server.Started{}, err
 	}
-	opts := audio.PlayOptions{Volume: map[string]float32{}}
-	if snd.LocalVolume != nil {
-		opts.Volume[audio.RoleMonitor] = audio.Gain(*snd.LocalVolume)
-	}
-	if snd.RemoteVolume != nil {
-		opts.Volume[audio.RoleCable] = audio.Gain(*snd.RemoteVolume)
-	}
+	opts := audio.PlayOptions{}
 	if preview {
 		opts.Roles = []string{audio.RoleMonitor}
 	}
@@ -106,6 +100,10 @@ func (a *App) playSound(soundID uint64, preview bool) (server.Started, error) {
 		info audio.PlayInfo
 	)
 	if !a.onUI(func() {
+		// The volumes are read here, not before decoding: a change saved
+		// meanwhile is either read now or applied by SetSoundVolume, which
+		// runs on this thread after the voice is known.
+		opts.Volume = a.soundVolumes(soundID)
 		info, err = a.start(p, opts, voiceMeta{soundID: soundID, name: snd.Name}, !preview)
 	}) {
 		return server.Started{}, errUIBusy
@@ -118,22 +116,38 @@ func (a *App) playSound(soundID uint64, preview bool) (server.Started, error) {
 
 func (r remotePlayer) StopAll() { r.a.onUI(r.a.stopAll) }
 
-// SetSoundVolume re-applies a sound's volumes to its playing voices. Engine
-// and voice state are thread-safe, so it doesn't wait for the UI thread.
-func (r remotePlayer) SetSoundVolume(soundID uint64, local, remote *int) {
-	a := r.a
+// soundVolumes is a library sound's custom volumes as PlayOptions.Volume
+// gains; roles without one follow the default volume.
+func (a *App) soundVolumes(soundID uint64) map[string]float32 {
 	vol := map[string]float32{}
-	if local != nil {
-		vol[audio.RoleMonitor] = audio.Gain(*local)
+	snd, _, ok := a.lib.Sound(soundID)
+	if !ok {
+		return vol
 	}
-	if remote != nil {
-		vol[audio.RoleCable] = audio.Gain(*remote)
+	if snd.LocalVolume != nil {
+		vol[audio.RoleMonitor] = audio.Gain(*snd.LocalVolume)
 	}
-	for _, v := range a.engine.Voices() {
-		if meta, ok := a.playback.voice(v.ID); ok && meta.soundID == soundID {
-			a.engine.SetVoiceVolume(v.ID, vol)
+	if snd.RemoteVolume != nil {
+		vol[audio.RoleCable] = audio.Gain(*snd.RemoteVolume)
+	}
+	return vol
+}
+
+// SetSoundVolume re-applies a sound's saved volumes to its playing voices.
+// It runs on the UI thread, like the start of a play, so a voice that is
+// being started can't miss it: before, a change that came while a sound was
+// decoding was lost for that play. It doesn't wait; the saved volumes are
+// read when it runs, so the newest always wins.
+func (r remotePlayer) SetSoundVolume(soundID uint64, _, _ *int) {
+	a := r.a
+	a.tray.Post(func() {
+		vol := a.soundVolumes(soundID)
+		for _, v := range a.engine.Voices() {
+			if meta, ok := a.playback.voice(v.ID); ok && meta.soundID == soundID {
+				a.engine.SetVoiceVolume(v.ID, vol)
+			}
 		}
-	}
+	})
 }
 
 // Progress reads engine and voice state directly; it is polled several
@@ -170,9 +184,11 @@ func (r remotePlayer) TogglePanel() bool {
 	return open
 }
 
+// DefaultVolumes reads the mirrors set by applyVolumes. It used to ask the UI
+// thread, which returned 0, 0 when that took over 3 s: a volume request then
+// saved 0% for both outputs whatever the slider said.
 func (r remotePlayer) DefaultVolumes() (local, remote int) {
-	r.a.onUI(func() { local, remote = r.a.cfg.MonitorVolume, r.a.cfg.CableVolume })
-	return
+	return int(r.a.monitorVolume.Load()), int(r.a.cableVolume.Load())
 }
 
 // --- server lifecycle (UI thread) ------------------------------------------
