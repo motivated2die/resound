@@ -52,11 +52,13 @@ type Player interface {
 	// returns whether it is open now.
 	TogglePanel() bool
 	// DefaultVolumes returns the default "you hear" / "others hear"
-	// volumes in percent.
+	// volumes in percent. It must not block or fail: the volume request
+	// saves custom volumes computed from them.
 	DefaultVolumes() (local, remote int)
 	// SetSoundVolume applies a sound's new custom volumes (percent, nil =
 	// the default) to its playing voices, previews included, so changes are
-	// heard at once.
+	// heard at once. The app applies the volumes saved in the library when
+	// it runs, so the newest change wins.
 	SetSoundVolume(soundID uint64, local, remote *int)
 }
 

@@ -33,6 +33,23 @@ func Gain(percent int) float32 {
 	return float32(at(p))
 }
 
+// Percent is the inverse of Gain: the volume percentage (0..200) whose gain
+// is closest to g on the curve.
+func Percent(g float32) int {
+	switch {
+	case g <= 0:
+		return 0
+	case g >= 1:
+		return min(200, int(math.Round(float64(g)*100)))
+	}
+	knee := math.Pow(10, -volumeRangeDB*(1-volumeFadeAt)/20) // Gain at volumeFadeAt
+	p := 1 + 20*math.Log10(float64(g))/volumeRangeDB
+	if float64(g) < knee {
+		p = volumeFadeAt * float64(g) / knee
+	}
+	return int(math.Round(p * 100))
+}
+
 // FromLinear converts a percentage saved before the curve (gain =
 // percent/100) into the percentage with the closest loudness on the
 // curve, e.g. 50 → 85. Values from 100 up are unchanged.

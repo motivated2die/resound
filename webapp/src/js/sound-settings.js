@@ -529,13 +529,20 @@ function setSliderPosition(pos) {
 // it to the saved volume and to the sound if it is playing. One request at a
 // time: while one is under way only the newest position waits, so updates
 // stay in order and the volume follows the finger at network speed.
+// The last position always goes out, also once the sheet has closed, and a
+// failed request is sent again once: otherwise the PC could keep an earlier
+// position (heard by others) while the slider shows the one let go at.
 let volumeInFlight = false;
-let volumePending = null; // { soundId, pos }
+let volumePending = null; // { soundId, pos, retried }
 function updateVolumeWithSlider(sliderPos) {
     if (!currentSoundId || !currentSoundData) return;
-    const job = { soundId: currentSoundId, pos: sliderPos };
+    sendVolume({ soundId: currentSoundId, pos: sliderPos, retried: false });
+}
+
+function sendVolume(job) {
     if (volumeInFlight) { volumePending = job; return; }
     volumeInFlight = true;
+    let failed = false;
     fetch(`/api/sounds/${job.soundId}/volume`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -543,7 +550,7 @@ function updateVolumeWithSlider(sliderPos) {
     })
     .then(response => response.json())
     .then(data => {
-        if (!data.success) return;
+        if (!data.success) { failed = true; return; }
         persistence.setSoundCustomVolume(job.soundId, job.pos !== 0, job.pos);
         refreshCards(job.soundId);
         if (job.soundId === currentSoundId && currentSoundData) {
@@ -551,13 +558,14 @@ function updateVolumeWithSlider(sliderPos) {
             currentSoundData.sliderPosition = job.pos;
         }
     })
-    .catch(error => console.error('Error updating volume:', error))
+    .catch(error => { failed = true; console.error('Error updating volume:', error); })
     .finally(() => {
         volumeInFlight = false;
-        const next = volumePending;
+        let next = volumePending;
         volumePending = null;
-        if (next && !(next.soundId === job.soundId && next.pos === job.pos) && next.soundId === currentSoundId) {
-            updateVolumeWithSlider(next.pos);
+        if (!next && failed && !job.retried) next = { ...job, retried: true };
+        if (next && !(!failed && next.soundId === job.soundId && next.pos === job.pos)) {
+            sendVolume(next);
         }
     });
 }
