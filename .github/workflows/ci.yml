@@ -1,5 +1,5 @@
-# Checks every push to main and every pull request: formatting, vet, tests
-# and a build. Releases are built by release.yml when a version tag is pushed.
+# Checks every push to main and every pull request: formatting, vet, tests,
+# known vulnerabilities and a build. Releases are built by release.yml when a version tag is pushed.
 name: CI
 
 on:
@@ -36,6 +36,11 @@ jobs:
 
       - name: go test
         run: go test ./...
+
+      # Fails when code we call has a known vulnerability, in a module or in
+      # the Go standard library (fixed by bumping the toolchain line in go.mod).
+      - name: govulncheck
+        run: go run golang.org/x/vuln/cmd/govulncheck@v1.9.0 ./...
 
       - name: go build
         run: go build -o resound-ci.exe ./cmd/resound
