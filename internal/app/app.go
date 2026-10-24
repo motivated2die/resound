@@ -375,6 +375,10 @@ func (a *App) quit() {
 }
 
 func (a *App) showPage(p page) {
+	if a.ptt.capturing { // a recording belongs to a card of the page it started on
+		a.ptt.capturing = false
+		a.applyHotkeys()
+	}
 	if p == pageHome {
 		a.parents = nil
 	}
