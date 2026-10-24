@@ -255,3 +255,85 @@ func TestEditable(t *testing.T) {
 		}
 	}
 }
+
+// A page that finishes ends its file at once, without the reload grace,
+// and asks for its window to be closed; only a window title of its own
+// form is passed on.
+func TestDone(t *testing.T) {
+	var closed, windows []string
+	b, token, port := newTestBridge(t, Options{
+		OnClose:     func(tk string) { closed = append(closed, tk) },
+		CloseWindow: func(title string) { windows = append(windows, title) },
+	})
+	for _, bad := range []string{``, `{}`, `{"window": "Inbox - Outlook"}`, `{"window": "Resound · Closing 0123"}`} {
+		if rec := do(b, port, "POST", "/v1/"+token+"/done", testOrigin, bad); rec.Code != http.StatusBadRequest {
+			t.Errorf("done with %s: %d, want 400", bad, rec.Code)
+		}
+	}
+	if len(windows) != 0 || len(closed) != 0 {
+		t.Fatalf("refused requests closed something: %v %v", closed, windows)
+	}
+	title := "Resound · Closing 0123456789abcdef"
+	if rec := do(b, port, "POST", "/v1/"+token+"/done", testOrigin, `{"window": "`+title+`"}`); rec.Code != http.StatusNoContent {
+		t.Fatalf("done: %d", rec.Code)
+	}
+	if len(closed) != 1 || closed[0] != token || len(windows) != 1 || windows[0] != title {
+		t.Errorf("OnClose %v, CloseWindow %v", closed, windows)
+	}
+	if rec := do(b, port, "GET", "/v1/"+token, testOrigin, ""); rec.Code != http.StatusNotFound {
+		t.Errorf("finished file still served: %d", rec.Code)
+	}
+}
+
+// Stopping in the panel: the page's state check says so, nothing else is
+// served, and the page may still finish (its window closes; the panel,
+// which stopped it, isn't told again). Without the page it is dropped.
+func TestStop(t *testing.T) {
+	var closed, windows []string
+	b, token, port := newTestBridge(t, Options{
+		OnClose:     func(tk string) { closed = append(closed, tk) },
+		CloseWindow: func(title string) { windows = append(windows, title) },
+	})
+	state := func() bool {
+		t.Helper()
+		rec := do(b, port, "GET", "/v1/"+token+"/state", testOrigin, "")
+		var s struct{ Stopped bool }
+		if rec.Code != http.StatusOK || json.Unmarshal(rec.Body.Bytes(), &s) != nil {
+			t.Fatalf("state: %d %s", rec.Code, rec.Body)
+		}
+		return s.Stopped
+	}
+	if state() {
+		t.Fatal("stopped before Stop")
+	}
+	b.Stop(token)
+	if !state() {
+		t.Fatal("not stopped after Stop")
+	}
+	for _, path := range []string{"", "/source"} {
+		if rec := do(b, port, "GET", "/v1/"+token+path, testOrigin, ""); rec.Code != http.StatusNotFound {
+			t.Errorf("GET %q after Stop: %d", path, rec.Code)
+		}
+	}
+	if rec := do(b, port, "POST", "/v1/"+token+"/close", testOrigin, ""); rec.Code != http.StatusNotFound {
+		t.Errorf("close after Stop: %d", rec.Code) // can't turn the stop into a reload grace
+	}
+	do(b, port, "POST", "/v1/"+token+"/done", testOrigin, `{"window": "Resound · Closing 0123456789abcdef"}`)
+	if len(closed) != 0 || len(windows) != 1 {
+		t.Errorf("finish after Stop: OnClose %v, CloseWindow %v", closed, windows)
+	}
+
+	// A stopped file whose page never answers goes after stopGrace.
+	b2, token2, _ := newTestBridge(t, Options{})
+	b2.Stop(token2)
+	b2.mu.Lock()
+	b2.jobs[token2].closer.Reset(10 * time.Millisecond)
+	b2.mu.Unlock()
+	time.Sleep(200 * time.Millisecond)
+	b2.mu.Lock()
+	_, still := b2.jobs[token2]
+	b2.mu.Unlock()
+	if still {
+		t.Error("a stopped file without its page wasn't dropped")
+	}
+}

@@ -144,6 +144,8 @@ h1 { margin: 0; font-size: 15px; font-weight: 600; }
 .btn-secondary { background: var(--border); color: var(--text); }
 .btn-secondary:hover { background: color-mix(in srgb, var(--border) 80%, white); }
 .btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+/* Done and Keep editing fit the slim bar while editing. */
+.btn-bar { flex: none; min-height: 28px; padding: 0 14px; border-radius: 8px; font-size: 13px; }
 
 progress { width: 100%; accent-color: var(--accent); }
 

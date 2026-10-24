@@ -18,6 +18,7 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/motivated2die/resound/internal/audio"
 	"github.com/motivated2die/resound/internal/editbridge"
@@ -63,6 +64,15 @@ func (a *App) editBridge() *editbridge.Bridge {
 			OnOpen:   func(token string) { a.tray.Post(func() { a.editorOpened(token) }) },
 			OnResult: a.saveClip,
 			OnClose:  func(token string) { a.tray.Post(func() { a.editorClosed(token) }) },
+			// A page that finished (Done, a saved sound, Stop editing here)
+			// can't close its own window; Resound opened it and closes it.
+			CloseWindow: func(title string) {
+				go func() { // it waits for the browser to show the title
+					if !ui.CloseBrowserWindow(title, 2*time.Second) {
+						logx.Printf("edit: the editor's window isn't an app window; the page asks to close it")
+					}
+				}()
+			},
 		})
 	}
 	return s.bridge
@@ -137,10 +147,11 @@ func (a *App) showEditor(job *soundImport) {
 	}
 }
 
-// stopEditing ends job: clips already added stay, the page can't add more.
+// stopEditing ends job: clips already added stay, the page can't add more
+// and finishes, which closes its window.
 func (a *App) stopEditing(job *soundImport) {
 	if job.token != "" && a.imports.bridge != nil {
-		a.imports.bridge.Remove(job.token)
+		a.imports.bridge.Stop(job.token)
 	}
 	a.imports.remove(job)
 	a.render()
@@ -272,9 +283,9 @@ func (a *App) editRows(job *soundImport) []ui.Row {
 	text := "Opening “" + job.src + "” in the editor in your browser…"
 	switch {
 	case job.opened && job.replace != "":
-		text = "“" + job.src + "” is open in the editor in your browser. Trim it and press “Save to Resound”: it replaces the sound."
+		text = "“" + job.src + "” is open in the editor in your browser. Trim it and press “Save to Resound”: it replaces the sound, and the editor closes."
 	case job.opened:
-		text = "“" + job.src + "” is open in the editor in your browser. Cut the part you want and press “Add to Resound”: each clip is saved here."
+		text = "“" + job.src + "” is open in the editor in your browser. Cut the part you want and press “Add to Resound”: each clip is saved here. Press “Done” there when you're finished."
 	}
 	return []ui.Row{
 		ui.Paragraph(text, ui.ToneMuted),

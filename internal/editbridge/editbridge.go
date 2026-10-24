@@ -23,6 +23,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"strconv"
 	"strings"
@@ -43,7 +44,15 @@ const (
 	// closeGrace is how long a page that went away (closed, or reloading)
 	// has to come back before its file counts as closed.
 	closeGrace = 10 * time.Second
+	// stopGrace is how long a file stopped in the panel waits for its page
+	// to finish (and have its window closed) before it is removed anyway.
+	stopGrace = 5 * time.Second
 )
+
+// windowTitle is the title a finishing page gives its window, so Resound
+// can close exactly that window (Options.CloseWindow): a fixed text and 16
+// random hex digits.
+var windowTitle = regexp.MustCompile(`^Resound · Closing [0-9a-f]{16}$`)
 
 // ErrTooLarge means a file is larger than MaxSourceBytes.
 var ErrTooLarge = errors.New("the file is too large for the editor")
@@ -59,9 +68,13 @@ type Options struct {
 	// OnResult saves a clip cut from the job's file and returns the name it
 	// was saved under. Its error's text is shown to the user in the page.
 	OnResult func(job Job, body io.Reader) (name string, err error)
-	// OnClose says that the page of this file was closed. The file is no
-	// longer served.
+	// OnClose says that the page of this file was closed, or finished. The
+	// file is no longer served.
 	OnClose func(token string)
+	// CloseWindow closes the browser window titled title, if Resound can:
+	// a page that finished asks for it, as pages may not close their own
+	// window. title matches windowTitle. It runs before OnClose.
+	CloseWindow func(title string)
 }
 
 // Job is a file being edited.
@@ -77,6 +90,9 @@ type Job struct {
 	Format  string
 	size    int64
 	closer  *time.Timer // set while the page is away
+	// stopped: editing was stopped in the panel. The page is told (state)
+	// and may still finish; nothing else is served.
+	stopped bool
 }
 
 // Bridge serves the files being edited. Its zero value is not usable; use New.
@@ -151,6 +167,30 @@ func (b *Bridge) remove(token string) {
 	}
 }
 
+// Stop ends editing a file from Resound's side: the page learns it on its
+// next state check and finishes, which closes its window. A page that
+// doesn't (closed already, or gone) is dropped after stopGrace. OnClose
+// doesn't run for it.
+func (b *Bridge) Stop(token string) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	j := b.jobs[token]
+	if j == nil {
+		return
+	}
+	j.stopped = true
+	if j.closer != nil {
+		j.closer.Stop()
+	}
+	j.closer = time.AfterFunc(stopGrace, func() {
+		b.mu.Lock()
+		defer b.mu.Unlock()
+		if b.jobs[token] == j {
+			b.remove(token)
+		}
+	})
+}
+
 // Close stops serving every file.
 func (b *Bridge) Close() {
 	b.mu.Lock()
@@ -177,8 +217,10 @@ func (b *Bridge) start() error {
 }
 
 // handler serves /v1/<token> (the file's details), /v1/<token>/source (the
-// file), /v1/<token>/result (POST: a clip) and /v1/<token>/close (POST: the
-// page is going away) for a server on port.
+// file), /v1/<token>/result (POST: a clip), /v1/<token>/state (whether
+// editing was stopped in the panel), /v1/<token>/done (POST: the user
+// finished; the window should close) and /v1/<token>/close (POST: the page
+// is going away) for a server on port.
 func (b *Bridge) handler(port int) http.Handler {
 	host := "127.0.0.1:" + strconv.Itoa(port)
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -216,7 +258,23 @@ func (b *Bridge) handler(port int) http.Handler {
 			return
 		}
 
+		if j.stopped && action != "state" && action != "done" {
+			writeJSON(w, http.StatusNotFound, map[string]string{"error": "Editing was stopped in the Resound panel."})
+			return
+		}
 		switch {
+		case action == "state" && r.Method == http.MethodGet:
+			writeJSON(w, http.StatusOK, map[string]bool{"stopped": j.stopped})
+		case action == "done" && r.Method == http.MethodPost:
+			var req struct {
+				Window string `json:"window"`
+			}
+			if err := json.NewDecoder(io.LimitReader(r.Body, 1<<10)).Decode(&req); err != nil || !windowTitle.MatchString(req.Window) {
+				writeJSON(w, http.StatusBadRequest, map[string]string{"error": "bad request"})
+				return
+			}
+			w.WriteHeader(http.StatusNoContent)
+			b.finish(token, req.Window)
 		case action == "" && r.Method == http.MethodGet:
 			b.opened(token)
 			writeJSON(w, http.StatusOK, map[string]any{
@@ -251,6 +309,27 @@ func (b *Bridge) handler(port int) http.Handler {
 			http.Error(w, "not found", http.StatusNotFound)
 		}
 	})
+}
+
+// finish ends a file whose page is done: it is removed at once (no grace,
+// as for a page that went away), and its window is closed.
+func (b *Bridge) finish(token, window string) {
+	b.mu.Lock()
+	j := b.jobs[token]
+	stopped := j != nil && j.stopped
+	if j != nil {
+		b.remove(token)
+	}
+	b.mu.Unlock()
+	if j == nil {
+		return
+	}
+	if b.opts.CloseWindow != nil {
+		b.opts.CloseWindow(window)
+	}
+	if !stopped && b.opts.OnClose != nil { // a stop came from the panel, which knows
+		b.opts.OnClose(token)
+	}
 }
 
 // opened notes that the page has the file (again): a pending close is off.

@@ -9,10 +9,13 @@
 // With -replace, the file is a sound of the library being edited, as from
 // its scissors on the library page: each save replaces it.
 //
-// It runs until Ctrl+C, or until the page is closed.
+// Enter stops editing, as "Stop editing" in the panel does: the page
+// finishes and its window closes. It runs until Ctrl+C, or until the page
+// is closed or finished.
 package main
 
 import (
+	"bufio"
 	"bytes"
 	"flag"
 	"fmt"
@@ -71,6 +74,9 @@ func main() {
 			return saved.Name, nil
 		},
 		OnClose: func(string) { close(closed) },
+		// As the panel: a page that finished has its app window closed
+		// (Windows only, closewindow_windows.go).
+		CloseWindow: closeWindow,
 	})
 	dir := *out
 	if *replace {
@@ -85,6 +91,12 @@ func main() {
 
 	interrupt := make(chan os.Signal, 1)
 	signal.Notify(interrupt, os.Interrupt)
+	go func() {
+		if _, err := bufio.NewReader(os.Stdin).ReadString('\n'); err == nil {
+			log.Print("stopping, as Stop editing in the panel")
+			b.Stop(token)
+		}
+	}()
 	select {
 	case <-interrupt:
 	case <-closed:

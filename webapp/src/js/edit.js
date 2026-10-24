@@ -2,7 +2,9 @@
 // play (a video, or audio in another format), dropped onto a library folder.
 // It reads the file from Resound on this PC, embeds the editor
 // (audiocutter.online) with the file loaded, and sends every clip the user
-// adds back to Resound, which saves it into the folder.
+// adds back to Resound, which saves it into the folder. Done, a saved
+// sound of the library, or Stop editing in the panel end it and close the
+// window.
 //
 // Resound serves the file on 127.0.0.1 (internal/editbridge); the port and
 // a token come in the fragment, which the browser never sends anywhere. The
@@ -153,6 +155,7 @@
                     setStatus(info.replace
                         ? `Editing “${info.name}” in “${info.folder}”. Select the part to keep and press “Save to Resound”: it replaces the sound.`
                         : `Saving clips into “${info.folder}”. Select the part you want and press “Add to Resound”.`);
+                    startFinishing();
                 }
                 break;
             case 'result':
@@ -226,9 +229,11 @@
                 });
                 const { name } = await res.json();
                 showClip(name);
-                setStatus(info.replace
-                    ? `Saved “${name}” in “${info.folder}”. Keep editing and save again, or close this window.`
-                    : `Added “${name}” to “${info.folder}”. Name it in the Resound panel, or cut another clip.`);
+                if (info.replace) {
+                    closeSoon(name);
+                } else {
+                    setStatus(`Added “${name}” to “${info.folder}”. Name it in the Resound panel, or cut another clip; press Done when you're finished.`);
+                }
             } catch (e) {
                 setStatus(e instanceof ResoundError ? e.message : 'The clip could not be sent to Resound.', true);
             }
@@ -247,6 +252,87 @@
         clips.append(li);
         clips.classList.toggle('overflowing', clips.scrollWidth > clips.clientWidth);
         clips.scrollTo({ left: clips.scrollWidth, behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+    }
+
+    // --- finishing ------------------------------------------------------------------
+
+    // Done ends editing: Resound stops serving the file at once and closes
+    // this window. The page can't close it itself: a window a script didn't
+    // open may only be closed by a page with a single history entry, and the
+    // editor adds one when it moves on to its editing page (measured in
+    // Edge: window.close() is refused). Resound opened the window, so it
+    // closes it, found by a title set just for that (editbridge, ui). In a
+    // normal browser window, which Resound never closes, the page says the
+    // tab can be closed.
+    //
+    // A sound of the library is done once it's saved: the window closes a
+    // moment later unless the user wants to keep editing. Stop editing in
+    // the panel ends it too; the page checks every second.
+    const CLOSE_DELAY = 2500;
+    let finished = false;
+    let closing = 0;
+    let checking = 0;
+
+    function startFinishing() {
+        const done = $('done');
+        done.hidden = false;
+        done.title = info.replace ? 'Close the editor' : 'Close the editor; the clips you added stay in Resound';
+        done.addEventListener('click', () => queue.then(() => finish('done')));
+        $('keep').addEventListener('click', () => {
+            clearTimeout(closing);
+            $('keep').hidden = true;
+            setStatus(`Saved in “${info.folder}”. Save again when you've changed it, or press Done.`);
+        });
+        checking = setInterval(async () => {
+            try {
+                const res = await fetch(base + '/state', { cache: 'no-store' });
+                if (res.ok && (await res.json()).stopped) finish('stopped');
+            } catch { /* Resound quit: the next request says so */ }
+        }, 1000);
+    }
+
+    // closeSoon closes the editor a moment after a sound was saved.
+    function closeSoon(name) {
+        setStatus(`Saved “${name}” in “${info.folder}”. Closing the editor…`);
+        $('keep').hidden = false;
+        clearTimeout(closing);
+        closing = setTimeout(() => finish('saved'), CLOSE_DELAY);
+    }
+
+    function finish(why) {
+        if (finished) return;
+        finished = true;
+        clearTimeout(closing);
+        clearInterval(checking);
+        $('keep').hidden = true;
+        $('done').hidden = true;
+        const random = crypto.getRandomValues(new Uint8Array(8));
+        const marker = 'Resound · Closing ' + Array.from(random, (b) => b.toString(16).padStart(2, '0')).join('');
+        const title = document.title;
+        document.title = marker;
+        fetch(base + '/done', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ window: marker }),
+        }).catch(() => {});
+        // Still here: not a window Resound closes (a tab of a normal browser
+        // window), or Resound is gone.
+        setTimeout(() => {
+            document.title = title;
+            const text = {
+                done: info.replace ? 'Done.' : `Done. The clips you added are in “${info.folder}”.`,
+                saved: `Saved “${info.name}” in “${info.folder}”.`,
+                stopped: 'Editing was stopped in the Resound panel.',
+            }[why] + ' You can close this page now.';
+            editor?.replaceWith(notice);
+            document.body.classList.remove('editing');
+            notice.hidden = false;
+            $('spinner').hidden = true;
+            $('progress').hidden = true;
+            $('notice-hint').hidden = true;
+            $('notice-text').textContent = text;
+            setStatus(text);
+        }, CLOSE_DELAY);
     }
 
     // --- page state -----------------------------------------------------------------
