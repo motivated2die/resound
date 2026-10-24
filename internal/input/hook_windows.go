@@ -49,6 +49,7 @@ import (
 type Watcher struct {
 	keymap  atomic.Pointer[Keymap]
 	lent    atomic.Pointer[Combo] // push-to-talk keys lent by the app (LendPTT)
+	talk    atomic.Int32          // the user's push-to-talk held: its index (ActionTalk), -1 for none
 	onEvent func(HotkeyEvent)
 
 	threadID uint32
@@ -211,7 +212,9 @@ func (t *hookThread) input(vk uint16, scan, flags uint32, down bool) bool {
 	}
 	wasOpen := t.filter.Open()
 	events, swallow := t.filter.Key(b, vk, down)
-	if !swallow && down && handsOver(events) {
+	// No hand-over while the user holds a push-to-talk key: the keys lent
+	// are theirs now, and letting go of them would cut them off.
+	if !swallow && down && handsOver(events) && !t.filter.Talking() {
 		swallow = t.handOverLater(vk, scan, flags)
 	}
 	t.deliver(events)
@@ -424,6 +427,12 @@ func (t *hookThread) syncMouse() {
 // hook whose callback is slow), e.g. by posting to the UI thread.
 func (t *hookThread) deliver(events []HotkeyEvent) {
 	for _, ev := range events {
+		switch {
+		case ev.Action == ActionTalk && ev.Down:
+			t.w.talk.Store(int32(ev.Index))
+		case ev.Action == ActionTalk:
+			t.w.talk.Store(-1)
+		}
 		t.w.onEvent(ev)
 	}
 }
@@ -432,6 +441,7 @@ func (t *hookThread) deliver(events []HotkeyEvent) {
 // on the hook thread and must not block.
 func StartWatcher(k Keymap, onEvent func(HotkeyEvent)) (*Watcher, error) {
 	w := &Watcher{onEvent: onEvent, done: make(chan struct{})}
+	w.talk.Store(-1)
 	w.keymap.Store(&k)
 	started := make(chan error, 1)
 	go w.run(started)
@@ -563,6 +573,11 @@ func (w *Watcher) TakePTT() Combo {
 	}
 	return nil
 }
+
+// Talking returns the index of the push-to-talk combination the user holds
+// themselves (Bindings.Talk), -1 for none, as the hook knows it now: before
+// its ActionTalk event has reached the app.
+func (w *Watcher) Talking() int { return int(w.talk.Load()) }
 
 // SetOverlayOpen tells the hook that the app opened or closed the overlay
 // itself (its preview button), so Esc and the wheel are taken while it is

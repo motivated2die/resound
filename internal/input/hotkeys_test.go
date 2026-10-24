@@ -308,3 +308,64 @@ func TestHandsOver(t *testing.T) {
 		}
 	}
 }
+
+// The user's own push-to-talk presses: a talk starts on the press that
+// completes a talk combination (reporting which one), lasts while one is
+// held, and works alongside pause keys. Repeats cause nothing.
+func TestMatcherTalk(t *testing.T) {
+	const vkPause, vkM4 = 0x13, VKXButton1
+	b := &Bindings{Talk: []Combo{{vkPause}, {vkLCtrl, vkM4}}, Pause: []Combo{{vkG}}}
+	var m Matcher
+	type ev = HotkeyEvent
+	steps := []struct {
+		vk   uint16
+		down bool
+		want []HotkeyEvent
+	}{
+		{vkLCtrl, true, nil},
+		{vkM4, true, []ev{{Action: ActionTalk, Down: true, Index: 1}}}, // Ctrl + Mouse 4
+		{vkM4, true, nil},    // repeat
+		{vkPause, true, nil}, // a second talk combination while talking
+		{vkM4, false, nil},   // Pause still holds the talk
+		{vkG, true, []ev{{Action: ActionPause, Down: true}}},
+		{vkPause, false, []ev{{Action: ActionTalk}}},
+		{vkG, false, []ev{{Action: ActionPause}}},
+		{vkLCtrl, false, nil},
+		{vkPause, true, []ev{{Action: ActionTalk, Down: true, Index: 0}}},
+		{vkPause, false, []ev{{Action: ActionTalk}}},
+	}
+	for i, s := range steps {
+		if got := m.Key(b, s.vk, s.down); !reflect.DeepEqual(got, s.want) {
+			t.Fatalf("step %d (vk %#x down=%v): got %v, want %v", i, s.vk, s.down, got, s.want)
+		}
+		if m.Talking() != (i >= 1 && i <= 5 || i == 9) {
+			t.Fatalf("step %d: talking %v", i, m.Talking())
+		}
+	}
+	if handsOver([]HotkeyEvent{{Action: ActionTalk, Down: true}}) {
+		t.Error("a talk must not hand push-to-talk over")
+	}
+}
+
+// A talk started in one app lasts across a switch to an app without
+// push-to-talk, until its key is let go; a talk key held when the switch
+// makes it one doesn't start a talk.
+func TestMatcherTalkAppSwitch(t *testing.T) {
+	game := &Bindings{Talk: []Combo{{vkF}}}
+	other := &Bindings{}
+	var m Matcher
+	if got := m.Key(game, vkF, true); len(got) != 1 || got[0].Action != ActionTalk || !got[0].Down {
+		t.Fatalf("press = %v", got)
+	}
+	if got := m.Key(other, vkG, true); got != nil || !m.Talking() {
+		t.Fatalf("after the switch: %v talking=%v", got, m.Talking())
+	}
+	if got := m.Key(other, vkF, false); len(got) != 1 || got[0].Down {
+		t.Fatalf("release = %v", got)
+	}
+	m.Key(other, vkG, false)
+	m.Key(other, vkF, true)
+	if got := m.Key(game, vkG, true); got != nil || m.Talking() {
+		t.Fatalf("held before the switch: %v", got)
+	}
+}

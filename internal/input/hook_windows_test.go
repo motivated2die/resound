@@ -457,3 +457,103 @@ func TestMouseHandOverLive(t *testing.T) {
 	expectSeen(seenKey{ptt, true, true}, seenKey{VKXButton2, false, true}, seenKey{VKXButton2, true, true})
 	expectEvents(HotkeyEvent{Action: ActionPause, Down: true}, HotkeyEvent{Action: ActionPause}, HotkeyEvent{Action: ActionHandOver, Down: true})
 }
+
+// TestTalkLive checks with real input that the user's own push-to-talk key
+// (F23) reaches other programs as pressed and reports a talk, Resound's own
+// press of it none, and that a pause key (F24) pressed while the user talks
+// passes as it is, without letting go of the push-to-talk keys lent:
+//
+//	$env:RESOUND_HOOK_TEST="1"; go test -run TalkLive -v ./internal/input
+func TestTalkLive(t *testing.T) {
+	if os.Getenv("RESOUND_HOOK_TEST") != "1" {
+		t.Skip("set RESOUND_HOOK_TEST=1 to inject input into the desktop")
+	}
+	const ptt, pause = 0x86, 0x87
+	startObserver(t)
+	events := make(chan HotkeyEvent, 16)
+	w, err := StartWatcher(Keymap{Global: Bindings{Talk: []Combo{{ptt}}, Pause: []Combo{{pause}}}}, func(ev HotkeyEvent) {
+		if ev.Action != ActionApp {
+			events <- ev
+		}
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer w.Close()
+	user := func(vk uint16, down bool) {
+		in := keyboardInput{Type: inputKeyboard, VK: vk}
+		if !down {
+			in.Flags = keyeventfKeyUp
+		}
+		if err := sendInput(unsafe.Pointer(&in), unsafe.Sizeof(in)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	expectSeen := func(want ...seenKey) {
+		t.Helper()
+		for _, k := range want {
+			select {
+			case got := <-obs.all:
+				if got != k {
+					t.Fatalf("other programs got %+v, want %+v", got, k)
+				}
+			case <-time.After(time.Second):
+				t.Fatalf("other programs didn't get %+v", k)
+			}
+		}
+		select {
+		case got := <-obs.all:
+			t.Fatalf("other programs got %+v as well", got)
+		case <-time.After(150 * time.Millisecond):
+		}
+	}
+	expectEvents := func(want ...HotkeyEvent) {
+		t.Helper()
+		for _, ev := range want {
+			select {
+			case got := <-events:
+				if got != ev {
+					t.Fatalf("event %v, want %v", got, ev)
+				}
+			case <-time.After(time.Second):
+				t.Fatalf("no %v event", ev)
+			}
+		}
+		select {
+		case got := <-events:
+			t.Fatalf("event %v as well", got)
+		case <-time.After(100 * time.Millisecond):
+		}
+	}
+
+	if err := Press(Combo{ptt}); err != nil { // Resound holds push-to-talk: no talk
+		t.Fatal(err)
+	}
+	expectSeen(seenKey{ptt, false, true})
+	expectEvents()
+	w.LendPTT(Combo{ptt})
+
+	user(ptt, true) // the user's own press passes and starts a talk
+	expectSeen(seenKey{ptt, false, false})
+	expectEvents(HotkeyEvent{Action: ActionTalk, Down: true})
+	if w.Talking() != 0 {
+		t.Fatalf("Talking() = %d while the user holds the key", w.Talking())
+	}
+	user(pause, true) // no hand-over while talking: no push-to-talk release
+	user(pause, false)
+	expectSeen(seenKey{pause, false, false}, seenKey{pause, true, false})
+	expectEvents(HotkeyEvent{Action: ActionPause, Down: true}, HotkeyEvent{Action: ActionPause})
+	if c := w.TakePTT(); c == nil {
+		t.Fatal("the loan was used while the user talked")
+	}
+	user(ptt, false)
+	expectSeen(seenKey{ptt, true, false})
+	expectEvents(HotkeyEvent{Action: ActionTalk})
+	if w.Talking() != -1 {
+		t.Fatalf("Talking() = %d after the release", w.Talking())
+	}
+	if err := Release(Combo{ptt}); err != nil {
+		t.Fatal(err)
+	}
+	expectSeen(seenKey{ptt, true, true})
+}

@@ -40,6 +40,12 @@ const (
 	// file name in lower case ("" when unknown), whose bindings apply now
 	// (Keymap). Resound's own windows never count. Down is always true.
 	ActionApp
+
+	// ActionTalk reports the user pressing (Down) and letting go of one of
+	// the push-to-talk keys Resound presses (Bindings.Talk) themselves. Index
+	// is the combination the press completed. Like a pause, it lasts while a
+	// talk combination is held. Its keys always pass to the game.
+	ActionTalk
 )
 
 // EscHoldTime is how long Esc is held in the open overlay to stop all
@@ -47,7 +53,7 @@ const (
 const EscHoldTime = 700 * time.Millisecond
 
 func (a Action) String() string {
-	return [...]string{"pause", "stop", "overlay open", "overlay select", "overlay close", "overlay scroll", "overlay Esc down", "overlay stop", "push-to-talk hand-over", "app"}[a]
+	return [...]string{"pause", "stop", "overlay open", "overlay select", "overlay close", "overlay scroll", "overlay Esc down", "overlay stop", "push-to-talk hand-over", "app", "talk"}[a]
 }
 
 // HotkeyEvent is a hotkey becoming active (Down) or inactive. Stop keys and
@@ -57,6 +63,7 @@ type HotkeyEvent struct {
 	Down   bool
 	Steps  int    // ActionOverlayScroll only
 	App    string // ActionApp only
+	Index  int    // ActionTalk only
 }
 
 // Bindings are the hotkey combinations; any one of them triggers its action.
@@ -64,15 +71,20 @@ type HotkeyEvent struct {
 type Bindings struct {
 	Pause, Stop []Combo
 	Overlay     Combo // opens the in-game overlay; empty = no overlay
+	// Talk are the push-to-talk combinations Resound presses, while the
+	// user's own presses of them count (ActionTalk); none otherwise.
+	Talk []Combo
 }
 
 // Empty reports whether no hotkey is set.
-func (b Bindings) Empty() bool { return len(b.Pause) == 0 && len(b.Stop) == 0 && len(b.Overlay) == 0 }
+func (b Bindings) Empty() bool {
+	return len(b.Pause) == 0 && len(b.Stop) == 0 && len(b.Overlay) == 0 && len(b.Talk) == 0
+}
 
 // UsesMouse reports whether a combination holds a mouse button, which the
 // mouse hook must watch.
 func (b Bindings) UsesMouse() bool {
-	for _, list := range [][]Combo{b.Pause, b.Stop, {b.Overlay}} {
+	for _, list := range [][]Combo{b.Pause, b.Stop, {b.Overlay}, b.Talk} {
 		for _, c := range list {
 			if slices.ContainsFunc(c, IsMouse) {
 				return true
@@ -151,10 +163,35 @@ func IsMouse(vk uint16) bool { return vk >= 0x01 && vk <= 0x06 && vk != 0x03 }
 // combination is held, of the bindings that started it as well as of the
 // current ones, so an app switch while a pause key is held never ends the
 // pause early or lets it bounce.
+// The user's push-to-talk (talk) lasts the same way.
 type Matcher struct {
-	down    map[uint16]bool // physical keys held now (left/right kept apart)
-	pauseOn bool
-	pauseBy []Combo // the pause combinations in effect when the pause started
+	down  map[uint16]bool // physical keys held now (left/right kept apart)
+	pause latch
+	talk  latch
+}
+
+// latch is an action that lasts while one of its combinations is held: on
+// since a press completed one, with the combinations in effect then (by).
+type latch struct {
+	on bool
+	by []Combo
+}
+
+// step updates l after a press (press) or release of vk with the current
+// combinations, and reports what changed: start (with the index of the
+// combination completed) or end.
+func (m *Matcher) step(l *latch, combos []Combo, vk uint16, press bool) (start, end bool, index int) {
+	switch {
+	case l.on && !m.anyHeld(combos) && !m.anyHeld(l.by):
+		l.on, l.by = false, nil
+		return false, true, 0
+	case !l.on && press:
+		if i := m.completes(combos, vk); i >= 0 {
+			l.on, l.by = true, combos
+			return true, false, i
+		}
+	}
+	return false, false, 0
 }
 
 // Key records a press or release and returns the hotkey events it causes.
@@ -169,27 +206,28 @@ func (m *Matcher) Key(b *Bindings, vk uint16, down bool) []HotkeyEvent {
 	} else {
 		delete(m.down, vk)
 	}
-	var pause, stop []Combo
+	var pause, stop, talk []Combo
 	if b != nil {
-		pause, stop = b.Pause, b.Stop
+		pause, stop, talk = b.Pause, b.Stop, b.Talk
 	}
 	var events []HotkeyEvent
-	switch {
-	case m.pauseOn && !m.anyHeld(pause) && !m.anyHeld(m.pauseBy):
-		m.pauseOn, m.pauseBy = false, nil
-		events = append(events, HotkeyEvent{Action: ActionPause})
-	case !m.pauseOn && press && m.completes(pause, vk):
-		m.pauseOn, m.pauseBy = true, pause
-		events = append(events, HotkeyEvent{Action: ActionPause, Down: true})
+	if start, end, _ := m.step(&m.pause, pause, vk, press); start || end {
+		events = append(events, HotkeyEvent{Action: ActionPause, Down: start})
 	}
-	if press && m.completes(stop, vk) {
+	if start, end, i := m.step(&m.talk, talk, vk, press); start || end {
+		events = append(events, HotkeyEvent{Action: ActionTalk, Down: start, Index: i})
+	}
+	if press && m.completes(stop, vk) >= 0 {
 		events = append(events, HotkeyEvent{Action: ActionStop, Down: true})
 	}
 	return events
 }
 
 // Paused reports whether a pause key holds the pause.
-func (m *Matcher) Paused() bool { return m.pauseOn }
+func (m *Matcher) Paused() bool { return m.pause.on }
+
+// Talking reports whether the user holds a push-to-talk key themselves.
+func (m *Matcher) Talking() bool { return m.talk.on }
 
 // Held returns the keys the matcher thinks are down.
 func (m *Matcher) Held() []uint16 {
@@ -200,15 +238,15 @@ func (m *Matcher) Held() []uint16 {
 	return keys
 }
 
-// completes reports whether pressing vk completed one of combos: one that
-// holds vk and is held now.
-func (m *Matcher) completes(combos []Combo, vk uint16) bool {
-	for _, c := range combos {
+// completes returns the index of the combination pressing vk completed: one
+// that holds vk and is held now; -1 for none.
+func (m *Matcher) completes(combos []Combo, vk uint16) int {
+	for i, c := range combos {
 		if m.held(c) && slices.ContainsFunc(c, func(k uint16) bool { return sameKey(k) == sameKey(vk) }) {
-			return true
+			return i
 		}
 	}
-	return false
+	return -1
 }
 
 func (m *Matcher) anyHeld(combos []Combo) bool {
