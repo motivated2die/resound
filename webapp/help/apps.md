@@ -7,12 +7,12 @@ Every app chooses its own microphone. In each app where others should hear your 
 1. Open **User Settings** (the gear next to your name) → **Voice & Video**.
 2. Set **Input Device** to **CABLE Output (VB-Audio Virtual Cable)**. Leave **Output Device** on your headphones.
 3. Turn off Discord's noise suppression, echo cancellation and automatic gain control, and set the input sensitivity by hand. Discord's voice processing is the most common reason sounds cut out: see [Sounds cut out in Discord](discord.md).
-4. If you use **Push to Talk** in Discord, set the same key in Resound, so it holds the key while sounds play: [Push-to-talk](push-to-talk.md).
+4. If you use **Push to Talk** in Discord, set the same key in Resound, so it holds the key while sounds play: [Keybinds](push-to-talk.md).
 
 ## Games
 
 - In the game's audio or voice chat settings, choose **CABLE Output** as the microphone or input device.
-- If the game has push-to-talk, set its key in Resound too.
+- If the game has push-to-talk, set its key in Resound too. A game whose key differs from Discord's can have [keys of its own](push-to-talk.md#keybinds-for-one-app).
 - Steam's voice chat: Steam → **Settings** → **Voice** → **Voice Input Device**: CABLE Output.
 
 ### Games without a microphone choice

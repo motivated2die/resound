@@ -19,6 +19,15 @@ Windows doesn't let programs exchange keys with programs running as administrato
 
 - A combination counts only while all its keys are held. Left and right <kbd>Ctrl</kbd>, <kbd>Shift</kbd> and <kbd>Alt</kbd> count as the same key.
 - Keys can't be shared: a pause key can't also be a stop key or your push-to-talk key. Resound says so when you record one.
+- Mouse buttons: only the middle and side buttons (Mouse 3–5) can be keybinds. Mouse software that turns a side button into a key or a macro sends that instead; bind what it sends.
+
+## Keys for one game don't apply
+
+[Keys of a game's own](push-to-talk.md#keybinds-for-one-app) only work while that game is in front.
+
+- Check the game is listed under **App keybinds** with the functions you set (its line says which, such as *Push-to-talk, pause*). A function that says *Global* on its card uses the global keys.
+- Resound knows a game by its program file. If the game starts through a launcher, add the game itself while it runs, not the launcher.
+- A function set to **None** is off in that game: its global key does nothing there. The **↺** arrow brings the global keys back.
 
 ## The overlay doesn't show
 
