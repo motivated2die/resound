@@ -53,8 +53,12 @@ func glowPixels(w, h int, cx, cy, rx, ry float64, accent uint32, g glowSpec) []u
 // following the same falloff as the background light.
 
 // borderGlow is how far towards the light colour the edge goes at the
-// corner.
-const borderGlow = 0.6
+// corner; borderReach how much further than the background light it
+// reaches along the edges.
+const (
+	borderGlow  = 0.42
+	borderReach = 1.3
+)
 
 // borderPixels renders the 1-pixel border of a w×h window whose corners
 // Windows rounds with radius r (pixels), as premultiplied RGBA: base, lit

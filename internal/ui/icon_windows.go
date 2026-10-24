@@ -125,7 +125,7 @@ func (c *canvas) glowBorder(w, h int32) {
 			}
 		}
 		r := windowRadiusL * c.scale
-		rx, ry := float64(c.px(cornerGlow.radiusXL)), float64(c.px(cornerGlow.radiusYL))
+		rx, ry := borderReach*float64(c.px(cornerGlow.radiusXL)), borderReach*float64(c.px(cornerGlow.radiusYL))
 		d = newDIB(borderPixels(int(w), int(h), r, rx, ry, windowBorder, borderLight, cornerGlow), w, h)
 		borderCache[key] = d
 	}
