@@ -383,7 +383,7 @@ func TestMouseHandOverLive(t *testing.T) {
 	}
 	defer w.Close()
 	time.Sleep(100 * time.Millisecond) // the hook thread installs the mouse hook
-	button := func(down bool) { // the button as the user presses it
+	button := func(down bool) {        // the button as the user presses it
 		in := mouseInput{Type: inputMouse, MouseData: 2 /* XBUTTON2 */, Flags: mouseeventfXUp}
 		if down {
 			in.Flags = mouseeventfXDown
