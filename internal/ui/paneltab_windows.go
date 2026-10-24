@@ -328,12 +328,15 @@ func (t *panelTab) draw(c *canvas) {
 	c.roundRect(face, c.px(14), bg)
 	x = box.Right - pad - t.closeWidth(c)
 	cw := c.px(12)
-	c.icon(IconClose, rect{x, line.Top, x + cw, line.Bottom}, 12, colText)
+	// The X sat a pixel high beside the capitals; nudged down to them.
+	c.icon(IconClose, rect{x, line.Top + c.px(1), x + cw, line.Bottom + c.px(1)}, 12, colText)
 	x += cw + c.px(4)
 	tw := c.textWidth(tabCloseLabel, fontSmall)
 	c.text(tabCloseLabel, rect{x, line.Top, x + tw + c.px(2), line.Bottom}, fontSmall, colText, dtLeft)
 	x += tw + c.px(6)
 	keycap := rect{x, line.Top, x + t.keyWidth(c), line.Bottom}
-	c.roundRect(keycap, c.px(6), shade(bg, -22))
+	// Its background loses a pixel at the top, which evens out the space
+	// around the letters; they stay where they are.
+	c.roundRect(rect{keycap.Left, keycap.Top + c.px(1), keycap.Right, keycap.Bottom}, c.px(6), shade(bg, -22))
 	c.text(tabCloseKey, keycap, fontSmall, colMuted, dtCenter)
 }
