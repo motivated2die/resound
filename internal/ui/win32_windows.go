@@ -128,6 +128,7 @@ const (
 	dwmwaWindowCornerPreference = 33
 	dwmwcpRound                 = 2
 	dwmwaBorderColor            = 34
+	dwmColorNone                = 0xFFFFFFFE // no border
 
 	dtLeft        = 0x0000
 	dtCenter      = 0x0001
@@ -302,24 +303,24 @@ func InitDPIAwareness() {
 	}
 }
 
-// windowBorder is the colour of the 1-pixel border Windows 11 draws around
-// rounded windows: about what its own translucent grey looks like on a dark
-// desktop.
+// windowBorder is the colour of the 1-pixel border around rounded windows:
+// about what Windows 11's own translucent grey looks like on a dark desktop.
 var windowBorder = rgb(0x38, 0x38, 0x38)
 
 // roundCorners asks Windows 11 to round a window's corners, smoothly, as
-// it does for its own windows. It returns false where it can't (Windows 10).
+// it does for its own windows, with border as the colour of the 1-pixel
+// border it draws then (dwmColorNone: none, the window paints its own). It
+// returns false where it can't (Windows 10).
 //
-// The border Windows draws then is translucent by default, so whatever lies
-// behind shows through it: the panel's sides went lighter where its tab is
-// tucked under them. An opaque border colour looks the same everywhere.
-func roundCorners(hwnd uintptr) bool {
+// Windows' border is translucent by default, so whatever lies behind shows
+// through it: the panel's sides went lighter where its tab is tucked under
+// them. An opaque colour looks the same everywhere.
+func roundCorners(hwnd uintptr, border uint32) bool {
 	if procDwmSetWindowAttribute.Find() != nil {
 		return false
 	}
 	pref := uint32(dwmwcpRound)
 	hr, _, _ := procDwmSetWindowAttribute.Call(hwnd, dwmwaWindowCornerPreference, uintptr(unsafe.Pointer(&pref)), 4)
-	border := windowBorder
 	procDwmSetWindowAttribute.Call(hwnd, dwmwaBorderColor, uintptr(unsafe.Pointer(&border)), 4)
 	return hr == 0
 }

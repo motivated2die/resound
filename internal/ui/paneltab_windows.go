@@ -83,7 +83,7 @@ func newPanelTab(p *Popup, owner uintptr) (*panelTab, error) {
 		return nil, err
 	}
 	t.hwnd = h
-	t.rounded = roundCorners(h)
+	t.rounded = roundCorners(h, windowBorder)
 	return t, nil
 }
 

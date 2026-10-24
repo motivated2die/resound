@@ -21,6 +21,7 @@ type trayMenu struct {
 	scale   float64
 	w, h    int32 // current size, device pixels
 	actions [3]Action
+	rounded bool // Windows rounds its corners; it paints its border
 
 	hover, press int // button index, -1 for none
 	tracks       bool
@@ -45,7 +46,7 @@ func newTrayMenu(actions [3]Action) (*trayMenu, error) {
 		return nil, err
 	}
 	m.hwnd = h
-	roundCorners(h) // like the panel
+	m.rounded = roundCorners(h, dwmColorNone) // like the panel, with its glowing border
 	if m.shadow, err = newShadow(); err != nil {
 		return nil, err
 	}
@@ -205,5 +206,8 @@ func (m *trayMenu) draw(c *canvas) {
 	for i, box := range m.boxes(c) {
 		a := m.actions[i]
 		paintButton(c, box, a.Label, a.Icon, a.Style, a.Disabled, m.hover == i, m.press == i)
+	}
+	if m.rounded {
+		c.glowBorder(m.w, m.h)
 	}
 }

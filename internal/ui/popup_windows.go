@@ -54,6 +54,7 @@ type Popup struct {
 	lastHidden         time.Time
 
 	measureDC uintptr // memory DC for measuring text outside painting
+	rounded   bool    // Windows rounds its corners; it paints its border
 
 	shadow *shadow   // drop shadow window beneath the popup
 	tab    *panelTab // the tab above it: move handle and "Close"
@@ -171,7 +172,7 @@ func newPopup() (*Popup, error) {
 	}
 	p.hwnd = h
 	p.ole = registerDropTarget(p)
-	roundCorners(h)
+	p.rounded = roundCorners(h, dwmColorNone) // its border is painted, lit by the glow
 	return p, nil
 }
 
@@ -604,6 +605,9 @@ func (p *Popup) paint() {
 	}
 	p.paintDropdown(c)
 	p.paintTip(c)
+	if p.rounded {
+		c.glowBorder(p.width, p.height)
+	}
 	procBitBlt.Call(hdc, 0, 0, uintptr(p.width), uintptr(p.height), mem, 0, 0, 0x00CC0020 /* SRCCOPY */)
 }
 
