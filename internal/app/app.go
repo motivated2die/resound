@@ -395,6 +395,9 @@ func (a *App) showPage(p page) {
 
 // render rebuilds the panel rows from the current state.
 func (a *App) render() {
+	if a.tray == nil {
+		return // tests without a panel
+	}
 	a.updateTooltip()
 	a.flowOnPage = false // set again by flowRows
 	a.tray.Popup().SetRows(a.rows())

@@ -33,11 +33,15 @@ func (a *App) keymap() input.Keymap {
 
 // bindingsFor is what pause, stop and the overlay's key are while app is in
 // the foreground. While a key is recorded in the panel, the overlay key
-// isn't taken from it, so it can be recorded again.
+// isn't taken from it, so it can be recorded again. Nor does the user's
+// push-to-talk count then.
 func (a *App) bindingsFor(app string) input.Bindings {
 	b := input.Bindings{Pause: combos(a.keysFor(app, fnPause)), Stop: combos(a.keysFor(app, fnStop))}
 	if !a.ptt.capturing {
 		b.Overlay = input.Combo(a.cfg.OverlayKeys)
+		if a.talkPauses() {
+			b.Talk = combos(a.keysFor(app, fnPTT)) // the user's own presses pause (talk.go)
+		}
 	}
 	return b
 }
@@ -92,6 +96,7 @@ func (a *App) closeHotkeys() {
 		a.hotkeys = nil
 		logx.Printf("hotkeys: off")
 	}
+	a.ptt.userTalk, a.ptt.pauseKey = false, false // no release will be reported
 	a.keys = input.Keymap{}
 	a.fgApp = "" // no app is followed without the watcher; keybindsChanged syncs held keys
 }
@@ -115,15 +120,13 @@ func (a *App) onHotkey(ev input.HotkeyEvent) {
 		return // the user is recording a key in the panel
 	}
 	switch ev.Action {
+	case input.ActionTalk:
+		a.onTalk(ev.Down, ev.Index)
 	case input.ActionStop:
 		logx.Printf("hotkey: stop")
 		a.stopAll()
 	case input.ActionPause:
-		if ev.Down {
-			a.setHoldPause(true)
-		} else {
-			a.releaseHoldPause()
-		}
+		a.onPauseKey(ev.Down)
 	}
 	a.render()
 }

@@ -399,7 +399,7 @@ func (a *App) releasePlayback() {
 // holdMic mutes the microphone for the duration of playback, if enabled.
 func (a *App) holdMic() {
 	pb := &a.playback
-	if !a.cfg.MuteMicWhilePlaying || pb.mutedMic != "" || a.route.Mic == nil {
+	if !a.cfg.MuteMicWhilePlaying || pb.mutedMic != "" || a.route.Mic == nil || a.ptt.userTalk {
 		return
 	}
 	id := a.route.Mic.ID

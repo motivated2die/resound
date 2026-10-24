@@ -79,6 +79,7 @@ Good to know:
 ## Options
 
 - **Hold push-to-talk while sounds play**: off, Resound never presses push-to-talk for sounds. Talk-through on the phone always holds it.
+- **My push-to-talk pauses sounds** (on by default, see [below](#press-your-push-to-talk-key-yourself)): holding your push-to-talk key yourself pauses the sounds so you can talk.
 - **Let go of push-to-talk first** (shown while you have push-to-talk and a pause or stop key): while sounds hold push-to-talk, a pause or stop key waits a moment for Resound to let go of it, so the game doesn't end your own push-to-talk too. Turn it off if a game ignores your key while sounds play.
 
 ## One key, one job
@@ -101,7 +102,20 @@ Use **−** and **+** to change the length, or click the value to type one, such
 
 ## Talk over a sound
 
+- **Your own push-to-talk key**: just hold it and talk, see below.
 - **Talk-through** in the phone app: hold the microphone button next to STOP. The sounds pause and your microphone is live; push-to-talk stays held.
 - **Pause keys** on the PC (above): the sounds pause and push-to-talk is let go, for example to talk on another channel.
+
+## Press your push-to-talk key yourself
+
+While a sound plays, Resound holds your push-to-talk key. You can still press that key yourself to talk, as always: with **My push-to-talk pauses sounds** on (the default), it works like a pause key.
+
+1. You press your push-to-talk key: the sound pauses and your microphone is live. Your game keeps sending, now your voice.
+2. You let go: your game stops sending, as it always does when the key goes up.
+3. A moment later (0.15 s), the sound continues and Resound presses push-to-talk again, so others hear the rest of it.
+
+Press the key again within that moment and the sound stays paused. Holding a pause key at the same time keeps the sound paused until you let go of both.
+
+With the switch off, your key is just a key: but when you let go of it while a sound plays, many games end push-to-talk, and the rest of the sound isn't heard until the next one starts. The switch shows under **Options** while Resound holds push-to-talk for sounds.
 
 Keys not working in a game? See [Keys don't work in a game](keys-in-games.md).

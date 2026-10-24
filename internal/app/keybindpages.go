@@ -164,6 +164,12 @@ func (a *App) keyOptionRows() []ui.Row {
 			"Off: Resound never presses push-to-talk for sounds. Talk-through on the phone always holds it.",
 			a.cfg.PushToTalkWhilePlaying, a.togglePTTWhilePlaying),
 	}
+	if a.anyPTT() && a.cfg.PushToTalkWhilePlaying {
+		rows = append(rows, ui.ToggleInfo("My push-to-talk pauses sounds",
+			"Hold your push-to-talk key yourself while sounds play: they pause so you can talk. "+
+				"Letting go resumes them, and Resound presses push-to-talk again, as your release ended it in the game.",
+			!a.cfg.NoPushToTalkPauses, a.togglePTTPauses))
+	}
 	if a.anyPTT() && a.keys.Hotkeys() {
 		rows = append(rows, ui.ToggleInfo("Let go of push-to-talk first",
 			"While sounds hold push-to-talk, a pause or stop key waits a moment for Resound to let go of it, "+

@@ -274,7 +274,7 @@ func (a *App) tick() bool {
 // phone, a hotkey), so a badge never outlives its state.
 func (a *App) heldKey() string {
 	pb := &a.playback
-	return fmt.Sprintf("%s|%v|%v%v%v", pb.mutedMic, a.ptt.pressed, pb.pausedActive, pb.talkLive, pb.holdLive)
+	return fmt.Sprintf("%s|%v|%v%v%v%v", pb.mutedMic, a.ptt.pressed, pb.pausedActive, pb.talkLive, pb.holdLive, a.ptt.userTalk)
 }
 
 // --- building the flow -------------------------------------------------------------
@@ -359,6 +359,9 @@ func (a *App) audioFlow() ui.AudioFlow {
 		switch {
 		case pb.talkLive:
 			label, tip = "Talking", "Talk-through: the sounds pause while you talk, push-to-talk stays held."
+		case pb.holdLive && a.ptt.userTalk:
+			label, tip = "You talk", "The sounds pause while you hold your push-to-talk key. Letting go resumes them, and Resound presses push-to-talk again. Click for the keys."
+			onClick = func() { a.openPage(pageKeys) }
 		case pb.holdLive:
 			label, tip = "Pause key held", "The sounds pause while you hold a pause key, and your mic and push-to-talk are let go. Click for the keys."
 			onClick = func() { a.openPage(pageKeys) }

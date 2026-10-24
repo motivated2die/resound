@@ -17,6 +17,12 @@ const (
 	pttTalk     = "talk"
 )
 
+// pressKeys and releaseKeys send push-to-talk keys; tests record them instead.
+var (
+	pressKeys   = input.Press
+	releaseKeys = input.Release
+)
+
 // pttState is UI-thread state.
 type pttState struct {
 	reasons map[string]bool
@@ -34,6 +40,13 @@ type pttState struct {
 
 	sendIn  int       // seconds until "send to game" taps the keys; 0 = idle
 	sendFor keyTarget // whose keys it sends
+
+	// userTalk: the user holds one of the push-to-talk keys themselves
+	// (onTalk). The keys are theirs meanwhile: Resound neither presses nor
+	// releases them. talkGen tells one talk from the next.
+	userTalk bool
+	talkGen  int
+	pauseKey bool // a pause key is held (onPauseKey)
 }
 
 func (p *pttState) init() {
@@ -63,6 +76,7 @@ func pttUnion(keys [][]uint16) input.Combo {
 // setPTT adds or removes a reason and presses/releases the keys when the
 // first reason appears or the last one goes away.
 func (a *App) setPTT(reason string, on bool) {
+	a.catchUpTalk()
 	a.reclaimPTT()
 	defer a.lendPTT()
 	p := &a.ptt
@@ -72,13 +86,15 @@ func (a *App) setPTT(reason string, on bool) {
 		delete(p.reasons, reason)
 	}
 	switch {
+	case len(p.reasons) > 0 && p.pressed == nil && p.userTalk:
+		// The user holds the keys: pressed again once they let go (afterTalk).
 	case len(p.reasons) > 0 && p.pressed == nil:
 		held := a.pttCombos()
 		keys := pttUnion(held)
 		if len(keys) == 0 {
 			return
 		}
-		if err := input.Press(keys); err != nil {
+		if err := pressKeys(keys); err != nil {
 			logx.Printf("push-to-talk press: %v", err)
 		}
 		p.pressed, p.held = keys, held
@@ -93,8 +109,9 @@ func (a *App) setPTT(reason string, on bool) {
 // of the keys no longer wanted and presses the new ones. Keys in both stay
 // down, so a key both apps use never bounces.
 func (a *App) syncPTTKeys() {
+	a.catchUpTalk()
 	p := &a.ptt
-	if len(p.reasons) == 0 {
+	if len(p.reasons) == 0 || p.userTalk {
 		return
 	}
 	a.reclaimPTT()
@@ -116,10 +133,10 @@ func (a *App) syncPTTKeys() {
 			down = append(down, vk)
 		}
 	}
-	if err := input.Release(up); err != nil {
+	if err := releaseKeys(up); err != nil {
 		logx.Printf("push-to-talk release: %v", err)
 	}
-	if err := input.Press(down); err != nil {
+	if err := pressKeys(down); err != nil {
 		logx.Printf("push-to-talk press: %v", err)
 	}
 	if len(keys) == 0 {
@@ -135,7 +152,7 @@ func (a *App) syncPTTKeys() {
 // as the user talks on Resound's channel then.
 func (a *App) lendPTT() {
 	p := &a.ptt
-	if p.lent || p.pressed == nil || a.hotkeys == nil || p.capturing || a.cfg.NoPushToTalkHandOver ||
+	if p.lent || p.pressed == nil || p.userTalk || a.hotkeys == nil || p.capturing || a.cfg.NoPushToTalkHandOver ||
 		len(p.reasons) != 1 || !p.reasons[pttPlayback] || !a.keys.Hotkeys() {
 		return
 	}
@@ -166,12 +183,13 @@ func (a *App) syncPTTLoan() {
 
 // releaseAllPTT lets go of the keys, whatever the reasons say.
 func (a *App) releaseAllPTT() {
+	a.catchUpTalk()
 	a.reclaimPTT()
 	p := &a.ptt
 	if p.pressed == nil {
 		return
 	}
-	if err := input.Release(p.pressed); err != nil {
+	if err := releaseKeys(p.pressed); err != nil {
 		logx.Printf("push-to-talk release: %v", err)
 	}
 	logx.Printf("push-to-talk up (%s)", keysText(p.held))
@@ -216,6 +234,7 @@ func (a *App) togglePTTWhilePlaying() {
 		a.setPTT(pttPlayback, false)
 	}
 	a.save()
+	a.applyHotkeys() // the user's push-to-talk pauses sounds only while Resound holds it for them
 	a.render()
 }
 
@@ -310,10 +329,11 @@ func (a *App) sendPTTToGame(t keyTarget) {
 // tapPTT presses and releases keys once (about 150 ms), unless push-to-talk
 // is held for playback or talk-through.
 func (a *App) tapPTT(keys input.Combo) {
-	if a.ptt.pressed != nil {
+	a.catchUpTalk()
+	if a.ptt.pressed != nil || a.ptt.userTalk { // never under the user's own key
 		return
 	}
-	if err := input.Press(keys); err != nil {
+	if err := pressKeys(keys); err != nil {
 		logx.Printf("push-to-talk tap: %v", err)
 		return
 	}
@@ -321,7 +341,7 @@ func (a *App) tapPTT(keys input.Combo) {
 	time.AfterFunc(150*time.Millisecond, func() {
 		a.tray.Post(func() {
 			if a.ptt.pressed == nil { // playback may have taken over meanwhile
-				_ = input.Release(keys)
+				_ = releaseKeys(keys)
 			}
 		})
 	})

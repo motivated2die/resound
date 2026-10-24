@@ -92,6 +92,12 @@ type Config struct {
 	// sounds hold push-to-talk. By default the key waits for Resound to let
 	// go of push-to-talk first (input.Watcher.LendPTT).
 	NoPushToTalkHandOver bool `json:"noPushToTalkHandOver,omitempty"`
+	// NoPushToTalkPauses: the user's own presses of the push-to-talk keys
+	// Resound holds do nothing special. By default (false) holding one pauses
+	// the sounds like a pause key, and Resound presses push-to-talk again
+	// after it is let go (app.onTalk): the user's release has ended it in the
+	// game.
+	NoPushToTalkPauses bool `json:"noPushToTalkPauses,omitempty"`
 	// NoUpdateCheck turns off the automatic check for new releases on
 	// GitHub ("Check now" still works).
 	NoUpdateCheck bool `json:"noUpdateCheck,omitempty"`
