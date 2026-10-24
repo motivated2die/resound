@@ -15,7 +15,7 @@ Each function has a card: **Push-to-talk**, **Pause** and **Stop**. The **Global
 | **+** | Records a key: press a key, a combination (such as <kbd>Ctrl</kbd> + <kbd>F</kbd>) or a mouse button. Or choose one from the list that opens. <kbd>Esc</kbd> or **✕** cancels |
 | **✕** on a key | Removes that key |
 | ⓘ | Says what the function does |
-| A greyed-out card | No key set: the function is off |
+| A greyed-out, flat card | No key set: the function is off |
 
 The ⓘ next to each function and option explains it in a sentence; **Help** at the top opens this article.
 

@@ -21,7 +21,6 @@ type KeybindSpec struct {
 	Inherited bool     // Keys are the global ones, shown in an app's card: muted, not removable
 	Off       bool     // the function is off in this app; Keys are empty
 	OffLabel  string   // the chip for Off, e.g. "None: off in this app"
-	Empty     string   // shown without keys, e.g. "Not set"
 
 	Recording bool     // waiting for a key or mouse button
 	Pressed   string   // what was pressed so far while recording, "" for nothing yet
@@ -90,7 +89,6 @@ const (
 	kbChipInherited
 	kbChipOff
 	kbChipRecording
-	kbChipEmpty
 )
 
 // kbLayout is where everything of a card goes, in device pixels.
@@ -118,7 +116,7 @@ func (k keybindRow) chips() []kbChip {
 		}
 		return []kbChip{{text: s.OffLabel, style: kbChipOff, removes: removes}}
 	case len(s.Keys) == 0:
-		return []kbChip{{text: s.Empty, style: kbChipEmpty, removes: -2}}
+		return nil // the greyed-out card says it: it collapses to its header
 	}
 	chips := make([]kbChip, len(s.Keys))
 	for i, name := range s.Keys {
@@ -191,9 +189,6 @@ func (k keybindRow) layout(c *canvas, r rect) kbLayout {
 		if ch.removes != -2 {
 			w += c.px(kbChipXL) - c.px(kbChipPadL)/2
 		}
-		if ch.style == kbChipEmpty {
-			w = c.textWidth(ch.text, fontBody) + c.px(2)
-		}
 		w = min(w, areaR-areaL)
 		if x > areaL && x+w > areaR {
 			x, y = areaL, y+chipH+gap
@@ -204,7 +199,10 @@ func (k keybindRow) layout(c *canvas, r rect) kbLayout {
 		}
 		x += w + gap
 	}
-	y += chipH
+	collapsed := len(l.chips) == 0
+	if !collapsed {
+		y += chipH
+	}
 
 	if s.Recording {
 		if s.Hint != "" {
@@ -219,15 +217,22 @@ func (k keybindRow) layout(c *canvas, r rect) kbLayout {
 	}
 	if s.Note != "" {
 		h := c.wrapHeight(s.Note, areaR-areaL, fontBody)
+		if collapsed {
+			y -= gap // right under the header
+		}
 		l.note = rect{areaL, y + gap, areaR, y + gap + h}
 		y = l.note.Bottom
+		collapsed = false
 	}
 	l.box.Bottom = y + c.px(kbBottomL)
+	if collapsed {
+		l.box.Bottom = y // the header alone, its contents centred
+	}
 	l.height = l.box.Bottom + c.px(kbMarginL) - r.Top
 	return l
 }
 
-func (keybindRow) height() int { return kbMarginL*2 + kbHeaderL + kbChipL + kbBottomL }
+func (keybindRow) height() int { return kbMarginL*2 + kbHeaderL }
 
 func (k keybindRow) measure(c *canvas, width int32) int32 {
 	return k.layout(c, rect{0, 0, width, 0}).height
@@ -398,9 +403,6 @@ func (k keybindRow) paint(c *canvas, r rect, st rowState) {
 		case kbChipRecording:
 			c.frame(ch.box, chipR, shade(bg, -4), colAccent)
 			col = colAccent
-		case kbChipEmpty:
-			text = ch.box
-			col = colMuted
 		}
 		c.text(ch.text, text, fontBody, col, dtLeft)
 		if ch.del != (rect{}) {

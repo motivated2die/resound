@@ -29,9 +29,8 @@ func (a *App) keysSummary() (string, ui.Tone) {
 func (a *App) keysPage() []ui.Row {
 	rows := []ui.Row{
 		ui.HeaderButton("Keybinds", a.back, ui.IconHelp, "Help", "How keybinds work: opens the help article", func() { a.openHelpAt(helpKeybinds) }),
-		ui.Paragraph("Keys and mouse buttons that work in any game. Click + to add one.", ui.ToneMuted),
 		ui.Section("Global"),
-		ui.Paragraph("These keys work in every app, unless an app below has its own.", ui.ToneMuted),
+		ui.Paragraph("Keys and mouse buttons that work in every game and app, unless an app below has its own. Click + to add one.", ui.ToneMuted),
 	}
 	rows = append(rows, a.keybindCards("")...)
 	rows = append(rows, a.appListRows()...)
@@ -76,19 +75,17 @@ func (a *App) keybindCard(t keyTarget) ui.Row {
 	p := &a.ptt
 	s := ui.KeybindSpec{
 		ID: fmt.Sprintf("keys-%s-%d", t.app, t.fn), Icon: keyIcon(t.fn), Title: t.fn.title(), Info: keyInfo(t.fn),
-		Empty: "Not set", OffLabel: "None: off in this app", AddTip: "Add a key or mouse button",
+		OffLabel: "None: off in this app", AddTip: "Add a key or mouse button",
 	}
 	for _, k := range kb.keys {
 		s.Keys = append(s.Keys, input.Combo(k).String())
 	}
 	switch {
-	case t.fn == fnOverlay:
-		s.Empty = "No key: the overlay is off"
 	case t.app == "":
 	case kb.off:
 		s.Off, s.OnReset = true, func() { a.resetKeys(t) }
 	case !kb.own:
-		s.Inherited, s.Scope, s.Empty = true, "Global", "Not set globally"
+		s.Inherited, s.Scope = true, "Global"
 		s.AddTip = "Give " + a.appName(t.app) + " its own keys: they replace the global ones there"
 	default:
 		s.OnReset, s.ResetTip = func() { a.resetKeys(t) }, "Use the global keys again"
