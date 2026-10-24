@@ -17,7 +17,7 @@ Each function has a card: **Push-to-talk**, **Pause** and **Stop**. The **Global
 | ⓘ | Says what the function does |
 | A greyed-out card | No key set: the function is off |
 
-The ⓘ next to each heading and option explains it in a sentence; the **?** at the top opens this article.
+The ⓘ next to each function and option explains it in a sentence; **Help** at the top opens this article.
 
 ## Set your game's push-to-talk key
 
@@ -60,7 +60,7 @@ For each function, the app either:
 
 - **keeps the global keys** (nothing set: the card says *Global*),
 - **has its own keys**, which replace the global ones in that app, or
-- has **None**: choose it at the top of the list while recording, and the function is off in that app.
+- has **None**: click **⊘** on its card (or choose None at the top of the list while recording), and the function is off in that app.
 
 The **↺** arrow on a card goes back to the global keys. Only the functions you set change; everything else keeps working as everywhere else.
 

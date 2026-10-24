@@ -57,6 +57,8 @@ const (
 	IconPause        Icon = "player-pause"
 	IconPencil       Icon = "pencil"
 	IconPlay         Icon = "player-play"
+	IconPlus         Icon = "plus"
+	IconBan          Icon = "ban"
 	IconPower        Icon = "power"
 	IconUnplugged    Icon = "plug-connected-x"
 	IconRefresh      Icon = "refresh"

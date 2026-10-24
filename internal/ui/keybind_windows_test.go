@@ -6,16 +6,16 @@ func testKeybinds() []Row {
 	presets := []Option{{Label: "None", Detail: "off in this app"}, {Label: "Pause", Detail: "rarely used"}, {Label: "Mouse 4", Detail: "mouse"}}
 	noop, remove := func() {}, func(int) {}
 	return []Row{
-		SectionInfo("Global", "These keys work in every app, unless an app below has its own."),
+		Section("Global"),
 		Keybind(KeybindSpec{ID: "ptt", Icon: IconMic, Title: "Push-to-talk", Info: "Resound holds it while sounds play.",
 			Keys: []string{"Pause", "Ctrl + Mouse 5"}, Empty: "Not set", OnAdd: noop, AddTip: "Add a key", OnRemove: remove}),
 		Keybind(KeybindSpec{ID: "pause", Icon: IconPause, Title: "Pause", Info: "Hold to pause.",
 			Empty: "No key: click + to add one", OnAdd: noop}),
 		Keybind(KeybindSpec{ID: "stop", Icon: IconStop, Title: "Stop", Info: "Stops all sounds.", Recording: true, Pressed: "Left Ctrl",
 			Hint: "Mouse buttons 3–5 too, over this panel. Esc cancels.", Presets: presets, OnPreset: remove, OnCancel: noop}),
-		SectionInfo("Valorant", "Its own keys replace the global ones while it is in front."),
+		Section("Valorant"),
 		Keybind(KeybindSpec{ID: "app-ptt", Icon: IconMic, Title: "Push-to-talk", Info: "i", Scope: "Global",
-			Keys: []string{"Pause"}, Inherited: true, Empty: "Not set", OnAdd: noop}),
+			Keys: []string{"Pause"}, Inherited: true, Empty: "Not set", OnAdd: noop, OnOff: noop}),
 		Keybind(KeybindSpec{ID: "app-pause", Icon: IconPause, Title: "Pause", Info: "i", Keys: []string{"Mouse 4", "V", "Left Alt + Numpad 0", "Scroll Lock"},
 			OnAdd: noop, OnRemove: remove, OnReset: noop, ResetTip: "Use the global keys"}),
 		Keybind(KeybindSpec{ID: "app-stop", Icon: IconStop, Title: "Stop", Info: "i", Off: true, OffLabel: "None: off in this app",

@@ -38,6 +38,8 @@ type KeybindSpec struct {
 	OnRemove func(i int) // a key's remove button; nil: none
 	OnReset  func()      // back to the global keys (an app's own keys or Off); nil hides it
 	ResetTip string
+	OnOff    func() // turns the function off in this app, left of the add tool; nil hides it
+	OffTip   string
 
 	Tool    Icon   // a further tool left of the others, e.g. push-to-talk's "send to game"; "" for none
 	ToolTip string // its tooltip
@@ -57,6 +59,7 @@ const (
 	kbSegCancel
 	kbSegField
 	kbSegTool
+	kbSegOff
 	kbSegChips
 )
 
@@ -93,7 +96,7 @@ const (
 // kbLayout is where everything of a card goes, in device pixels.
 type kbLayout struct {
 	box, icon, title, info, scope rect
-	add, reset, cancel, tool      rect
+	add, off, reset, cancel, tool rect
 	chips                         []kbChip
 	hint, field, note             rect
 	height                        int32 // the row's
@@ -153,6 +156,7 @@ func (k keybindRow) layout(c *canvas, r rect) kbLayout {
 		l.cancel = place(s.OnCancel != nil)
 	} else {
 		l.add = place(s.OnAdd != nil)
+		l.off = place(s.OnOff != nil && !s.Off)
 		l.reset = place(s.OnReset != nil && !s.Off)
 		l.tool = place(s.Tool != "")
 	}
@@ -235,7 +239,7 @@ func (k keybindRow) segments(c *canvas, r rect) []rect {
 	if k.s.OnTool == nil {
 		tool = rect{}
 	}
-	segs := []rect{l.info, l.add, l.reset, l.cancel, l.field, tool}
+	segs := []rect{l.info, l.add, l.reset, l.cancel, l.field, tool, l.off}
 	for _, ch := range l.chips {
 		segs = append(segs, ch.del)
 	}
@@ -253,6 +257,8 @@ func (k keybindRow) click(seg int) {
 		s.OnCancel()
 	case seg == kbSegTool && s.OnTool != nil:
 		s.OnTool()
+	case seg == kbSegOff && s.OnOff != nil:
+		s.OnOff()
 	case seg >= kbSegChips:
 		chips := k.chips()
 		if i := seg - kbSegChips; i < len(chips) {
@@ -291,6 +297,8 @@ func (k keybindRow) tip(c *canvas, r rect, seg int) string {
 		return "Cancel (Esc)"
 	case kbSegTool:
 		return s.ToolTip
+	case kbSegOff:
+		return s.OffTip
 	}
 	if i := seg - kbSegChips; i >= 0 {
 		if chips := k.chips(); i < len(chips) {
@@ -347,7 +355,8 @@ func (k keybindRow) paint(c *canvas, r rect, st rowState) {
 		}
 		paint(colText)
 	}
-	paintTool(kbSegAdd, l.add, func(col uint32) { c.text("+", l.add, fontTitle, col, dtCenter) })
+	paintTool(kbSegAdd, l.add, func(col uint32) { c.icon(IconPlus, l.add, 18, col) })
+	paintTool(kbSegOff, l.off, func(col uint32) { c.icon(IconBan, l.off, 16, col) })
 	paintTool(kbSegReset, l.reset, func(col uint32) { c.icon(IconRestore, l.reset, 16, col) })
 	paintTool(kbSegCancel, l.cancel, func(col uint32) { c.icon(IconClose, l.cancel, 16, col) })
 	if s.Tool != "" {
@@ -412,46 +421,6 @@ func (k keybindRow) paint(c *canvas, r rect, st rowState) {
 	if l.note != (rect{}) {
 		c.textWrapped(s.Note, l.note, fontBody, s.NoteTone.color())
 	}
-}
-
-// --- Section caption with an info icon -------------------------------------
-
-type sectionInfoRow struct{ text, info string }
-
-// SectionInfo is a Section caption with an info icon after it, whose
-// tooltip says more.
-func SectionInfo(text, info string) Row { return sectionInfoRow{text, info} }
-
-func (sectionInfoRow) height() int { return 28 }
-
-func (s sectionInfoRow) iconBox(c *canvas, r rect) rect {
-	in := inset(c, r)
-	x := in.Left + c.textWidth(upper(s.text), fontCaption) + c.px(4)
-	size := c.px(18)
-	top := r.Top + c.px(8) + (r.Bottom-r.Top-c.px(8)-size)/2
-	return rect{x, top, x + size, top + size}
-}
-
-func (s sectionInfoRow) segments(c *canvas, r rect) []rect {
-	return []rect{s.iconBox(c, r)}
-}
-func (sectionInfoRow) click(int)       {}
-func (sectionInfoRow) keepsOpen() bool { return true }
-func (s sectionInfoRow) tip(_ *canvas, _ rect, seg int) string {
-	if seg == 0 {
-		return s.info
-	}
-	return ""
-}
-func (s sectionInfoRow) paint(c *canvas, r rect, st rowState) {
-	in := inset(c, r)
-	in.Top += c.px(8)
-	c.text(upper(s.text), in, fontCaption, colCaption, dtLeft)
-	col := colCaption
-	if st.hover == 0 {
-		col = colText
-	}
-	c.icon(IconInfo, s.iconBox(c, r), 13, col)
 }
 
 // --- Toggle with an info icon ------------------------------------------------

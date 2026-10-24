@@ -3,6 +3,7 @@ package app
 import (
 	"fmt"
 	"slices"
+	"strings"
 
 	"github.com/motivated2die/resound/internal/config"
 	"github.com/motivated2die/resound/internal/input"
@@ -12,7 +13,8 @@ import (
 // The Keybinds page: the global keys of each function as cards, then the
 // apps with keybinds of their own (each opens a page with the same cards
 // for that app) and a list of running apps to add one, then two options.
-// Texts stay short; the info icons and the help article say more.
+// Texts stay short: a line or two under each section; the info icons and
+// the help article say more.
 
 func (a *App) keysSummary() (string, ui.Tone) {
 	if keys := a.globalKeys(fnPTT); len(keys) > 0 {
@@ -26,9 +28,10 @@ func (a *App) keysSummary() (string, ui.Tone) {
 
 func (a *App) keysPage() []ui.Row {
 	rows := []ui.Row{
-		ui.HeaderTool("Keybinds", a.back, ui.IconHelp, "How keybinds work: opens the help article", func() { a.openHelpAt(helpKeybinds) }),
+		ui.HeaderButton("Keybinds", a.back, ui.IconHelp, "Help", "How keybinds work: opens the help article", func() { a.openHelpAt(helpKeybinds) }),
 		ui.Paragraph("Keys and mouse buttons that work in any game. Click + to add one.", ui.ToneMuted),
-		ui.SectionInfo("Global", "These keys work in every app, except where an app below has keys of its own."),
+		ui.Section("Global"),
+		ui.Paragraph("These keys work in every app, unless an app below has its own.", ui.ToneMuted),
 	}
 	rows = append(rows, a.keybindCards("")...)
 	rows = append(rows, a.appListRows()...)
@@ -97,6 +100,9 @@ func (a *App) keybindCard(t keyTarget) ui.Row {
 	if !p.capturing && !full {
 		s.OnAdd = func() { a.startCapture(t) }
 	}
+	if t.app != "" && !kb.off && !p.capturing {
+		s.OnOff, s.OffTip = func() { a.setKeysOff(t) }, "Turn "+strings.ToLower(t.fn.title())+" off in "+a.appName(t.app)
+	}
 	if t.fn == fnPTT && len(kb.keys) > 0 {
 		s.Tool, s.ToolTip = ui.IconKeyboard, fmt.Sprintf("Send to game in %d s: Resound presses these keys while you click the game's keybind field", pttSendDelay)
 		if a.ptt.sendIn == 0 {
@@ -125,9 +131,10 @@ func (a *App) keybindCard(t keyTarget) ui.Row {
 // appListRows are the apps with keybinds of their own, each opening its
 // page, and the running apps to add one from.
 func (a *App) appListRows() []ui.Row {
-	rows := []ui.Row{ui.SectionInfo("App keybinds",
-		"Give a game keys of its own. While it is in the foreground, its keys replace the global ones of each function you set there; "+
-			"the other functions keep the global keys. Choose None to turn a function off in that app.")}
+	rows := []ui.Row{
+		ui.Section("App keybinds"),
+		ui.Paragraph("Give a game keys of its own. They replace the global ones while it's in front; functions you leave alone keep the global keys.", ui.ToneMuted),
+	}
 	for i := range a.cfg.AppKeybinds {
 		e := &a.cfg.AppKeybinds[i]
 		detail, tone := overrideSummary(e), ui.ToneMuted
@@ -211,9 +218,9 @@ func (a *App) appKeysPage() []ui.Row {
 			),
 			ui.Separator())
 	}
-	rows = append(rows, ui.SectionInfo("While it is in the foreground",
-		"Each function keeps the global keys until you give it keys of its own here with +. "+
-			"While recording, None in the list turns the function off in this app; the arrow goes back to the global keys."))
+	rows = append(rows,
+		ui.Section("While it is in the foreground"),
+		ui.Paragraph("Each function keeps the global keys until you add its own. ⊘ turns it off here, ↺ brings the global keys back.", ui.ToneMuted))
 	rows = append(rows, a.keybindCards(exe)...)
 	return append(rows, ui.Spacer(4))
 }
