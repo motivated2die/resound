@@ -5,8 +5,14 @@ Resound's controls on the PC live in a panel that opens from its tray icon, next
 ## Open and close it
 
 - **Open:** click the tray icon, or start Resound again from the Start Menu. From the phone app, a long press on the logo in the bottom bar opens or closes it.
-- **Close:** the **✕ CLOSE** tab above the panel, <kbd>Esc</kbd>, or the tray icon. <kbd>Esc</kbd> first goes back one page.
-- **Quick menu:** right-click the tray icon for **Show panel** and **Quit**, whatever page the panel is on.
+- **Close:** **✕ CLOSE** on the tab above the panel, <kbd>Esc</kbd>, or the tray icon. <kbd>Esc</kbd> first goes back one page, as does your mouse's back button (which never closes the panel).
+- **Quick menu:** right-click the tray icon for **Show panel**, **Quit** and **Reset panel position**, whatever page the panel is on.
+
+## Move it
+
+The panel opens next to the tray icon. If it covers something you need, drag it by **DRAG TO MOVE** on its tab to anywhere on your screens. It opens there from then on, also after a restart, and always stays fully on screen.
+
+To put it back next to the tray icon, double-click **DRAG TO MOVE**, or right-click the tray icon and choose **Reset panel position**. If the screen you moved it to is unplugged, the panel opens next to the tray icon until that screen is back.
 
 The panel stays open when you click into another window, so you can drag folders from Explorer or sounds from your browser onto it. It reopens on the page you left.
 

@@ -95,6 +95,7 @@ const (
 	wmContextMenu            = 0x007B
 	waInactive               = 0
 	vkEscape                 = 0x1B
+	vkBrowserBack            = 0xA6
 	vkReturn                 = 0x0D
 	vkUp                     = 0x26
 	vkDown                   = 0x28

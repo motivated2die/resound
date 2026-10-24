@@ -420,6 +420,7 @@ func (h headerRow) click(int) {
 	}
 }
 func (headerRow) keepsOpen() bool { return true }
+func (h headerRow) back() bool    { return runBack(h.onBack) }
 func (h headerRow) paint(c *canvas, r rect, st rowState) {
 	back := h.segments(c, r)[0]
 	paintBack(c, back, st)
@@ -468,6 +469,16 @@ func (h headerToolRow) click(seg int) {
 	}
 }
 func (headerToolRow) keepsOpen() bool { return true }
+func (h headerToolRow) back() bool    { return runBack(h.onBack) }
+
+// runBack runs a header's back button for Popup.back, if it has one.
+func runBack(onBack func()) bool {
+	if onBack == nil {
+		return false
+	}
+	onBack()
+	return true
+}
 
 func (h headerToolRow) tip(_ *canvas, _ rect, seg int) string {
 	if seg == 1 {

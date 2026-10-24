@@ -442,6 +442,7 @@ func (h wizardHeaderRow) click(int) {
 	}
 }
 func (wizardHeaderRow) keepsOpen() bool { return true }
+func (h wizardHeaderRow) back() bool    { return runBack(h.onBack) }
 func (h wizardHeaderRow) paint(c *canvas, r rect, st rowState) {
 	in := inset(c, r)
 	left := in.Left

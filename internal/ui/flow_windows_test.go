@@ -96,25 +96,25 @@ func renderRows(t *testing.T, rows []Row, scale float64, states map[int]rowState
 	})
 }
 
-// TestCloseTabRender draws the top of the panel with its close tab peeking
-// out above, over a desktop-coloured background.
-func TestCloseTabRender(t *testing.T) {
+// TestPanelTabRender draws the top of the panel with its tab peeking out
+// above, over a desktop-coloured background: nothing hovered, the handle,
+// and Close.
+func TestPanelTabRender(t *testing.T) {
 	rows := testFlow().Rows()[:2]
 	for _, scale := range []float64{1, 1.5} {
-		for _, hover := range []bool{false, true} {
+		for _, hover := range []int{-1, tabHandle, tabClose} {
 			m := &canvas{scale: scale}
 			heights, total := rowsHeight(m, rows)
-			tabW, tabH := m.px(closeTabWL), m.px(closeTabHL)
+			tabW, tabH := m.px(popupWidthL), m.px(panelTabHL)
 			margin := m.px(16)
-			top := margin + tabH - m.px(closeTabUnderL) // the popup's top
+			top := margin + tabH - m.px(panelTabUnderL) // the popup's top
 			w, h := m.px(popupWidthL)+2*margin, top+total+m.px(popupPadL)
 			img := renderCanvas(t, w, h, scale, func(c *canvas) {
 				c.fill(rect{0, 0, w, h}, rgb(0x5A, 0x6B, 0x7C))
 				// The tab, clipped to its rounded window region.
-				tab := &closeTab{w: tabW, h: tabH, hover: hover}
-				x := margin + c.px(popupWidthL) - c.px(closeTabInsetL) - tabW
-				restore := c.clipRound(rect{x, margin, x + tabW, margin + tabH}, c.px(20))
-				procSetViewportOrgEx.Call(c.dc, uintptr(x), uintptr(margin), 0)
+				tab := &panelTab{w: tabW, h: tabH, hover: hover, press: -1}
+				restore := c.clipRound(rect{margin, margin, margin + tabW, margin + tabH}, c.px(20))
+				procSetViewportOrgEx.Call(c.dc, uintptr(margin), uintptr(margin), 0)
 				tab.draw(c)
 				procSetViewportOrgEx.Call(c.dc, 0, 0, 0)
 				restore()
@@ -124,8 +124,11 @@ func TestCloseTabRender(t *testing.T) {
 				paintRows(c, rows, heights, margin, top+c.px(popupPadL), nil)
 			})
 			name := "panel-top"
-			if hover {
-				name += "-hover"
+			switch hover {
+			case tabHandle:
+				name += "-hover-handle"
+			case tabClose:
+				name += "-hover-close"
 			}
 			if scale != 1 {
 				name += "@1.5x"

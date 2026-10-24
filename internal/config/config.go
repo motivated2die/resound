@@ -98,6 +98,16 @@ type Config struct {
 	// OverlayLast is the sound last highlighted in the overlay, highlighted
 	// again when it opens. 0 = the middle one.
 	OverlayLast uint64 `json:"overlayLast,omitempty"`
+	// PanelPos is where the user moved the panel by its tab: its top left
+	// corner in screen pixels. nil = docked next to the tray icon. It is
+	// only used while that point is on a screen, kept inside its work area.
+	PanelPos *PanelPos `json:"panelPos,omitempty"`
+}
+
+// PanelPos is a position on the virtual screen, in pixels.
+type PanelPos struct {
+	X int32 `json:"x"`
+	Y int32 `json:"y"`
 }
 
 // Default returns the configuration used on first start.

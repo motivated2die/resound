@@ -46,6 +46,7 @@ const (
 	IconFolder       Icon = "folder"
 	IconFolderOpen   Icon = "folder-open"
 	IconFolderPlus   Icon = "folder-plus"
+	IconGrip         Icon = "grip-horizontal"
 	IconHandGrab     Icon = "hand-grab"
 	IconHelp         Icon = "help-circle"
 	IconInfo         Icon = "info-circle"
