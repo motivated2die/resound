@@ -13,10 +13,16 @@ import (
 // deliberate click here (or Esc, or the tray icon). The tab is a window of
 // its own, right below the popup in the z-order: the popup covers its lower
 // edge, so it looks tucked under the panel. It never takes the focus.
+//
+// Like the popup it is rounded by Windows 11 itself (anti-aliased, the same
+// radius), and it reaches far enough under the popup that its own lower
+// corners stay hidden behind the popup's rounded ones. Where Windows can't
+// round it (Windows 10, square popup), a window region rounds it.
 type panelTab struct {
-	hwnd  uintptr
-	popup *Popup
-	w, h  int32 // current size, device pixels
+	hwnd    uintptr
+	popup   *Popup
+	w, h    int32 // current size, device pixels
+	rounded bool  // Windows rounds its corners; else a region does
 
 	hover  int  // tabClose, tabHandle or -1
 	press  int  // the part pressed, -1 for none
@@ -28,9 +34,12 @@ type panelTab struct {
 }
 
 const (
-	panelTabClass  = "ResoundPanelTab"
-	panelTabHL     = 36
-	panelTabUnderL = 12 // the part hidden under the popup
+	panelTabClass = "ResoundPanelTab"
+	panelTabHL    = 48
+	// panelTabUnderL is the part hidden under the popup: more than both
+	// windows' corner radii (8), so no corner of the tab shows in the
+	// popup's rounded top corners.
+	panelTabUnderL = 24
 	panelTabPadL   = 12 // between the content and the tab's sides
 )
 
@@ -62,30 +71,36 @@ var (
 	procGetMessagePos    = user32.NewProc("GetMessagePos")
 )
 
-func newPanelTab(p *Popup) (*panelTab, error) {
+// newPanelTab creates the tab, owned by owner (the popup's shadow).
+func newPanelTab(p *Popup, owner uintptr) (*panelTab, error) {
 	t := &panelTab{popup: p, hover: -1, press: -1}
 	// CS_DBLCLKS: a double-click on the handle resets the position.
 	if err := registerClass(panelTabClass, csDblClks, windows.NewCallback(t.wndProc)); err != nil {
 		return nil, err
 	}
-	h, err := createWindow(wsExToolWindow|wsExTopmost|wsExNoActivate, wsPopup, panelTabClass)
+	h, err := createOwnedWindow(wsExToolWindow|wsExTopmost|wsExNoActivate, wsPopup, panelTabClass, owner)
 	if err != nil {
 		return nil, err
 	}
 	t.hwnd = h
+	t.rounded = roundCorners(h)
 	return t, nil
 }
 
 // visibleH is the height of the part above the popup, device pixels.
 func (t *panelTab) visibleH(c *canvas) int32 { return c.px(panelTabHL - panelTabUnderL) }
 
-// size sets the tab's size for a popup w wide, with its rounded region.
+// size sets the tab's size for a popup w wide, and its rounded region
+// where Windows doesn't round it.
 func (t *panelTab) size(c *canvas, w int32) {
 	h := c.px(panelTabHL)
 	if w == t.w && h == t.h {
 		return
 	}
 	t.w, t.h = w, h
+	if t.rounded {
+		return
+	}
 	radius := c.px(20)
 	rgn, _, _ := procCreateRoundRectRgn.Call(0, 0, uintptr(w+1), uintptr(h+1), uintptr(radius), uintptr(radius))
 	procSetWindowRgn.Call(t.hwnd, rgn, 1) // the window owns the region now
@@ -285,6 +300,10 @@ func (t *panelTab) draw(c *canvas) {
 	c.fill(rect{0, 0, t.w, t.h}, colControl)
 	vis := rect{0, 0, t.w, t.visibleH(c) + c.px(1)}
 	pad := c.px(panelTabPadL)
+	// Everything is centred on one line, the ESC keycap's: centring the
+	// labels in vis instead, an odd height away, put them a pixel lower.
+	kh := c.px(14)
+	line := rect{0, vis.Top + (vis.h()-kh)/2, t.w, vis.Top + (vis.h()-kh)/2 + kh}
 
 	// The handle.
 	fg := colMuted
@@ -292,9 +311,9 @@ func (t *panelTab) draw(c *canvas) {
 		fg = colText
 	}
 	iw := c.px(16)
-	c.icon(IconGrip, rect{pad, vis.Top, pad + iw, vis.Bottom}, 16, fg)
+	c.icon(IconGrip, rect{pad, line.Top, pad + iw, line.Bottom}, 16, fg)
 	x := pad + iw + c.px(6)
-	c.text(tabMoveLabel, rect{x, vis.Top, t.closeBox(c).Left, vis.Bottom}, fontSmall, fg, dtLeft)
+	c.text(tabMoveLabel, rect{x, line.Top, t.closeBox(c).Left, line.Bottom}, fontSmall, fg, dtLeft)
 
 	// Close, with a button face of its own.
 	box := t.closeBox(c)
@@ -309,13 +328,12 @@ func (t *panelTab) draw(c *canvas) {
 	c.roundRect(face, c.px(14), bg)
 	x = box.Right - pad - t.closeWidth(c)
 	cw := c.px(12)
-	c.icon(IconClose, rect{x, vis.Top, x + cw, vis.Bottom}, 12, colText)
+	c.icon(IconClose, rect{x, line.Top, x + cw, line.Bottom}, 12, colText)
 	x += cw + c.px(4)
 	tw := c.textWidth(tabCloseLabel, fontSmall)
-	c.text(tabCloseLabel, rect{x, vis.Top, x + tw + c.px(2), vis.Bottom}, fontSmall, colText, dtLeft)
+	c.text(tabCloseLabel, rect{x, line.Top, x + tw + c.px(2), line.Bottom}, fontSmall, colText, dtLeft)
 	x += tw + c.px(6)
-	kw, kh := t.keyWidth(c), c.px(14)
-	keycap := rect{x, vis.Top + (vis.h()-kh)/2, x + kw, vis.Top + (vis.h()-kh)/2 + kh}
+	keycap := rect{x, line.Top, x + t.keyWidth(c), line.Bottom}
 	c.roundRect(keycap, c.px(6), shade(bg, -22))
 	c.text(tabCloseKey, keycap, fontSmall, colMuted, dtCenter)
 }

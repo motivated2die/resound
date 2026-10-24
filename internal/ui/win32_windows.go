@@ -273,8 +273,14 @@ func registerClass(name string, style uint32, proc uintptr) error {
 }
 
 func createWindow(exStyle, style uint32, class string) (uintptr, error) {
+	return createOwnedWindow(exStyle, style, class, 0)
+}
+
+// createOwnedWindow creates a top-level window owned by owner: Windows
+// always keeps it above its owner and raises them together.
+func createOwnedWindow(exStyle, style uint32, class string, owner uintptr) (uintptr, error) {
 	h, _, err := procCreateWindowExW.Call(uintptr(exStyle), uintptr(unsafe.Pointer(utf16Ptr(class))), 0,
-		uintptr(style), 0, 0, 0, 0, 0, 0, moduleHandle(), 0)
+		uintptr(style), 0, 0, 0, 0, owner, 0, moduleHandle(), 0)
 	if h == 0 {
 		return 0, err
 	}
@@ -293,6 +299,17 @@ func InitDPIAwareness() {
 	if procSetProcessDpiAwarenessContext.Find() == nil {
 		procSetProcessDpiAwarenessContext.Call(dpiAwarenessPerMonitorV2)
 	}
+}
+
+// roundCorners asks Windows 11 to round a window's corners, smoothly, as
+// it does for its own windows. It returns false where it can't (Windows 10).
+func roundCorners(hwnd uintptr) bool {
+	if procDwmSetWindowAttribute.Find() != nil {
+		return false
+	}
+	pref := uint32(dwmwcpRound)
+	hr, _, _ := procDwmSetWindowAttribute.Call(hwnd, dwmwaWindowCornerPreference, uintptr(unsafe.Pointer(&pref)), 4)
+	return hr == 0
 }
 
 // monitorAt returns the work area and DPI scale of the monitor at pt.

@@ -4,6 +4,7 @@ package ui
 
 import (
 	"os"
+	"path/filepath"
 	"runtime"
 	"testing"
 	"unsafe"
@@ -11,7 +12,12 @@ import (
 	"golang.org/x/sys/windows"
 )
 
-var procEnumDisplayMonitors = user32.NewProc("EnumDisplayMonitors")
+var (
+	procEnumDisplayMonitors = user32.NewProc("EnumDisplayMonitors")
+	procGetWindow           = user32.NewProc("GetWindow")
+)
+
+const gwHwndNext = 2
 
 // screens lists every monitor's full rectangle.
 func screens() []rect {
@@ -99,6 +105,28 @@ func TestPanelMoveLive(t *testing.T) {
 
 	p.ShowAt(icon)
 	r := check("docked")
+	if dir := os.Getenv("RESOUND_RENDER_DIR"); dir != "" {
+		pad := p.canvas(0).px(24)
+		saveScreen(t, rect{r.Left - pad, r.Top - p.tab.h - pad, r.Right + pad, r.Top + p.canvas(0).px(80)}, filepath.Join(dir, "live-panel-top.png"))
+	}
+
+	// Raising the panel (a click activates it) brings its tab and shadow
+	// along: no other always-on-top window can come between them.
+	other, err := createWindow(wsExToolWindow|wsExTopmost|wsExNoActivate, wsPopup, shadowClass)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer procDestroyWindow.Call(other)
+	procSetWindowPos.Call(other, hwndTopmost, uintptr(r.Left), uintptr(r.Top-200), 100, 400, swpNoActivate|swpShowWindow)
+	procSetWindowPos.Call(p.hwnd, hwndTopmost, 0, 0, 0, 0, swpNoMove|swpNoSize|swpNoActivate)
+	pump(30e6)
+	if next, _, _ := procGetWindow.Call(p.hwnd, gwHwndNext); next != p.tab.hwnd {
+		t.Errorf("raised panel: the window below it is %#x, not its tab %#x", next, p.tab.hwnd)
+	}
+	if next, _, _ := procGetWindow.Call(p.tab.hwnd, gwHwndNext); next != p.shadow.hwnd {
+		t.Errorf("raised panel: the window below its tab is %#x, not its shadow %#x", next, p.shadow.hwnd)
+	}
+	procShowWindow.Call(other, swHide)
 	c := p.canvas(0)
 	if want := dockedPos(icon, primary, p.width, p.height, c.px(popupGapL), p.tab.visibleH(c)); r.Left != want.X || r.Top != want.Y {
 		t.Errorf("docked at %v, want %v", r, want)

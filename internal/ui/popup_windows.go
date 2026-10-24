@@ -152,24 +152,26 @@ func newPopup() (*Popup, error) {
 	if err := registerClass(popupClass, 0, windows.NewCallback(p.wndProc)); err != nil {
 		return nil, err
 	}
+	// The drop shadow is a window of its own (CS_DROPSHADOW is too faint),
+	// and so is the tab. They own each other in a chain, shadow → tab →
+	// popup, so Windows keeps them stacked in that order and raises them
+	// together: when a click raises the popup, nothing can come between it
+	// and its tab or shadow.
+	var err error
+	if p.shadow, err = newShadow(); err != nil {
+		return nil, err
+	}
+	if p.tab, err = newPanelTab(p, p.shadow.hwnd); err != nil {
+		return nil, err
+	}
 	// Child windows (a TextField's control) are clipped out of painting.
-	h, err := createWindow(wsExToolWindow|wsExTopmost, wsPopup|wsClipChildren, popupClass)
+	h, err := createOwnedWindow(wsExToolWindow|wsExTopmost, wsPopup|wsClipChildren, popupClass, p.tab.hwnd)
 	if err != nil {
 		return nil, err
 	}
 	p.hwnd = h
 	p.ole = registerDropTarget(p)
-	if procDwmSetWindowAttribute.Find() == nil { // rounded corners on Windows 11
-		pref := uint32(dwmwcpRound)
-		procDwmSetWindowAttribute.Call(h, dwmwaWindowCornerPreference, uintptr(unsafe.Pointer(&pref)), 4)
-	}
-	// The drop shadow is a window of its own (CS_DROPSHADOW is too faint).
-	if p.shadow, err = newShadow(); err != nil {
-		return nil, err
-	}
-	if p.tab, err = newPanelTab(p); err != nil {
-		return nil, err
-	}
+	roundCorners(h)
 	return p, nil
 }
 
@@ -300,8 +302,8 @@ func (p *Popup) layoutAndPlace() {
 	p.pos = p.target(docked)
 	r := rect{p.pos.X, p.pos.Y, p.pos.X + p.width, p.pos.Y + p.height}
 	procSetWindowPos.Call(p.hwnd, hwndTopmost, uintptr(r.Left), uintptr(r.Top), uintptr(p.width), uintptr(p.height), swpShowWindow)
-	p.shadow.place(p.hwnd, r, p.scale)
-	p.tab.place(r) // between the popup and its shadow
+	p.shadow.place(p.tab.hwnd, r, p.scale) // below the tab
+	p.tab.place(r)                         // below the popup
 	p.syncField()
 	procInvalidateRect.Call(p.hwnd, 0, 0)
 }

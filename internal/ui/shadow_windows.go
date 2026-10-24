@@ -47,8 +47,8 @@ func newShadow() (*shadow, error) {
 }
 
 // place shows the shadow around popup rectangle r (screen pixels), directly
-// beneath the popup.
-func (s *shadow) place(popup uintptr, r rect, scale float64) {
+// beneath window above (the popup, or the panel's tab).
+func (s *shadow) place(above uintptr, r rect, scale float64) {
 	if s == nil {
 		return
 	}
@@ -70,8 +70,8 @@ func (s *shadow) place(popup uintptr, r rect, scale float64) {
 	procSelectObject.Call(mem, old)
 	procDeleteDC.Call(mem)
 	procReleaseDC.Call(0, screen)
-	// Right below the popup, which is topmost; no activation.
-	procSetWindowPos.Call(s.hwnd, popup, 0, 0, 0, 0, swpNoMove|swpNoSize|swpNoActivate|swpShowWindow)
+	// Right below it (it is topmost); no activation.
+	procSetWindowPos.Call(s.hwnd, above, 0, 0, 0, 0, swpNoMove|swpNoSize|swpNoActivate|swpShowWindow)
 }
 
 // origin is the shadow window's top left corner around popup rectangle r.

@@ -45,10 +45,7 @@ func newTrayMenu(actions [3]Action) (*trayMenu, error) {
 		return nil, err
 	}
 	m.hwnd = h
-	if procDwmSetWindowAttribute.Find() == nil { // rounded corners on Windows 11, like the panel
-		pref := uint32(dwmwcpRound)
-		procDwmSetWindowAttribute.Call(h, dwmwaWindowCornerPreference, uintptr(unsafe.Pointer(&pref)), 4)
-	}
+	roundCorners(h) // like the panel
 	if m.shadow, err = newShadow(); err != nil {
 		return nil, err
 	}
