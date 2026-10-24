@@ -4,7 +4,7 @@ Play your favorites without leaving the game: one key slides a bar of your favor
 
 ## Turn it on
 
-1. Settings → **In-game overlay** → **Set key**, and press a key or a combination, for example <kbd>Alt</kbd> + <kbd>F1</kbd>. Keyboard keys only.
+1. Settings → **In-game overlay** → **+** on the **Overlay** card, and press a key, a combination or a mouse button (3–5), for example <kbd>Alt</kbd> + <kbd>F1</kbd> or Mouse 4.
 2. Choose the **Screen edge**: Left (default) or Right.
 3. Click **Show the overlay** to try it right there, without a game.
 
@@ -28,4 +28,4 @@ Your game keeps the focus all along. While the bar shows, only your key, <kbd>Es
 
 - The overlay shows on the main screen, over games in windowed, borderless and most fullscreen modes. A game in true “exclusive” fullscreen covers it: switch the game to borderless or windowed.
 - Games running as administrator don't let Resound see your keys. See [Keys don't work in a game](keys-in-games.md).
-- To turn the overlay off, click **Turn off** on its page.
+- To turn the overlay off, remove its key with **✕** on its page.

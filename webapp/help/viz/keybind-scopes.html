@@ -1,0 +1,31 @@
+<!-- Which keys work where: the global keys, an app's own (push-to-talk),
+     an app's None (pause) and a function it leaves alone (stop). The
+     switch sets data-mode (help.js), "other" (any other app) or "game";
+     each cell of the last column shows the keys of its mode (data-when). -->
+<div class="vk" data-mode="other" data-viz-modes="other game">
+    <div class="vd-toggle" role="group" aria-label="The app in front">
+        <button type="button" data-mode-set="other" aria-pressed="true">In Discord</button>
+        <button type="button" data-mode-set="game" aria-pressed="false">In Valorant</button>
+    </div>
+    <div class="vk-grid" role="img" aria-label="Global keys: push-to-talk Pause, pause Mouse 5, stop F9. Valorant has its own push-to-talk key, Mouse 4, its pause is set to None, and it keeps the global stop key. In Discord or any other app, Pause, Mouse 5 and F9 work. In Valorant, Mouse 4 is held for push-to-talk, there is no pause key, and F9 stops.">
+        <span class="vk-head"></span>
+        <span class="vk-head">Global</span>
+        <span class="vk-head vk-app">Valorant</span>
+        <span class="vk-head vk-now">Works now</span>
+
+        <span class="vk-fn"><span class="icon" data-icon="mic" aria-hidden="true"></span>Push-to-talk</span>
+        <span class="vk-cell vk-replaced"><kbd>Pause</kbd></span>
+        <span class="vk-cell vk-app"><kbd>Mouse 4</kbd></span>
+        <span class="vk-cell vk-now"><kbd data-when="other">Pause</kbd><kbd data-when="game">Mouse 4</kbd></span>
+
+        <span class="vk-fn"><span class="icon" data-icon="pause" aria-hidden="true"></span>Pause</span>
+        <span class="vk-cell vk-replaced"><kbd>Mouse 5</kbd></span>
+        <span class="vk-cell vk-app"><em class="vk-none">None</em></span>
+        <span class="vk-cell vk-now"><kbd data-when="other">Mouse 5</kbd><em data-when="game" class="vk-none">off</em></span>
+
+        <span class="vk-fn"><span class="icon" data-icon="stop" aria-hidden="true"></span>Stop</span>
+        <span class="vk-cell"><kbd>F9</kbd></span>
+        <span class="vk-cell vk-app"><em class="vk-keeps">global</em></span>
+        <span class="vk-cell vk-now"><kbd>F9</kbd></span>
+    </div>
+</div>

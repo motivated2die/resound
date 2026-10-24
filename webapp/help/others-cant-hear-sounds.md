@@ -6,7 +6,7 @@ You hear your sounds, but your friends in Discord or the game don't. Go through 
 - [ ] **Your app's microphone is CABLE Output.** In Discord: User Settings → Voice & Video → Input Device → **CABLE Output (VB-Audio Virtual Cable)**. The same in every game. This is the most common cause. See [Use Resound in Discord and games](apps.md).
 - [ ] **The bar under “Others hear” moves** when you play Test sound. If it doesn't: a marker on the line says why. **Elsewhere** means sounds for others go to another device (Settings → Audio & voice chat → Advanced → **Automatic: VB-Cable**); **Output failed** means click **Restart outputs**.
 - [ ] **The Others hear volume** isn't turned down to nothing.
-- [ ] **Push-to-talk:** if the game or Discord uses push-to-talk, set the same key in Resound and keep **Hold it while sounds play** on. See [Push-to-talk](push-to-talk.md).
+- [ ] **Push-to-talk:** if the game or Discord uses push-to-talk, set the same key in Resound (Settings → **Keybinds**) and keep **Hold push-to-talk while sounds play** on. See [Keybinds](push-to-talk.md).
 - [ ] **Voice processing and input sensitivity** let your sounds through. Discord's noise suppression and automatic sensitivity often cut sounds off. See [Sounds cut out in Discord](discord.md).
 - [ ] **The app was restarted after installing VB-Cable.** Some apps only see new devices after a restart.
 - [ ] **CABLE Output isn't muted in Windows.** Settings → Audio & voice chat → **Windows sound** → Recording tab → **CABLE Output** → Properties → Levels: not muted, at 100. Check **CABLE Input** on the Playback tab the same way.

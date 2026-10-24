@@ -436,12 +436,22 @@ type headerToolRow struct {
 	icon    Icon
 	tipText string
 	onTool  func()
+	label   string // HeaderButton: shown after the icon, on a button face
 }
 
 // HeaderTool is a Header with a square icon button at its right end, such
 // as a refresh button. tip is its tooltip; a nil onTool shows it disabled.
 func HeaderTool(title string, onBack func(), icon Icon, tip string, onTool func()) Row {
-	return headerToolRow{title, onBack, icon, tip, onTool}
+	return headerToolRow{title, onBack, icon, tip, onTool, ""}
+}
+
+// headerButtonIconL is the icon size on a HeaderButton.
+const headerButtonIconL = 20
+
+// HeaderButton is a HeaderTool whose button carries a label after its icon,
+// e.g. "Help", on a button face, so it reads as an action of the page.
+func HeaderButton(title string, onBack func(), icon Icon, label, tip string, onTool func()) Row {
+	return headerToolRow{title, onBack, icon, tip, onTool, label}
 }
 
 func (headerToolRow) height() int { return 46 }
@@ -449,7 +459,11 @@ func (headerToolRow) height() int { return 46 }
 func (h headerToolRow) tool(c *canvas, r rect) rect {
 	back := backButton(c, r)
 	in := inset(c, r)
-	return rect{in.Right - back.w(), back.Top, in.Right, back.Bottom}
+	w := back.w()
+	if h.label != "" {
+		w = c.px(headerButtonIconL) + c.px(6) + c.textWidth(h.label, fontBold) + 2*c.px(10)
+	}
+	return rect{in.Right - w, back.Top, in.Right, back.Bottom}
 }
 
 func (h headerToolRow) segments(c *canvas, r rect) []rect {
@@ -490,6 +504,15 @@ func (h headerToolRow) tip(_ *canvas, _ rect, seg int) string {
 func (h headerToolRow) paint(c *canvas, r rect, st rowState) {
 	back, tool := backButton(c, r), h.tool(c, r)
 	paintBack(c, back, st)
+	if h.label != "" {
+		paintButton(c, tool, "", "", ButtonNormal, h.onTool == nil, st.hover == 1, st.press == 1)
+		_, fg := buttonColors(ButtonNormal, h.onTool == nil, false, false)
+		icon := rect{tool.Left + c.px(10), tool.Top, tool.Left + c.px(10) + c.px(headerButtonIconL), tool.Bottom}
+		c.icon(h.icon, icon, headerButtonIconL, fg)
+		c.text(h.label, rect{icon.Right + c.px(6), tool.Top, tool.Right - c.px(8), tool.Bottom}, fontBold, fg, dtLeft)
+		c.text(h.title, headerTitle(c, r, back.Right+c.px(8), tool.Left-c.px(8)), fontTitle, colText, dtLeft)
+		return
+	}
 	switch {
 	case h.onTool == nil:
 	case st.press == 1:

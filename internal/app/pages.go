@@ -9,7 +9,6 @@ import (
 	"github.com/skip2/go-qrcode"
 
 	"github.com/motivated2die/resound/internal/audio"
-	"github.com/motivated2die/resound/internal/input"
 	"github.com/motivated2die/resound/internal/library"
 	"github.com/motivated2die/resound/internal/logx"
 	"github.com/motivated2die/resound/internal/ui"
@@ -43,6 +42,8 @@ func (a *App) rows() []ui.Row {
 		return a.diagnosticsPage()
 	case pageOverlay:
 		return a.overlayPage()
+	case pageAppKeys:
+		return a.appKeysPage()
 	}
 	return a.homePage()
 }
@@ -114,6 +115,9 @@ func (a *App) homePage() []ui.Row {
 	}
 	// While sounds play: what plays, with a thin progress bar (like the
 	// phone's top bar). Problems still have their own rows below.
+	if keys := a.runningKeysStatus(); keys != "" && len(issues) == 0 {
+		status = "Ready · " + keys // an app with keybinds of its own runs: they apply while it is in front
+	}
 	if text, ok := a.playingStatus(); ok {
 		status = text
 	}
@@ -182,6 +186,7 @@ func (a *App) openHelp() { a.openHelpAt("") }
 const (
 	helpOwnMixer      = "voicemeeter"
 	helpBeforeVBCable = "voicemeeter#before-you-install-vb-cable"
+	helpKeybinds      = "push-to-talk"
 )
 
 // openHelpAt opens one help article ("" = the help center's start page).
@@ -213,7 +218,7 @@ func (a *App) settingsPage() []ui.Row {
 	return []ui.Row{
 		ui.Header("Settings", func() { a.showPage(pageHome) }),
 		ui.Nav("Audio & voice chat", audioDetail, audioTone, func() { a.openPage(pageAudio) }),
-		ui.Nav("Push-to-talk", keys, keysTone, func() { a.openPage(pageKeys) }),
+		ui.Nav("Keybinds", keys, keysTone, func() { a.openPage(pageKeys) }),
 		ui.Nav("Sound library", lib, libTone, func() { a.openPage(pageLibrary) }),
 		ui.Nav("In-game overlay", overlayDetail, overlayTone, func() { a.openPage(pageOverlay) }),
 		ui.Nav("Remote App", remote, remoteTone, func() { a.openPage(pageRemote) }),
@@ -285,7 +290,7 @@ func (a *App) audioPage() []ui.Row {
 	rows = append(rows, ui.Section("While sounds play"))
 	rows = append(rows, a.muteMicRows()...)
 	keys, keysTone := a.keysSummary()
-	rows = append(rows, ui.Nav("Push-to-talk key", keys, keysTone, func() { a.openPage(pageKeys) }))
+	rows = append(rows, ui.Nav("Keybinds", keys, keysTone, func() { a.openPage(pageKeys) }))
 
 	rows = append(rows, ui.Section("Devices"))
 	if a.route.MicRouted && a.busy == "" {
@@ -402,42 +407,6 @@ func (a *App) voiceReady() bool {
 	return st.CableInstalled() && a.cableSelected() && (st.MicRouted || st.Mic == nil)
 }
 
-// --- push-to-talk -----------------------------------------------------------
-
-func (a *App) keysSummary() (string, ui.Tone) {
-	if len(a.cfg.PushToTalkKeys) == 0 {
-		return "Not set", ui.ToneMuted
-	}
-	return a.pttText(), ui.ToneGood
-}
-
-func (a *App) keysPage() []ui.Row {
-	rows := []ui.Row{ui.Header("Push-to-talk", a.back), a.pttIntro()}
-	rows = append(rows, a.pttRows()...)
-	rows = append(rows, a.hotkeyRows(capturePause)...)
-	rows = append(rows, a.hotkeyRows(captureStop)...)
-	rows = append(rows, a.handOverRows()...)
-	return append(rows, ui.Spacer(4))
-}
-
-// handOverRows is the switch for letting go of push-to-talk before a pause
-// or stop key reaches the game, shown while it can matter.
-func (a *App) handOverRows() []ui.Row {
-	if len(a.cfg.PushToTalkKeys) == 0 || len(a.cfg.PauseHotkeys) == 0 && len(a.cfg.StopHotkeys) == 0 {
-		return nil
-	}
-	return []ui.Row{
-		ui.Toggle("Let go of push-to-talk first", !a.cfg.NoPushToTalkHandOver, a.togglePTTHandOver),
-		ui.Paragraph("While sounds hold push-to-talk, a pause or stop key waits a moment for Resound to let go of it, "+
-			"so the game doesn't end your own push-to-talk too. Turn this off if a game ignores your key while sounds play.", ui.ToneMuted),
-	}
-}
-
-func (a *App) pttIntro() ui.Row {
-	return ui.Paragraph("Games with push-to-talk only send your voice while its key is held. "+
-		"Resound holds the key while sounds play, so others hear them.", ui.ToneMuted)
-}
-
 // connectRows offer to connect VB-Cable in one go (sounds into CABLE Input,
 // the microphone into the cable) while either is missing.
 func (a *App) connectRows() []ui.Row {
@@ -477,44 +446,6 @@ func (a *App) recheckCable() {
 	a.refreshDevices(true)
 	a.refreshRouting(true)
 	a.render()
-}
-
-func (a *App) pttRows() []ui.Row {
-	var rows []ui.Row
-	if a.ptt.capturing && a.ptt.target == capturePTT {
-		got := "…"
-		if len(a.ptt.captured) > 0 {
-			got = a.ptt.captured.String() + " …"
-		}
-		return append(rows,
-			ui.Text("Press your push-to-talk key", got, ui.ToneWarning),
-			ui.Text("Mouse buttons: press them over this panel. Esc cancels.", "", ui.ToneMuted))
-	}
-	presetOpts := make([]ui.Option, len(input.Presets))
-	for i, p := range input.Presets {
-		presetOpts[i] = ui.Option{Label: p.Keys.String(), Detail: p.Note}
-	}
-	rows = append(rows, ui.Dropdown("ptt-preset", "Pick a push to talk key", "Choose from these buttons or set your own…",
-		presetOpts, a.presetIndex(), a.choosePreset))
-	action := "Record"
-	if len(a.cfg.PushToTalkKeys) > 0 {
-		action = "Change"
-	}
-	rows = append(rows, ui.Item("Game push-to-talk key", a.pttText(), action, a.startPTTCapture))
-	if len(a.cfg.PushToTalkKeys) == 0 {
-		return rows
-	}
-	if a.ptt.sendIn > 0 {
-		rows = append(rows, ui.Text(fmt.Sprintf("Sending %s in %d…", a.pttText(), a.ptt.sendIn), "", ui.ToneWarning))
-	} else {
-		rows = append(rows, ui.Button(fmt.Sprintf("Send it to the game in %d s", pttSendDelay), ui.ButtonNormal, false, a.sendPTTToGame))
-	}
-	return append(rows,
-		ui.Text("Press, then click the game's keybind field.", "", ui.ToneMuted),
-		ui.Toggle("Hold it while sounds play", a.cfg.PushToTalkWhilePlaying, a.togglePTTWhilePlaying),
-		ui.Text("Talk-through on the phone always holds the PTT key.", "", ui.ToneMuted),
-		ui.Button("Remove push-to-talk key", ui.ButtonNormal, false, func() { a.setPTTKeys(nil) }),
-	)
 }
 
 // --- sound library ---------------------------------------------------------

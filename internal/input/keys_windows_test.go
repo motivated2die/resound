@@ -177,7 +177,6 @@ var (
 	procDefWindowProcW          = user32.NewProc("DefWindowProcW")
 	procShowWindow              = user32.NewProc("ShowWindow")
 	procSetForegroundWindow     = user32.NewProc("SetForegroundWindow")
-	procGetForegroundWindow     = user32.NewProc("GetForegroundWindow")
 	procRegisterRawInputDevices = user32.NewProc("RegisterRawInputDevices")
 	procGetRawInputData         = user32.NewProc("GetRawInputData")
 	procDispatchMessageW        = user32.NewProc("DispatchMessageW")
