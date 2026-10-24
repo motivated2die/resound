@@ -52,9 +52,9 @@ func (a *App) applyHotkeys() {
 		a.closeHotkeys()
 		a.hotkeyErr = ""
 	case a.hotkeys != nil:
-		a.hotkeys.SetBindings(b)
+		a.hotkeys.SetKeymap(input.Keymap{Global: b})
 	default:
-		w, err := input.StartWatcher(b, func(ev input.HotkeyEvent) {
+		w, err := input.StartWatcher(input.Keymap{Global: b}, func(ev input.HotkeyEvent) {
 			a.tray.Post(func() { a.onHotkey(ev) }) // the hook must not wait
 		})
 		if err != nil {

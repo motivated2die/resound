@@ -22,11 +22,11 @@ func TestMatcherPause(t *testing.T) {
 		want []HotkeyEvent
 	}{
 		{vkF, true, nil}, // F alone is not Ctrl+F
-		{vkRCtrl, true, []HotkeyEvent{{ActionPause, true, 0}}}, // right Ctrl counts as Ctrl
+		{vkRCtrl, true, []HotkeyEvent{{Action: ActionPause, Down: true}}}, // right Ctrl counts as Ctrl
 		{vkF, true, nil},  // auto-repeat
 		{vkG, true, nil},  // a second pause binding while already paused
 		{vkF, false, nil}, // G still holds the pause
-		{vkG, false, []HotkeyEvent{{ActionPause, false, 0}}},
+		{vkG, false, []HotkeyEvent{{Action: ActionPause, Down: false}}},
 		{vkRCtrl, false, nil},
 	}
 	for i, s := range steps {
@@ -39,7 +39,7 @@ func TestMatcherPause(t *testing.T) {
 func TestMatcherStopOncePerPress(t *testing.T) {
 	b := &Bindings{Stop: []Combo{{vkX}}}
 	var m Matcher
-	stop := []HotkeyEvent{{ActionStop, true, 0}}
+	stop := []HotkeyEvent{{Action: ActionStop, Down: true}}
 	if got := m.Key(b, vkX, true); !reflect.DeepEqual(got, stop) {
 		t.Fatalf("press = %v", got)
 	}
@@ -54,15 +54,103 @@ func TestMatcherStopOncePerPress(t *testing.T) {
 	}
 }
 
-func TestMatcherRebind(t *testing.T) {
+// A pause lasts while its keys are held, also when the bindings change
+// meanwhile (another app comes to the foreground, or the settings change):
+// it never ends early or bounces, and it ends with its keys' release.
+func TestMatcherPauseLatched(t *testing.T) {
 	var m Matcher
-	b := &Bindings{Pause: []Combo{{vkG}}}
-	m.Key(b, vkG, true)
-	if got := m.Eval(&Bindings{}); !reflect.DeepEqual(got, []HotkeyEvent{{ActionPause, false, 0}}) {
-		t.Fatalf("clearing the bindings while held = %v, want a pause release", got)
+	game := &Bindings{Pause: []Combo{{vkG}}, Stop: []Combo{{vkX}}}
+	other := &Bindings{Stop: []Combo{{vkG}}} // G is a stop key there
+	pause := []HotkeyEvent{{Action: ActionPause, Down: true}}
+	if got := m.Key(game, vkG, true); !reflect.DeepEqual(got, pause) {
+		t.Fatalf("G in the game = %v", got)
 	}
-	if got := m.Eval(nil); got != nil {
-		t.Fatalf("nil bindings = %v", got)
+	if got := m.Key(other, vkG, true); got != nil {
+		t.Fatalf("G repeating in the other app = %v, want nothing", got)
+	}
+	if got := m.Key(other, vkF, true); got != nil || !m.Paused() {
+		t.Fatalf("another key in the other app = %v, paused %v: the pause must last", got, m.Paused())
+	}
+	if got := m.Key(nil, vkF, false); got != nil {
+		t.Fatalf("F up = %v", got)
+	}
+	if got := m.Key(other, vkG, false); !reflect.DeepEqual(got, []HotkeyEvent{{Action: ActionPause}}) {
+		t.Fatalf("letting go of G = %v, want the pause to end", got)
+	}
+	if got := m.Key(other, vkG, true); !reflect.DeepEqual(got, []HotkeyEvent{{Action: ActionStop, Down: true}}) {
+		t.Fatalf("G pressed again in the other app = %v, want its stop", got)
+	}
+}
+
+// Keys held when the bindings change don't start anything: only a press
+// that completes a combination does.
+func TestMatcherOnlyPressesStart(t *testing.T) {
+	var m Matcher
+	none := &Bindings{}
+	b := &Bindings{Pause: []Combo{{vkLCtrl, vkF}}, Stop: []Combo{{vkX}}}
+	m.Key(none, vkLCtrl, true)
+	m.Key(none, vkF, true)
+	m.Key(none, vkX, true)
+	if got := m.Key(b, vkG, true); got != nil {
+		t.Fatalf("an unrelated press with Ctrl+F and X held = %v, want nothing", got)
+	}
+	if got := m.Key(b, vkF, true); got != nil {
+		t.Fatalf("F repeating = %v, want nothing", got)
+	}
+	m.Key(b, vkF, false)
+	if got := m.Key(b, vkF, true); !reflect.DeepEqual(got, []HotkeyEvent{{Action: ActionPause, Down: true}}) {
+		t.Fatalf("F pressed again = %v, want the pause", got)
+	}
+	if got := m.Key(nil, vkLCtrl, false); !reflect.DeepEqual(got, []HotkeyEvent{{Action: ActionPause}}) {
+		t.Fatalf("letting go of Ctrl = %v, want the pause to end", got)
+	}
+}
+
+// Mouse buttons count like keys, alone or with keys.
+func TestMatcherMouse(t *testing.T) {
+	var m Matcher
+	b := &Bindings{Pause: []Combo{{VKXButton1}}, Stop: []Combo{{vkLCtrl, VKMiddle}}}
+	if got := m.Key(b, VKXButton1, true); !reflect.DeepEqual(got, []HotkeyEvent{{Action: ActionPause, Down: true}}) {
+		t.Fatalf("Mouse 4 = %v", got)
+	}
+	if got := m.Key(b, VKXButton1, false); !reflect.DeepEqual(got, []HotkeyEvent{{Action: ActionPause}}) {
+		t.Fatalf("Mouse 4 up = %v", got)
+	}
+	if got := m.Key(b, VKMiddle, true); got != nil {
+		t.Fatalf("Mouse 3 alone = %v", got)
+	}
+	m.Key(b, VKMiddle, false)
+	m.Key(b, vkRCtrl, true)
+	if got := m.Key(b, VKMiddle, true); !reflect.DeepEqual(got, []HotkeyEvent{{Action: ActionStop, Down: true}}) {
+		t.Fatalf("Ctrl + Mouse 3 = %v", got)
+	}
+	if !b.UsesMouse() || (&Bindings{Pause: []Combo{{vkG}}, Overlay: Combo{vkF}}).UsesMouse() {
+		t.Error("UsesMouse is wrong")
+	}
+	if !(&Bindings{Overlay: Combo{vkLCtrl, VKXButton2}}).UsesMouse() {
+		t.Error("an overlay key with a mouse button uses the mouse")
+	}
+}
+
+func TestKeymapFor(t *testing.T) {
+	k := &Keymap{
+		Global: Bindings{Pause: []Combo{{vkG}}},
+		Apps:   map[string]Bindings{"game.exe": {Stop: []Combo{{vkX}}}},
+	}
+	if b := k.For("game.exe"); len(b.Pause) != 0 || len(b.Stop) != 1 {
+		t.Errorf("game.exe got %+v", b)
+	}
+	if b := k.For("other.exe"); len(b.Pause) != 1 {
+		t.Errorf("other.exe got %+v, want the global bindings", b)
+	}
+	if b := k.For(""); len(b.Pause) != 1 {
+		t.Errorf("an unknown app got %+v, want the global bindings", b)
+	}
+	if !k.Hotkeys() || (Keymap{Apps: map[string]Bindings{"a.exe": {}}}).Hotkeys() {
+		t.Error("Hotkeys is wrong")
+	}
+	if (Keymap{Apps: map[string]Bindings{"a.exe": {}}}).Empty() || !(Keymap{}).Empty() {
+		t.Error("Empty is wrong: an app of its own needs the watcher")
 	}
 }
 
@@ -92,22 +180,22 @@ func TestFilterOverlay(t *testing.T) {
 	}{
 		{"Esc while closed passes", vkEscape, true, nil, false},
 		{"its release too", vkEscape, false, nil, false},
-		{"overlay key opens", vkF8, true, []ev{{ActionOverlayOpen, true, 0}}, true},
+		{"overlay key opens", vkF8, true, []ev{{Action: ActionOverlayOpen, Down: true}}, true},
 		{"auto-repeat swallowed", vkF8, true, nil, true},
 		{"release swallowed", vkF8, false, nil, true},
 		{"other keys pass while open", vkW, true, nil, false},
 		{"and are released", vkW, false, nil, false},
-		{"pause keys still work", vkG, true, []ev{{ActionPause, true, 0}}, false},
-		{"and release", vkG, false, []ev{{ActionPause, false, 0}}, false},
-		{"overlay key selects", vkF8, true, []ev{{ActionOverlaySelect, true, 0}}, true},
+		{"pause keys still work", vkG, true, []ev{{Action: ActionPause, Down: true}}, false},
+		{"and release", vkG, false, []ev{{Action: ActionPause, Down: false}}, false},
+		{"overlay key selects", vkF8, true, []ev{{Action: ActionOverlaySelect, Down: true}}, true},
 		{"release swallowed", vkF8, false, nil, true},
 		{"Esc after select passes", vkEscape, true, nil, false},
 		{"release", vkEscape, false, nil, false},
-		{"open again", vkF8, true, []ev{{ActionOverlayOpen, true, 0}}, true},
-		{"Esc down while the key is held", vkEscape, true, []ev{{ActionOverlayEscDown, true, 0}}, true},
+		{"open again", vkF8, true, []ev{{Action: ActionOverlayOpen, Down: true}}, true},
+		{"Esc down while the key is held", vkEscape, true, []ev{{Action: ActionOverlayEscDown, Down: true}}, true},
 		{"Esc repeat swallowed", vkEscape, true, nil, true},
 		{"overlay key release swallowed", vkF8, false, nil, true},
-		{"tapping Esc closes on its release", vkEscape, false, []ev{{ActionOverlayClose, true, 0}}, true},
+		{"tapping Esc closes on its release", vkEscape, false, []ev{{Action: ActionOverlayClose, Down: true}}, true},
 		{"Esc while closed passes again", vkEscape, true, nil, false},
 		{"release", vkEscape, false, nil, false},
 	}

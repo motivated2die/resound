@@ -143,7 +143,7 @@ func (a *App) startCapture(t captureTarget) {
 	clear(p.down)
 	a.reclaimPTT() // the keys recorded aren't held back
 	if a.hotkeys != nil {
-		a.hotkeys.SetBindings(a.hotkeyBindings()) // without the overlay key
+		a.hotkeys.SetKeymap(input.Keymap{Global: a.hotkeyBindings()}) // without the overlay key
 	}
 	a.render()
 }

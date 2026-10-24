@@ -1,11 +1,15 @@
 package input
 
-import "time"
+import (
+	"slices"
+	"time"
+)
 
-// Hotkeys: keys the user holds or presses anywhere in Windows to pause or
-// stop Resound's sounds, or to open the in-game overlay (see Watcher). The
-// matching is portable and tested; watching the keyboard is Windows-only
-// (hook_windows.go).
+// Hotkeys: keys and mouse buttons the user holds or presses anywhere in
+// Windows to pause or stop Resound's sounds, or to open the in-game overlay
+// (see Watcher). Each app can have bindings of its own (Keymap). The
+// matching is portable and tested; watching the keyboard and mouse is
+// Windows-only (hook_windows.go).
 
 // Action is what a hotkey does.
 type Action int
@@ -31,6 +35,11 @@ const (
 	// push-to-talk keys lent to the hook (Watcher.LendPTT) before passing
 	// the key on. Down is false if SendInput failed.
 	ActionHandOver
+
+	// ActionApp reports that another app came to the foreground: App is its
+	// file name in lower case ("" when unknown), whose bindings apply now
+	// (Keymap). Resound's own windows never count. Down is always true.
+	ActionApp
 )
 
 // EscHoldTime is how long Esc is held in the open overlay to stop all
@@ -38,7 +47,7 @@ const (
 const EscHoldTime = 700 * time.Millisecond
 
 func (a Action) String() string {
-	return [...]string{"pause", "stop", "overlay open", "overlay select", "overlay close", "overlay scroll", "overlay Esc down", "overlay stop", "push-to-talk hand-over"}[a]
+	return [...]string{"pause", "stop", "overlay open", "overlay select", "overlay close", "overlay scroll", "overlay Esc down", "overlay stop", "push-to-talk hand-over", "app"}[a]
 }
 
 // HotkeyEvent is a hotkey becoming active (Down) or inactive. Stop keys and
@@ -46,10 +55,12 @@ func (a Action) String() string {
 type HotkeyEvent struct {
 	Action Action
 	Down   bool
-	Steps  int // ActionOverlayScroll only
+	Steps  int    // ActionOverlayScroll only
+	App    string // ActionApp only
 }
 
 // Bindings are the hotkey combinations; any one of them triggers its action.
+// A combination may hold mouse buttons 3–5 as well as keys.
 type Bindings struct {
 	Pause, Stop []Combo
 	Overlay     Combo // opens the in-game overlay; empty = no overlay
@@ -57,6 +68,56 @@ type Bindings struct {
 
 // Empty reports whether no hotkey is set.
 func (b Bindings) Empty() bool { return len(b.Pause) == 0 && len(b.Stop) == 0 && len(b.Overlay) == 0 }
+
+// UsesMouse reports whether a combination holds a mouse button, which the
+// mouse hook must watch.
+func (b Bindings) UsesMouse() bool {
+	for _, list := range [][]Combo{b.Pause, b.Stop, {b.Overlay}} {
+		for _, c := range list {
+			if slices.ContainsFunc(c, IsMouse) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// Keymap is the bindings of every app: Global, unless the app in the
+// foreground has bindings of its own in Apps (by its file name in lower
+// case, e.g. "valorant.exe"), complete and already merged with the global
+// ones where it keeps those.
+type Keymap struct {
+	Global Bindings
+	Apps   map[string]Bindings
+}
+
+// For returns the bindings that apply while app is in the foreground.
+func (k *Keymap) For(app string) *Bindings {
+	if k == nil {
+		return nil
+	}
+	if b, ok := k.Apps[app]; ok {
+		return &b
+	}
+	return &k.Global
+}
+
+// Empty reports whether no app has a hotkey and no app has bindings of its
+// own (whose foreground the app may follow, ActionApp).
+func (k Keymap) Empty() bool { return k.Global.Empty() && len(k.Apps) == 0 }
+
+// Hotkeys reports whether a pause or stop key is set for any app.
+func (k Keymap) Hotkeys() bool {
+	if len(k.Global.Pause) > 0 || len(k.Global.Stop) > 0 {
+		return true
+	}
+	for _, b := range k.Apps {
+		if len(b.Pause) > 0 || len(b.Stop) > 0 {
+			return true
+		}
+	}
+	return false
+}
 
 // sameKey folds the left/right variants of Shift, Ctrl, Alt and Windows into
 // one key, so "Left Ctrl + F" also matches Right Ctrl + F.
@@ -74,15 +135,26 @@ func sameKey(vk uint16) uint16 {
 	return vk
 }
 
-// IsMouse reports whether vk is a mouse button (hotkeys are keyboard-only).
+// IsMouse reports whether vk is a mouse button. Only the middle button and
+// the side buttons (VKMiddle, VKXButton1, VKXButton2) can be bound: the
+// left and right ones work the panel and aim in games.
 func IsMouse(vk uint16) bool { return vk >= 0x01 && vk <= 0x06 && vk != 0x03 }
 
-// Matcher turns key presses and releases into hotkey events. It is not safe
-// for concurrent use; the Watcher drives it from its hook thread.
+// Matcher turns key and mouse button presses and releases into hotkey
+// events. It is not safe for concurrent use; the Watcher drives it from its
+// hook thread.
+//
+// An action starts on the press that completes one of its combinations: a
+// combination that becomes complete in another way, because the bindings
+// changed while its keys were held (another app came to the foreground),
+// does nothing until it is pressed again. A pause lasts while any pause
+// combination is held, of the bindings that started it as well as of the
+// current ones, so an app switch while a pause key is held never ends the
+// pause early or lets it bounce.
 type Matcher struct {
-	down     map[uint16]bool // physical keys held now (left/right kept apart)
-	pauseOn  bool
-	stopHeld bool
+	down    map[uint16]bool // physical keys held now (left/right kept apart)
+	pauseOn bool
+	pauseBy []Combo // the pause combinations in effect when the pause started
 }
 
 // Key records a press or release and returns the hotkey events it causes.
@@ -91,13 +163,33 @@ func (m *Matcher) Key(b *Bindings, vk uint16, down bool) []HotkeyEvent {
 	if m.down == nil {
 		m.down = map[uint16]bool{}
 	}
+	press := down && !m.down[vk]
 	if down {
 		m.down[vk] = true
 	} else {
 		delete(m.down, vk)
 	}
-	return m.Eval(b)
+	var pause, stop []Combo
+	if b != nil {
+		pause, stop = b.Pause, b.Stop
+	}
+	var events []HotkeyEvent
+	switch {
+	case m.pauseOn && !m.anyHeld(pause) && !m.anyHeld(m.pauseBy):
+		m.pauseOn, m.pauseBy = false, nil
+		events = append(events, HotkeyEvent{Action: ActionPause})
+	case !m.pauseOn && press && m.completes(pause, vk):
+		m.pauseOn, m.pauseBy = true, pause
+		events = append(events, HotkeyEvent{Action: ActionPause, Down: true})
+	}
+	if press && m.completes(stop, vk) {
+		events = append(events, HotkeyEvent{Action: ActionStop, Down: true})
+	}
+	return events
 }
+
+// Paused reports whether a pause key holds the pause.
+func (m *Matcher) Paused() bool { return m.pauseOn }
 
 // Held returns the keys the matcher thinks are down.
 func (m *Matcher) Held() []uint16 {
@@ -108,21 +200,15 @@ func (m *Matcher) Held() []uint16 {
 	return keys
 }
 
-// Eval compares the held keys with the bindings and reports what changed,
-// e.g. after the bindings were replaced.
-func (m *Matcher) Eval(b *Bindings) []HotkeyEvent {
-	var events []HotkeyEvent
-	pause := b != nil && m.anyHeld(b.Pause)
-	if pause != m.pauseOn {
-		m.pauseOn = pause
-		events = append(events, HotkeyEvent{Action: ActionPause, Down: pause})
+// completes reports whether pressing vk completed one of combos: one that
+// holds vk and is held now.
+func (m *Matcher) completes(combos []Combo, vk uint16) bool {
+	for _, c := range combos {
+		if m.held(c) && slices.ContainsFunc(c, func(k uint16) bool { return sameKey(k) == sameKey(vk) }) {
+			return true
+		}
 	}
-	stop := b != nil && m.anyHeld(b.Stop)
-	if stop && !m.stopHeld {
-		events = append(events, HotkeyEvent{Action: ActionStop, Down: true})
-	}
-	m.stopHeld = stop
-	return events
+	return false
 }
 
 func (m *Matcher) anyHeld(combos []Combo) bool {

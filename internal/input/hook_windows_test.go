@@ -34,7 +34,7 @@ func TestWatcherLive(t *testing.T) {
 		t.Skip("set RESOUND_HOOK_TEST=1 to inject F24 into the desktop")
 	}
 	events := make(chan HotkeyEvent, 8)
-	w, err := StartWatcher(Bindings{Pause: []Combo{{0x87}}}, func(ev HotkeyEvent) { events <- ev })
+	w, err := StartWatcher(Keymap{Global: Bindings{Pause: []Combo{{0x87}}}}, func(ev HotkeyEvent) { events <- ev })
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -58,11 +58,11 @@ func TestWatcherLive(t *testing.T) {
 	expect(nil)
 
 	sendF24(t, true, false)
-	expect(&HotkeyEvent{ActionPause, true, 0})
+	expect(&HotkeyEvent{Action: ActionPause, Down: true})
 	sendF24(t, false, false)
-	expect(&HotkeyEvent{ActionPause, false, 0})
+	expect(&HotkeyEvent{Action: ActionPause, Down: false})
 
-	if _, err := StartWatcher(Bindings{}, func(HotkeyEvent) {}); err == nil {
+	if _, err := StartWatcher(Keymap{Global: Bindings{}}, func(HotkeyEvent) {}); err == nil {
 		t.Error("a second watcher started")
 	}
 }
@@ -104,6 +104,13 @@ var obsMouseCallback = windows.NewCallback(func(code, wparam uintptr, m *msLLHoo
 	if int32(code) >= 0 && obs != nil && wparam == wmMouseWheel {
 		obs.wheels <- m.MouseData
 	}
+	if vk, down, ok := mouseButton(wparam, m.MouseData); int32(code) >= 0 && obs != nil && ok && vk == VKXButton2 {
+		select {
+		case obs.all <- seenKey{uint32(vk), !down, m.ExtraInfo == sendMarker}:
+		default:
+		}
+		return 1 // the test's "forward" clicks never reach the window under the pointer
+	}
 	r, _, _ := procCallNextHookEx.Call(0, code, wparam, uintptr(unsafe.Pointer(m)))
 	return r
 })
@@ -144,7 +151,7 @@ func TestOverlayHookLive(t *testing.T) {
 	}
 	startObserver(t)
 	events := make(chan HotkeyEvent, 16)
-	w, err := StartWatcher(Bindings{Overlay: Combo{0x87}}, func(ev HotkeyEvent) { events <- ev })
+	w, err := StartWatcher(Keymap{Global: Bindings{Overlay: Combo{0x87}}}, func(ev HotkeyEvent) { events <- ev })
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -250,7 +257,7 @@ func TestHandOverLive(t *testing.T) {
 	const ptt, pause, stop = 0x86, 0x87, 0x84
 	startObserver(t)
 	events := make(chan HotkeyEvent, 16)
-	w, err := StartWatcher(Bindings{Pause: []Combo{{pause}}, Stop: []Combo{{stop}}}, func(ev HotkeyEvent) { events <- ev })
+	w, err := StartWatcher(Keymap{Global: Bindings{Pause: []Combo{{pause}}, Stop: []Combo{{stop}}}}, func(ev HotkeyEvent) { events <- ev })
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -351,4 +358,102 @@ func TestHandOverLive(t *testing.T) {
 		t.Fatalf("unexpected event %v", ev)
 	case <-time.After(100 * time.Millisecond):
 	}
+}
+
+// TestMouseHandOverLive is TestHandOverLive with a mouse button as the
+// pause key: Mouse 5 (forward) while push-to-talk (F23) is lent reaches
+// other programs only after the push-to-talk release. The observer swallows
+// every Mouse 5 event, so the forward clicks reach no window:
+//
+//	$env:RESOUND_HOOK_TEST="1"; go test -run MouseHandOverLive -v ./internal/input
+func TestMouseHandOverLive(t *testing.T) {
+	if os.Getenv("RESOUND_HOOK_TEST") != "1" {
+		t.Skip("set RESOUND_HOOK_TEST=1 to inject input into the desktop")
+	}
+	const ptt = 0x86
+	startObserver(t)
+	events := make(chan HotkeyEvent, 16)
+	w, err := StartWatcher(Keymap{Global: Bindings{Pause: []Combo{{VKXButton2}}}}, func(ev HotkeyEvent) {
+		if ev.Action != ActionApp {
+			events <- ev
+		}
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer w.Close()
+	time.Sleep(100 * time.Millisecond) // the hook thread installs the mouse hook
+	button := func(down bool) { // the button as the user presses it
+		in := mouseInput{Type: inputMouse, MouseData: 2 /* XBUTTON2 */, Flags: mouseeventfXUp}
+		if down {
+			in.Flags = mouseeventfXDown
+		}
+		if err := sendInput(unsafe.Pointer(&in), unsafe.Sizeof(in)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	expectSeen := func(want ...seenKey) {
+		t.Helper()
+		for _, k := range want {
+			select {
+			case got := <-obs.all:
+				if got != k {
+					t.Fatalf("other programs got %+v, want %+v", got, k)
+				}
+			case <-time.After(time.Second):
+				t.Fatalf("other programs didn't get %+v", k)
+			}
+		}
+		select {
+		case got := <-obs.all:
+			t.Fatalf("other programs got %+v as well", got)
+		case <-time.After(150 * time.Millisecond):
+		}
+	}
+	expectEvents := func(want ...HotkeyEvent) {
+		t.Helper()
+		for _, ev := range want {
+			select {
+			case got := <-events:
+				if got != ev {
+					t.Fatalf("event %v, want %v", got, ev)
+				}
+			case <-time.After(time.Second):
+				t.Fatalf("no %v event", ev)
+			}
+		}
+	}
+
+	if err := Press(Combo{ptt}); err != nil {
+		t.Fatal(err)
+	}
+	expectSeen(seenKey{ptt, false, true})
+	w.LendPTT(Combo{ptt})
+	button(true) // the release first, then the button
+	expectSeen(seenKey{ptt, true, true}, seenKey{VKXButton2, false, true})
+	expectEvents(HotkeyEvent{Action: ActionPause, Down: true}, HotkeyEvent{Action: ActionHandOver, Down: true})
+	button(false)
+	expectSeen(seenKey{VKXButton2, true, false})
+	expectEvents(HotkeyEvent{Action: ActionPause})
+
+	button(true) // nothing lent: the button passes as it is
+	button(false)
+	expectSeen(seenKey{VKXButton2, false, false}, seenKey{VKXButton2, true, false})
+	expectEvents(HotkeyEvent{Action: ActionPause, Down: true}, HotkeyEvent{Action: ActionPause})
+
+	// A click sent in one go: its release must still come after the press.
+	if err := Press(Combo{ptt}); err != nil {
+		t.Fatal(err)
+	}
+	expectSeen(seenKey{ptt, false, true})
+	w.LendPTT(Combo{ptt})
+	click := []inputRecord{
+		asRecord(mouseInput{Type: inputMouse, MouseData: 2, Flags: mouseeventfXDown}),
+		asRecord(mouseInput{Type: inputMouse, MouseData: 2, Flags: mouseeventfXUp}),
+	}
+	if _, err := sendRecordsN(click); err != nil {
+		t.Fatal(err)
+	}
+	expectSeen(seenKey{ptt, true, true}, seenKey{VKXButton2, false, true}, seenKey{VKXButton2, true, true})
+	expectEvents(HotkeyEvent{Action: ActionPause, Down: true}, HotkeyEvent{Action: ActionPause}, HotkeyEvent{Action: ActionHandOver, Down: true})
 }
