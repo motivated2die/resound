@@ -18,7 +18,7 @@
 - [The audio editor](audio-editor.md)
 - [The phone app](phone-app.md)
 - [Volume and loudness](volume.md)
-- [Push-to-talk, pause and stop keys](push-to-talk.md)
+- [Keybinds: push-to-talk, pause and stop](push-to-talk.md)
 - [In-game overlay](overlay.md)
 - [Updates](updates.md)
 - [Backup and restore](backup.md)

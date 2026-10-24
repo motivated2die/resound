@@ -1,43 +1,47 @@
 package app
 
 import (
+	"maps"
 	"slices"
 
 	"github.com/motivated2die/resound/internal/input"
 	"github.com/motivated2die/resound/internal/logx"
-	"github.com/motivated2die/resound/internal/ui"
 )
 
 // Hotkeys work anywhere in Windows, e.g. in a game: holding a pause key
 // pauses the sounds and lets go of push-to-talk and the mic, so the user can
-// talk on another channel; a stop key stops everything. The keyboard is only
-// watched while at least one hotkey is set (input.Watcher).
+// talk on another channel; a stop key stops everything. Keys and mouse
+// buttons 3–5 work, alone or together. The keyboard (and the mouse, while a
+// binding holds a button) is only watched while a hotkey is set or an app
+// has keybinds of its own (input.Watcher); the watcher then also reports
+// which app is in the foreground, whose keybinds apply (keybinds.go).
 
-// maxHotkeys limits each list; more would not fit the panel.
-const maxHotkeys = 8
-
-// captureTarget is what a key recorded in the panel is for.
-type captureTarget int
-
-const (
-	capturePTT captureTarget = iota
-	capturePause
-	captureStop
-	captureOverlay
-)
-
-func (a *App) hotkeyBindings() input.Bindings {
-	var b input.Bindings
-	for _, c := range a.cfg.PauseHotkeys {
-		b.Pause = append(b.Pause, input.Combo(c))
+// keymap is the bindings the watcher matches: the global ones, and for each
+// app that replaces some of them, its complete set.
+func (a *App) keymap() input.Keymap {
+	k := input.Keymap{Global: a.bindingsFor("")}
+	for i := range a.cfg.AppKeybinds {
+		if e := &a.cfg.AppKeybinds[i]; hasOverrides(e) {
+			if k.Apps == nil {
+				k.Apps = map[string]input.Bindings{}
+			}
+			k.Apps[e.Exe] = a.bindingsFor(e.Exe)
+		}
 	}
-	for _, c := range a.cfg.StopHotkeys {
-		b.Stop = append(b.Stop, input.Combo(c))
-	}
-	// While a key is recorded in the panel, the overlay key isn't taken from
-	// it, so it can be recorded again.
+	return k
+}
+
+// bindingsFor is what pause, stop and the overlay's key are while app is in
+// the foreground. While a key is recorded in the panel, the overlay key
+// isn't taken from it, so it can be recorded again. Nor does the user's
+// push-to-talk count then.
+func (a *App) bindingsFor(app string) input.Bindings {
+	b := input.Bindings{Pause: combos(a.keysFor(app, fnPause)), Stop: combos(a.keysFor(app, fnStop))}
 	if !a.ptt.capturing {
 		b.Overlay = input.Combo(a.cfg.OverlayKeys)
+		if a.talkPauses() {
+			b.Talk = combos(a.keysFor(app, fnPTT)) // the user's own presses pause (talk.go)
+		}
 	}
 	return b
 }
@@ -45,16 +49,17 @@ func (a *App) hotkeyBindings() input.Bindings {
 // applyHotkeys starts, updates or stops watching the keyboard to match the
 // settings. The overlay's preview needs the watcher too (Esc and the wheel).
 func (a *App) applyHotkeys() {
-	b := a.hotkeyBindings()
+	k := a.keymap()
 	a.setHoldPause(false) // a held pause key may no longer be one
 	switch {
-	case b.Empty() && !a.overlay.preview:
+	case k.Empty() && !a.overlay.preview:
 		a.closeHotkeys()
 		a.hotkeyErr = ""
+		return
 	case a.hotkeys != nil:
-		a.hotkeys.SetBindings(b)
+		a.hotkeys.SetKeymap(k)
 	default:
-		w, err := input.StartWatcher(b, func(ev input.HotkeyEvent) {
+		w, err := input.StartWatcher(k, func(ev input.HotkeyEvent) {
 			a.tray.Post(func() { a.onHotkey(ev) }) // the hook must not wait
 		})
 		if err != nil {
@@ -64,10 +69,24 @@ func (a *App) applyHotkeys() {
 		}
 		a.hotkeys, a.hotkeyErr = w, ""
 	}
-	a.syncPTTLoan() // the watcher or its keys may have changed
-	if a.hotkeys != nil {
-		logx.Printf("hotkeys: watching %d pause and %d stop key(s), overlay key %q", len(b.Pause), len(b.Stop), b.Overlay.String())
+	if !sameKeymap(k, a.keys) { // not for every recording again
+		logx.Printf("hotkeys: watching %d pause and %d stop key(s), %d app(s) with their own, overlay key %q",
+			len(k.Global.Pause), len(k.Global.Stop), len(k.Apps), k.Global.Overlay.String())
 	}
+	if !slices.Equal(slices.Sorted(maps.Keys(k.Apps)), slices.Sorted(maps.Keys(a.keys.Apps))) {
+		a.refreshRunning() // apps with keys of their own came or went
+	}
+	a.keys = k
+	a.syncPTTLoan() // the watcher or its keys may have changed
+}
+
+// sameKeymap reports whether two keymaps bind alike.
+func sameKeymap(x, y input.Keymap) bool {
+	list := func(p, q []input.Combo) bool { return slices.EqualFunc(p, q, input.Combo.Equal) }
+	same := func(a, b input.Bindings) bool {
+		return list(a.Pause, b.Pause) && list(a.Stop, b.Stop) && a.Overlay.Equal(b.Overlay)
+	}
+	return same(x.Global, y.Global) && maps.EqualFunc(x.Apps, y.Apps, same)
 }
 
 func (a *App) closeHotkeys() {
@@ -77,6 +96,9 @@ func (a *App) closeHotkeys() {
 		a.hotkeys = nil
 		logx.Printf("hotkeys: off")
 	}
+	a.ptt.userTalk, a.ptt.pauseKey = false, false // no release will be reported
+	a.keys = input.Keymap{}
+	a.fgApp = "" // no app is followed without the watcher; keybindsChanged syncs held keys
 }
 
 // onHotkey runs on the UI thread.
@@ -84,119 +106,64 @@ func (a *App) onHotkey(ev input.HotkeyEvent) {
 	if a.onOverlayEvent(ev) {
 		return
 	}
-	if ev.Action == input.ActionHandOver {
+	switch ev.Action {
+	case input.ActionHandOver:
 		if !ev.Down {
 			logx.Printf("hotkey: letting go of push-to-talk before the key failed")
 		}
+		a.syncPTTLoan() // the hook let go of the keys: the flow stops showing them held
+		a.render()
+		return
+	case input.ActionApp:
+		a.setForegroundApp(ev.App)
 		return
 	}
 	if ev.Down && a.ptt.capturing {
 		return // the user is recording a key in the panel
 	}
 	switch ev.Action {
+	case input.ActionTalk:
+		a.onTalk(ev.Down, ev.Index)
 	case input.ActionStop:
 		logx.Printf("hotkey: stop")
+		a.reclaimPTT() // keys the hook let go of for the stop key aren't shown held
 		a.stopAll()
 	case input.ActionPause:
-		if ev.Down {
-			a.setHoldPause(true)
-		} else {
-			a.releaseHoldPause()
-		}
+		a.onPauseKey(ev.Down)
 	}
 	a.render()
 }
 
-func (a *App) hotkeyList(t captureTarget) *[][]uint16 {
-	if t == captureStop {
-		return &a.cfg.StopHotkeys
-	}
-	return &a.cfg.PauseHotkeys
-}
-
-// addHotkey adds a recorded combination to a list, unless it is already
-// in use.
-func (a *App) addHotkey(t captureTarget, c input.Combo) {
-	a.ptt.hotkeyNote, a.ptt.noteFor = "", t
-	if t == captureOverlay {
-		a.setOverlayKey(c)
+// setForegroundApp follows the app in the foreground: its push-to-talk
+// keys apply from now on, also to keys held right now. A new app may have
+// just started, so which apps run is checked again too.
+func (a *App) setForegroundApp(app string) {
+	if app == a.fgApp {
 		return
 	}
-	list := a.hotkeyList(t)
-	other, otherName := a.cfg.StopHotkeys, "stop"
-	if t == captureStop {
-		other, otherName = a.cfg.PauseHotkeys, "pause"
+	a.fgApp = app
+	if a.appKeybinds(app) != nil {
+		logx.Printf("keybinds: %s in the foreground", app)
 	}
-	switch {
-	case input.SameCombo(c, a.cfg.OverlayKeys):
-		a.ptt.hotkeyNote = c.String() + " opens the in-game overlay."
-	case containsCombo(*list, c):
-		a.ptt.hotkeyNote = c.String() + " is already in this list."
-	case containsCombo(other, c):
-		a.ptt.hotkeyNote = c.String() + " is already a " + otherName + " key."
-	case input.SameCombo(c, a.cfg.PushToTalkKeys):
-		a.ptt.hotkeyNote = c.String() + " is the push-to-talk key Resound presses."
-	case len(*list) >= maxHotkeys:
-		a.ptt.hotkeyNote = "That's the most this list can hold."
-	default:
-		*list = append(*list, slices.Clone(c))
-		a.save()
-		logx.Printf("hotkeys: %s key %s added", map[captureTarget]string{capturePause: "pause", captureStop: "stop"}[t], c)
-		a.applyHotkeys()
-	}
-	a.render()
+	a.syncPTTKeys()
+	a.refreshRunning()
 }
 
-func containsCombo(list [][]uint16, c input.Combo) bool {
-	for _, k := range list {
-		if input.SameCombo(k, c) {
-			return true
-		}
+// refreshRunning finds out, off the UI thread, which programs run, for the
+// home page's note on apps with keybinds of their own.
+func (a *App) refreshRunning() {
+	if len(a.cfg.AppKeybinds) == 0 {
+		a.running = nil
+		return
 	}
-	return false
-}
-
-func (a *App) clearHotkeys(t captureTarget) {
-	*a.hotkeyList(t) = nil
-	a.ptt.hotkeyNote = ""
-	a.save()
-	a.applyHotkeys()
-	a.render()
-}
-
-// hotkeyRows is the pause or stop section of the push-to-talk page.
-func (a *App) hotkeyRows(t captureTarget) []ui.Row {
-	title, intro := "Hold to pause",
-		"While you hold one of these keys, sounds pause and Resound lets go of push-to-talk and your mic, so you can talk on another channel. Letting go resumes them."
-	if t == captureStop {
-		title, intro = "Stop keys", "Pressing one of these keys stops all sounds at once and lets go of push-to-talk."
-	}
-	keys := *a.hotkeyList(t)
-	rows := []ui.Row{ui.Section(title), ui.Paragraph(intro, ui.ToneMuted)}
-	for _, k := range keys {
-		rows = append(rows, ui.Text(input.Combo(k).String(), "", ui.ToneGood))
-	}
-	if a.ptt.capturing && a.ptt.target == t {
-		got := "…"
-		if len(a.ptt.captured) > 0 {
-			got = a.ptt.captured.String() + " …"
-		}
-		return append(rows,
-			ui.Text("Press the key or combination", got, ui.ToneWarning),
-			ui.Text("Keyboard keys only. Esc cancels.", "", ui.ToneMuted))
-	}
-	if len(keys) == 0 {
-		rows = append(rows, ui.Text("No keys yet", "", ui.ToneMuted))
-	}
-	rows = append(rows, ui.Buttons(
-		ui.Action{Label: "Add key", Disabled: a.ptt.capturing || len(keys) >= maxHotkeys, OnClick: func() { a.startCapture(t) }},
-		ui.Action{Label: "Clear keys", Disabled: len(keys) == 0, OnClick: func() { a.clearHotkeys(t) }},
-	))
-	if a.ptt.hotkeyNote != "" && a.ptt.noteFor == t {
-		rows = append(rows, ui.Paragraph(a.ptt.hotkeyNote, ui.ToneWarning))
-	}
-	if a.hotkeyErr != "" && len(keys) > 0 {
-		rows = append(rows, ui.Paragraph(a.hotkeyErr, ui.ToneBad))
-	}
-	return rows
+	go func() {
+		running := input.RunningApps()
+		a.tray.Post(func() {
+			before := a.runningKeysStatus()
+			a.running = running
+			if a.runningKeysStatus() != before && a.tray.Popup().Visible() {
+				a.render()
+			}
+		})
+	}()
 }

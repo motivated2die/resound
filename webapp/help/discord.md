@@ -29,7 +29,7 @@ With **Voice Activity**, Discord only sends sound louder than a threshold. Quiet
 - Turn off **Automatically determine input sensitivity**.
 - Drag the slider far to the left, so that quiet sounds still light up the bar (for example around −60 dB).
 
-Or use **Push to Talk** in Discord and let Resound hold the key while sounds play: [Push-to-talk](push-to-talk.md).
+Or use **Push to Talk** in Discord and let Resound hold the key while sounds play: [Keybinds](push-to-talk.md).
 
 ## Other apps
 

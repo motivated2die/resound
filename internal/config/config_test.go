@@ -63,3 +63,48 @@ func TestPanelPos(t *testing.T) {
 		t.Errorf("reset: %+v, file %s", c.PanelPos, data)
 	}
 }
+
+// Keybinds are tidied on load; configs from before app keybinds and further
+// push-to-talk keys load unchanged.
+func TestKeybindsLoad(t *testing.T) {
+	t.Setenv("LOCALAPPDATA", t.TempDir())
+	if err := os.MkdirAll(Dir(), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	write := func(json string) {
+		t.Helper()
+		if err := os.WriteFile(filepath.Join(Dir(), "config.json"), []byte(json), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	write(`{"pushToTalkKeys": [19], "pauseHotkeys": [[71], []], "stopHotkeys": [[88]]}`)
+	c := Load()
+	if len(c.PushToTalkKeys) != 1 || len(c.PushToTalkExtra) != 0 || len(c.PauseHotkeys) != 1 || len(c.StopHotkeys) != 1 || c.AppKeybinds != nil {
+		t.Errorf("older config: %+v", c)
+	}
+
+	write(`{"pushToTalkKeys": [], "pushToTalkExtra": [[145], [96]],
+		"appKeybinds": [
+			{"exe": " Game.EXE ", "name": "Game", "pause": {"off": true, "keys": [[1]]}, "stop": {"keys": []}, "pushToTalk": {"keys": [[5]]}},
+			{"exe": "game.exe", "name": "twice"},
+			{"exe": "", "name": "nameless"}
+		]}`)
+	c = Load()
+	if len(c.PushToTalkKeys) != 1 || c.PushToTalkKeys[0] != 145 || len(c.PushToTalkExtra) != 1 {
+		t.Errorf("extra push-to-talk keys didn't move up: %v %v", c.PushToTalkKeys, c.PushToTalkExtra)
+	}
+	if len(c.AppKeybinds) != 1 {
+		t.Fatalf("apps: %+v", c.AppKeybinds)
+	}
+	a := c.AppKeybinds[0]
+	switch {
+	case a.Exe != "game.exe":
+		t.Errorf("exe %q", a.Exe)
+	case a.Pause == nil || !a.Pause.Off || a.Pause.Keys != nil:
+		t.Errorf("pause %+v, want off without keys", a.Pause)
+	case a.Stop != nil:
+		t.Errorf("stop %+v, want no override", a.Stop)
+	case a.PushToTalk == nil || len(a.PushToTalk.Keys) != 1:
+		t.Errorf("push-to-talk %+v", a.PushToTalk)
+	}
+}

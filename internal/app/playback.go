@@ -380,6 +380,17 @@ func (a *App) longPlaying() bool {
 	return false
 }
 
+// soundsPaused reports whether a sound is paused right now (by whichever
+// pause owns it), as the audio flow shows it.
+func (a *App) soundsPaused() bool {
+	for _, v := range a.engine.Voices() {
+		if _, live := a.playback.remaining[v.ID]; live && v.Paused {
+			return true
+		}
+	}
+	return false
+}
+
 // syncMic mutes or unmutes the mic for what plays now, after the mute
 // settings changed: turned off, the mic is let go at once.
 func (a *App) syncMic() {
@@ -399,7 +410,7 @@ func (a *App) releasePlayback() {
 // holdMic mutes the microphone for the duration of playback, if enabled.
 func (a *App) holdMic() {
 	pb := &a.playback
-	if !a.cfg.MuteMicWhilePlaying || pb.mutedMic != "" || a.route.Mic == nil {
+	if !a.cfg.MuteMicWhilePlaying || pb.mutedMic != "" || a.route.Mic == nil || a.ptt.userTalk {
 		return
 	}
 	id := a.route.Mic.ID

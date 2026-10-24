@@ -179,12 +179,18 @@ func (a *App) connectCable() {
 }
 
 func (a *App) wizardKeys() []ui.Row {
-	rows := []ui.Row{a.wizardHeader("Push-to-talk key"), a.pttIntro()}
-	if !a.ptt.capturing {
-		rows = append(rows, ui.Paragraph("TIP: pick a rarely used key, such as Pause or a numpad key, and bind it as a secondary voice activation key. Or just bind your primary PTT key here. "+
-			"Use “Send it to the game”, then trigger the game's keybind field. No push-to-talk? Skip this step.", ui.ToneMuted))
+	t := keyTarget{fn: fnPTT}
+	rows := []ui.Row{
+		a.wizardHeader("Push-to-talk key"),
+		ui.Paragraph("Games with push-to-talk only send your voice while its key is held. "+
+			"Resound holds the key while sounds play, so others hear them.", ui.ToneMuted),
+		a.keybindCard(t),
 	}
-	rows = append(rows, a.pttRows()...)
+	if !a.ptt.capturing {
+		rows = append(rows, ui.Paragraph("TIP: pick a rarely used key, such as Pause or a numpad key, and bind it in your game as a second push-to-talk key. "+
+			"The keyboard button on the card presses it while you click the game's keybind field. "+
+			"More keys: Settings → Keybinds. No push-to-talk? Skip this step.", ui.ToneMuted))
+	}
 	return append(rows, ui.Flex(), ui.Separator(), a.wizardNext(len(a.cfg.PushToTalkKeys) > 0), ui.Spacer(4))
 }
 

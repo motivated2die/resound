@@ -274,7 +274,7 @@ func (a *App) tick() bool {
 // phone, a hotkey), so a badge never outlives its state.
 func (a *App) heldKey() string {
 	pb := &a.playback
-	return fmt.Sprintf("%s|%v|%v%v%v", pb.mutedMic, a.ptt.pressed, pb.pausedActive, pb.talkLive, pb.holdLive)
+	return fmt.Sprintf("%s|%v|%v%v%v%v%v", pb.mutedMic, a.ptt.pressed, pb.pausedActive, pb.talkLive, pb.holdLive, a.ptt.userTalk, a.soundsPaused())
 }
 
 // --- building the flow -------------------------------------------------------------
@@ -349,9 +349,12 @@ func (a *App) audioFlow() ui.AudioFlow {
 	f.CableLine = a.cableLine()
 	f.YouPipe = ui.Pipe{State: ui.PipeOn, Level: a.flowLevel(&l.monitor)}
 
-	// Playback paused: by the phone's pause, talk-through or a pause key.
-	// Both of the soundboard's streams stop and show the pause icon; the
-	// label goes on the headphones' pipe, which has the room for it.
+	// Playback paused: by the phone's pause, talk-through, a pause key or the
+	// user's own push-to-talk. While sounds are paused, both of the
+	// soundboard's streams stop and show the pause icon; the label goes on
+	// the headphones' pipe, which has the room for it. With nothing paused
+	// (the pause began with nothing playing, and sounds started since play),
+	// the pipes run and only the label says what is held.
 	pb := &a.playback
 	if pb.pausedActive || pb.talkLive || pb.holdLive {
 		label, tip := "Paused", "Playback is paused from the phone."
@@ -359,14 +362,23 @@ func (a *App) audioFlow() ui.AudioFlow {
 		switch {
 		case pb.talkLive:
 			label, tip = "Talking", "Talk-through: the sounds pause while you talk, push-to-talk stays held."
+		case pb.holdLive && a.ptt.userTalk:
+			label, tip = "You talk", "The sounds pause while you hold your push-to-talk key. Letting go resumes them, and Resound presses push-to-talk again. Click for the keys."
+			onClick = func() { a.openPage(pageKeys) }
 		case pb.holdLive:
 			label, tip = "Pause key held", "The sounds pause while you hold a pause key, and your mic and push-to-talk are let go. Click for the keys."
 			onClick = func() { a.openPage(pageKeys) }
 		}
-		if f.CablePipe.State == ui.PipeOn {
-			f.CablePipe = ui.Pipe{State: ui.PipeHeld, Badge: &ui.Badge{Icon: ui.IconPause, Tip: tip, OnClick: onClick}}
+		switch {
+		case a.soundsPaused():
+			if f.CablePipe.State == ui.PipeOn {
+				f.CablePipe = ui.Pipe{State: ui.PipeHeld, Badge: &ui.Badge{Icon: ui.IconPause, Tip: tip, OnClick: onClick}}
+			}
+			f.YouPipe = ui.Pipe{State: ui.PipeHeld, Badge: &ui.Badge{Icon: ui.IconPause, Label: label, Tip: tip, OnClick: onClick}}
+		case pb.holdLive || pb.talkLive:
+			// A key or the phone's talk button is held, but nothing is paused.
+			f.YouPipe.Badge = &ui.Badge{Icon: ui.IconPause, Label: label, Tip: tip, OnClick: onClick}
 		}
-		f.YouPipe = ui.Pipe{State: ui.PipeHeld, Badge: &ui.Badge{Icon: ui.IconPause, Label: label, Tip: tip, OnClick: onClick}}
 	}
 	if s, ok := a.outputStatus(audio.RoleMonitor); ok && !s.Running && s.Err != nil {
 		f.YouPipe = ui.Pipe{State: ui.PipeBroken, Badge: &ui.Badge{
@@ -664,8 +676,8 @@ func (a *App) cableLine() ui.Pipe {
 			OnClick: a.flowFix(func() {})}}
 	case a.ptt.pressed != nil:
 		return ui.Pipe{State: ui.PipeOn, Level: a.flowLevel(&a.levels.others), Badge: &ui.Badge{
-			Icon: ui.IconKeyboard, Label: "Holding " + a.ptt.pressed.String(), Tone: ui.ToneGood,
-			Tip:     "Resound holds your game's push-to-talk key, so the game sends what plays. Click for push-to-talk settings.",
+			Icon: ui.IconKeyboard, Label: "Holding " + keysText(a.ptt.held), Tone: ui.ToneGood,
+			Tip:     "Resound holds your game's push-to-talk key, so the game sends what plays. Click for the keybinds.",
 			OnClick: func() { a.openPage(pageKeys) }}}
 	case a.ownRouting():
 		return ui.Pipe{State: ui.PipeOn, Level: a.flowLevel(&a.levels.others), Badge: &ui.Badge{Icon: ui.IconInfo, Label: "Your mixer",

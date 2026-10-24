@@ -213,36 +213,6 @@ func (a *App) toggleOverlayPreview() {
 	a.render()
 }
 
-// setOverlayKey sets the recorded key, unless another hotkey uses it.
-func (a *App) setOverlayKey(c input.Combo) {
-	switch {
-	case containsCombo(a.cfg.PauseHotkeys, c):
-		a.ptt.hotkeyNote = c.String() + " is already a pause key."
-	case containsCombo(a.cfg.StopHotkeys, c):
-		a.ptt.hotkeyNote = c.String() + " is already a stop key."
-	case input.SameCombo(c, a.cfg.PushToTalkKeys):
-		a.ptt.hotkeyNote = c.String() + " is the push-to-talk key Resound presses."
-	default:
-		a.cfg.OverlayKeys = slices.Clone(c)
-		a.save()
-		logx.Printf("overlay: key set to %s", c)
-		a.applyHotkeys()
-	}
-	a.render()
-}
-
-func (a *App) clearOverlayKey() {
-	if a.overlay.open && !a.overlay.preview {
-		a.closeOverlay()
-	}
-	a.cfg.OverlayKeys = nil
-	a.ptt.hotkeyNote = ""
-	a.save()
-	logx.Printf("overlay: off")
-	a.applyHotkeys()
-	a.render()
-}
-
 func (a *App) setOverlaySide(left bool) {
 	a.cfg.OverlayRight = !left
 	a.save()
@@ -282,43 +252,13 @@ func (a *App) overlayPreviewRow(more ...string) ui.Row {
 }
 
 func (a *App) overlayPage() []ui.Row {
-	p := &a.ptt
 	rows := []ui.Row{
 		ui.Header("In-game overlay", a.back),
 		a.overlayPreviewRow(
 			"Esc closes the bar. Hold Esc to also stop all sounds.",
 			"Your game keeps the focus: only the key, Esc and the mouse wheel are kept from it while the bar shows."),
 		ui.Section("Key"),
-	}
-	switch {
-	case p.capturing && p.target == captureOverlay:
-		got := "…"
-		if len(p.captured) > 0 {
-			got = p.captured.String() + " …"
-		}
-		rows = append(rows,
-			ui.Text("Press the key or combination", got, ui.ToneWarning),
-			ui.Text("Keyboard keys only. Esc cancels.", "", ui.ToneMuted))
-	case len(a.cfg.OverlayKeys) == 0:
-		rows = append(rows, ui.Text("No key: the overlay is off", "", ui.ToneMuted))
-	default:
-		rows = append(rows, ui.Text(a.overlayKeyText(), "", ui.ToneGood))
-	}
-	if !(p.capturing && p.target == captureOverlay) {
-		label := "Set key"
-		if len(a.cfg.OverlayKeys) > 0 {
-			label = "Change key"
-		}
-		rows = append(rows, ui.Buttons(
-			ui.Action{Label: label, Disabled: p.capturing, OnClick: func() { a.startCapture(captureOverlay) }},
-			ui.Action{Label: "Turn off", Disabled: len(a.cfg.OverlayKeys) == 0, OnClick: a.clearOverlayKey},
-		))
-	}
-	if p.hotkeyNote != "" && p.noteFor == captureOverlay {
-		rows = append(rows, ui.Paragraph(p.hotkeyNote, ui.ToneWarning))
-	}
-	if a.hotkeyErr != "" && len(a.cfg.OverlayKeys) > 0 {
-		rows = append(rows, ui.Paragraph(a.hotkeyErr, ui.ToneBad))
+		a.keybindCard(keyTarget{fn: fnOverlay}),
 	}
 	rows = append(rows,
 		ui.Section("Screen edge"),

@@ -59,9 +59,9 @@ While the audio flow is on screen, Resound listens to your microphone and to CAB
 | Page | What's there |
 |---|---|
 | Audio & voice chat | The audio flow, VB-Cable, mic mute, **Restart outputs**, **Windows sound**, Advanced output choice |
-| Push-to-talk | Your game's push-to-talk key, pause keys and stop keys |
+| Keybinds | Push-to-talk, pause and stop keys and mouse buttons, everywhere or for one game |
 | Sound library | Folders, importing, loudness |
-| In-game overlay | The overlay's key and screen edge |
+| In-game overlay | The overlay's key or mouse button and screen edge |
 | Remote App | Pairing, the firewall, signing out devices |
 | App & startup | Version, start with Windows, updates, uninstall |
 | Backup & restore | Backups of your settings, and a zip of your sound files |
