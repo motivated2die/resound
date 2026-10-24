@@ -32,6 +32,7 @@ const (
 	fontBold
 	fontCaption
 	fontTitle
+	fontSmall // the panel tab's labels
 	fontCount
 )
 
@@ -51,6 +52,7 @@ func newFonts(scale float64) *fonts {
 		fontBold:    {13, 600},
 		fontCaption: {11, 600},
 		fontTitle:   {16, 600},
+		fontSmall:   {10, 600},
 	}
 	for k, s := range spec {
 		lf := logFont{Height: -int32(s.size*scale + 0.5), Weight: s.weight, Quality: 5 /* CLEARTYPE_QUALITY */}

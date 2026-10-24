@@ -47,3 +47,58 @@ func glowPixels(w, h int, cx, cy, rx, ry float64, accent uint32, g glowSpec) []u
 	}
 	return pix
 }
+
+// The glow lights the panel's border too: its 1-pixel edge turns from the
+// plain border colour to a light accent tint near the top left corner,
+// following the same falloff as the background light.
+
+// borderGlow is how far towards the light colour the edge goes at the
+// corner; borderReach how much further than the background light it
+// reaches along the edges.
+const (
+	borderGlow  = 0.52
+	borderReach = 1.4
+)
+
+// borderPixels renders the 1-pixel border of a w×h window whose corners
+// Windows rounds with radius r (pixels), as premultiplied RGBA: base, lit
+// towards light by glow g centred on the top left corner (radii rx, ry).
+// Only the ring's inner edge is anti-aliased: its outer edge is the
+// window's, which Windows smooths when it rounds the corners.
+func borderPixels(w, h int, r, rx, ry float64, base, light uint32, g glowSpec) []uint8 {
+	pix := make([]uint8, 4*w*h)
+	floor := math.Exp(-g.falloff)
+	for y := range h {
+		for x := range w {
+			px, py := float64(x)+0.5, float64(y)+0.5
+			d := roundRectDistance(px, py, float64(w), float64(h), r)
+			if d > 0.5 {
+				continue // outside the window
+			}
+			inner := max(0, min(1, -0.5-d)) // coverage of the window inset by a pixel
+			a := 1 - inner
+			if a <= 0 {
+				continue
+			}
+			lit := 0.0
+			if t := (px/rx)*(px/rx) + (py/ry)*(py/ry); t < 1 {
+				lit = borderGlow * (math.Exp(-g.falloff*t) - floor) / (1 - floor)
+			}
+			i := 4 * (y*w + x)
+			for c := range 3 {
+				b, l := float64(base>>(8*c)&0xFF), float64(light>>(8*c)&0xFF)
+				pix[i+c] = uint8(math.Round((b + (l-b)*lit) * a))
+			}
+			pix[i+3] = uint8(math.Round(255 * a))
+		}
+	}
+	return pix
+}
+
+// roundRectDistance is the signed distance from (x, y) to the edge of the
+// rectangle (0, 0)–(w, h) with corner radius r: negative inside.
+func roundRectDistance(x, y, w, h, r float64) float64 {
+	qx := math.Abs(x-w/2) - (w/2 - r)
+	qy := math.Abs(y-h/2) - (h/2 - r)
+	return math.Hypot(max(qx, 0), max(qy, 0)) + min(max(qx, qy), 0) - r
+}

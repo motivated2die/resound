@@ -24,7 +24,7 @@ type Tray struct {
 	hwnd           uintptr
 	nid            notifyIconData
 	popup          *Popup
-	menu           *trayMenu // right-click: Show panel, Quit
+	menu           *trayMenu // right-click: Show panel, Quit, Reset panel position
 	taskbarCreated uint32
 
 	qmu   sync.Mutex
@@ -63,9 +63,11 @@ func NewTray(tooltip string) (*Tray, error) {
 	if t.popup, err = newPopup(); err != nil {
 		return nil, fmt.Errorf("creating popup: %w", err)
 	}
-	t.menu, err = newTrayMenu([2]Action{
+	t.popup.dockAnchor = t.iconAnchor
+	t.menu, err = newTrayMenu([3]Action{
 		{Label: "Show panel", OnClick: t.showPanelFromMenu},
 		{Label: "Quit", Icon: IconPower, Style: ButtonDanger, OnClick: t.quitFromMenu},
+		{Label: "Reset panel position", Icon: IconRestore, OnClick: t.resetPanelFromMenu},
 	})
 	if err != nil {
 		return nil, fmt.Errorf("creating tray menu: %w", err)
@@ -163,6 +165,7 @@ func (t *Tray) toggleMenu() {
 	case t.menu.recentlyHidden():
 		// This click closed it by taking the focus away; leave it closed.
 	default:
+		t.menu.actions[2].Disabled = !t.popup.Moved() // already at the taskbar
 		t.menu.show(cursorPos())
 	}
 }
@@ -175,6 +178,13 @@ func (t *Tray) showPanelFromMenu() {
 		return
 	}
 	t.ShowPanel()
+}
+
+// resetPanelFromMenu docks the panel at the taskbar again and shows it
+// there, so the user sees where it went.
+func (t *Tray) resetPanelFromMenu() {
+	t.popup.ResetPosition()
+	t.showPanelFromMenu()
 }
 
 func (t *Tray) quitFromMenu() {
@@ -283,15 +293,20 @@ func (t *Tray) ShowPanel() {
 	if t.popup.Visible() {
 		return
 	}
+	t.popup.ShowAt(t.iconAnchor())
+}
+
+// iconAnchor is the centre of the tray icon, or, when the icon sits in the
+// hidden-icons overflow, the taskbar's corner: where the panel docks.
+func (t *Tray) iconAnchor() point {
 	id := notifyIconIdentifier{Wnd: t.hwnd, ID: t.nid.ID}
 	id.Size = uint32(unsafe.Sizeof(id))
 	var r rect
 	if hr, _, _ := procShellNotifyIconGetRect.Call(uintptr(unsafe.Pointer(&id)), uintptr(unsafe.Pointer(&r))); hr == 0 && r.w() > 0 {
-		t.popup.ShowAt(point{r.Left + r.w()/2, r.Top + r.h()/2})
-		return
+		return point{r.Left + r.w()/2, r.Top + r.h()/2}
 	}
 	work, _ := taskbarWorkArea()
-	t.popup.ShowAt(point{work.Right - 1, work.Bottom - 1})
+	return point{work.Right - 1, work.Bottom - 1}
 }
 
 // TogglePanel opens the panel like ShowPanel, or closes it if it is open,

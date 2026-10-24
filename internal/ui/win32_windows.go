@@ -95,6 +95,7 @@ const (
 	wmContextMenu            = 0x007B
 	waInactive               = 0
 	vkEscape                 = 0x1B
+	vkBrowserBack            = 0xA6
 	vkReturn                 = 0x0D
 	vkUp                     = 0x26
 	vkDown                   = 0x28
@@ -126,6 +127,8 @@ const (
 
 	dwmwaWindowCornerPreference = 33
 	dwmwcpRound                 = 2
+	dwmwaBorderColor            = 34
+	dwmColorNone                = 0xFFFFFFFE // no border
 
 	dtLeft        = 0x0000
 	dtCenter      = 0x0001
@@ -272,8 +275,14 @@ func registerClass(name string, style uint32, proc uintptr) error {
 }
 
 func createWindow(exStyle, style uint32, class string) (uintptr, error) {
+	return createOwnedWindow(exStyle, style, class, 0)
+}
+
+// createOwnedWindow creates a top-level window owned by owner: Windows
+// always keeps it above its owner and raises them together.
+func createOwnedWindow(exStyle, style uint32, class string, owner uintptr) (uintptr, error) {
 	h, _, err := procCreateWindowExW.Call(uintptr(exStyle), uintptr(unsafe.Pointer(utf16Ptr(class))), 0,
-		uintptr(style), 0, 0, 0, 0, 0, 0, moduleHandle(), 0)
+		uintptr(style), 0, 0, 0, 0, owner, 0, moduleHandle(), 0)
 	if h == 0 {
 		return 0, err
 	}
@@ -292,6 +301,28 @@ func InitDPIAwareness() {
 	if procSetProcessDpiAwarenessContext.Find() == nil {
 		procSetProcessDpiAwarenessContext.Call(dpiAwarenessPerMonitorV2)
 	}
+}
+
+// windowBorder is the colour of the 1-pixel border around rounded windows:
+// about what Windows 11's own translucent grey looks like on a dark desktop.
+var windowBorder = rgb(0x38, 0x38, 0x38)
+
+// roundCorners asks Windows 11 to round a window's corners, smoothly, as
+// it does for its own windows, with border as the colour of the 1-pixel
+// border it draws then (dwmColorNone: none, the window paints its own). It
+// returns false where it can't (Windows 10).
+//
+// Windows' border is translucent by default, so whatever lies behind shows
+// through it: the panel's sides went lighter where its tab is tucked under
+// them. An opaque colour looks the same everywhere.
+func roundCorners(hwnd uintptr, border uint32) bool {
+	if procDwmSetWindowAttribute.Find() != nil {
+		return false
+	}
+	pref := uint32(dwmwcpRound)
+	hr, _, _ := procDwmSetWindowAttribute.Call(hwnd, dwmwaWindowCornerPreference, uintptr(unsafe.Pointer(&pref)), 4)
+	procDwmSetWindowAttribute.Call(hwnd, dwmwaBorderColor, uintptr(unsafe.Pointer(&border)), 4)
+	return hr == 0
 }
 
 // monitorAt returns the work area and DPI scale of the monitor at pt.

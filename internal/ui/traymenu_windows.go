@@ -9,7 +9,8 @@ import (
 
 // trayMenu is the small menu a right-click on the tray icon opens: "Show
 // panel" and "Quit" side by side (two thirds and one third), so quitting is
-// always one click away, whatever page the panel shows. It looks like the
+// always one click away, whatever page the panel shows, and "Reset panel
+// position" below them, for a panel moved away from the taskbar. It looks like the
 // panel (its background, glow, buttons and drop shadow) but closes like a
 // menu: when it loses the focus (a click anywhere else), on Esc, or after a
 // choice.
@@ -19,7 +20,8 @@ type trayMenu struct {
 	fonts   *fonts
 	scale   float64
 	w, h    int32 // current size, device pixels
-	actions [2]Action
+	actions [3]Action
+	rounded bool // Windows rounds its corners; it paints its border
 
 	hover, press int // button index, -1 for none
 	tracks       bool
@@ -34,7 +36,7 @@ const (
 	trayMenuBtnHL = 34  // button height
 )
 
-func newTrayMenu(actions [2]Action) (*trayMenu, error) {
+func newTrayMenu(actions [3]Action) (*trayMenu, error) {
 	m := &trayMenu{actions: actions, hover: -1, press: -1, scale: 1}
 	if err := registerClass(trayMenuClass, 0, windows.NewCallback(m.wndProc)); err != nil {
 		return nil, err
@@ -44,10 +46,7 @@ func newTrayMenu(actions [2]Action) (*trayMenu, error) {
 		return nil, err
 	}
 	m.hwnd = h
-	if procDwmSetWindowAttribute.Find() == nil { // rounded corners on Windows 11, like the panel
-		pref := uint32(dwmwcpRound)
-		procDwmSetWindowAttribute.Call(h, dwmwaWindowCornerPreference, uintptr(unsafe.Pointer(&pref)), 4)
-	}
+	m.rounded = roundCorners(h, dwmColorNone) // like the panel, with its glowing border
 	if m.shadow, err = newShadow(); err != nil {
 		return nil, err
 	}
@@ -77,7 +76,7 @@ func (m *trayMenu) show(pt point) {
 		m.scale = scale
 	}
 	c := m.canvas(0)
-	m.w, m.h = c.px(trayMenuWL), 2*c.px(trayMenuPadL)+c.px(trayMenuBtnHL)
+	m.w, m.h = c.px(trayMenuWL), trayMenuHeight(c)
 	m.hover, m.press = -1, -1
 	gap := c.px(popupGapL)
 	x := max(work.Left+gap, min(pt.X-m.w/2, work.Right-gap-m.w))
@@ -103,12 +102,23 @@ func (m *trayMenu) hide() {
 	m.hover, m.press, m.tracks = -1, -1, false
 }
 
-// boxes are the two buttons: two thirds and one third of the width.
-func (m *trayMenu) boxes(c *canvas) [2]rect {
-	pad, gap := c.px(trayMenuPadL), c.px(trayMenuGapL)
+// trayMenuHeight is the menu's height: two rows of buttons.
+func trayMenuHeight(c *canvas) int32 {
+	return 2*c.px(trayMenuPadL) + 2*c.px(trayMenuBtnHL) + c.px(trayMenuGapL)
+}
+
+// boxes are the buttons: the first two side by side (two thirds and one
+// third of the width), the third below them across the whole width.
+func (m *trayMenu) boxes(c *canvas) [3]rect {
+	pad, gap, bh := c.px(trayMenuPadL), c.px(trayMenuGapL), c.px(trayMenuBtnHL)
 	in := rect{pad, pad, m.w - pad, m.h - pad}
 	split := in.Left + (in.w()-gap)*2/3
-	return [2]rect{{in.Left, in.Top, split, in.Bottom}, {split + gap, in.Top, in.Right, in.Bottom}}
+	top := rect{in.Left, in.Top, in.Right, in.Top + bh}
+	return [3]rect{
+		{top.Left, top.Top, split, top.Bottom},
+		{split + gap, top.Top, top.Right, top.Bottom},
+		{in.Left, top.Bottom + gap, in.Right, top.Bottom + gap + bh},
+	}
 }
 
 // hit returns the button at a client point, -1 for none.
@@ -162,7 +172,7 @@ func (m *trayMenu) wndProc(hwnd uintptr, msg uint32, w, l uintptr) uintptr {
 		i, pressed := m.hit(loword(l), hiword(l)), m.press
 		m.press = -1
 		procInvalidateRect.Call(hwnd, 0, 0)
-		if i >= 0 && i == pressed {
+		if i >= 0 && i == pressed && !m.actions[i].Disabled {
 			m.hide() // before the action, which may show the panel or quit
 			if a := m.actions[i]; a.OnClick != nil {
 				a.OnClick()
@@ -196,5 +206,8 @@ func (m *trayMenu) draw(c *canvas) {
 	for i, box := range m.boxes(c) {
 		a := m.actions[i]
 		paintButton(c, box, a.Label, a.Icon, a.Style, a.Disabled, m.hover == i, m.press == i)
+	}
+	if m.rounded {
+		c.glowBorder(m.w, m.h)
 	}
 }

@@ -230,6 +230,10 @@ func Run() int {
 	a.tray.Popup().OnDrop = a.onDropAnywhere // drops on a folder go to its own field
 	a.tray.Popup().OnKey = a.onPanelKey
 	a.tray.Popup().OnEscape = a.onEscape
+	if pos := a.cfg.PanelPos; pos != nil {
+		a.tray.Popup().SetPosition(&ui.PanelPos{X: pos.X, Y: pos.Y})
+	}
+	a.tray.Popup().OnMove = a.onPanelMove
 	a.tray.OnQuit = a.quit // the tray icon's right-click menu
 	a.tray.OnQuitRequest = func() {
 		logx.Printf("quit requested by another process (update or uninstall)")
@@ -320,6 +324,16 @@ func (a *App) onEscape() bool {
 		a.back()
 	}
 	return true
+}
+
+// onPanelMove keeps where the user moved the panel (nil: back at the
+// taskbar), so it opens there after a restart too.
+func (a *App) onPanelMove(pos *ui.PanelPos) {
+	a.cfg.PanelPos = nil
+	if pos != nil {
+		a.cfg.PanelPos = &config.PanelPos{X: pos.X, Y: pos.Y}
+	}
+	a.save()
 }
 
 // reopenPanel shows the panel again after a dialog (folder or file picker)

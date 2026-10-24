@@ -47,8 +47,8 @@ func newShadow() (*shadow, error) {
 }
 
 // place shows the shadow around popup rectangle r (screen pixels), directly
-// beneath the popup.
-func (s *shadow) place(popup uintptr, r rect, scale float64) {
+// beneath window above (the popup, or the panel's tab).
+func (s *shadow) place(above uintptr, r rect, scale float64) {
 	if s == nil {
 		return
 	}
@@ -61,7 +61,7 @@ func (s *shadow) place(popup uintptr, r rect, scale float64) {
 	screen, _, _ := procGetDC.Call(0)
 	mem, _, _ := procCreateCompatibleDC.Call(screen)
 	old, _, _ := procSelectObject.Call(mem, s.dib.bmp)
-	dst := point{r.Left - s.pad, r.Top - s.pad}
+	dst := s.origin(r)
 	size := struct{ CX, CY int32 }{s.dib.w, s.dib.h}
 	var src point
 	blend := uint32(0 | 0<<8 | 255<<16 | 1<<24) // AC_SRC_OVER, alpha 255, AC_SRC_ALPHA
@@ -70,9 +70,12 @@ func (s *shadow) place(popup uintptr, r rect, scale float64) {
 	procSelectObject.Call(mem, old)
 	procDeleteDC.Call(mem)
 	procReleaseDC.Call(0, screen)
-	// Right below the popup, which is topmost; no activation.
-	procSetWindowPos.Call(s.hwnd, popup, 0, 0, 0, 0, swpNoMove|swpNoSize|swpNoActivate|swpShowWindow)
+	// Right below it (it is topmost); no activation.
+	procSetWindowPos.Call(s.hwnd, above, 0, 0, 0, 0, swpNoMove|swpNoSize|swpNoActivate|swpShowWindow)
 }
+
+// origin is the shadow window's top left corner around popup rectangle r.
+func (s *shadow) origin(r rect) point { return point{r.Left - s.pad, r.Top - s.pad} }
 
 func (s *shadow) hide() {
 	if s != nil {

@@ -93,6 +93,63 @@ func (c *canvas) glows() {
 	c.glow(cornerGlow, rx, ry, 0, 0, 0, 0)
 }
 
+// windowRadiusL is the radius Windows 11 rounds the panel's corners with
+// (DWMWCP_ROUND), logical pixels; it scales with the screen's DPI.
+const windowRadiusL = 8
+
+// borderLight is the colour the border turns to at the glow: the accent,
+// lightened.
+var borderLight = rgb(0xA8, 0xEF, 0xD3)
+
+type borderKey struct {
+	w, h  int32
+	scale float64
+}
+
+// borderCache holds the last rendered border per size (UI thread only).
+var borderCache = map[borderKey]*dib{}
+
+// glowBorder draws the 1-pixel border of a w×h window rounded by Windows,
+// lit by the corner glow (see borderPixels), in place of Windows' own
+// border. Only the strips along the edges are blended.
+func (c *canvas) glowBorder(w, h int32) {
+	key := borderKey{w, h, c.scale}
+	d, ok := borderCache[key]
+	if !ok {
+		if len(borderCache) > 8 { // sizes come and go with pages and screens
+			for k, old := range borderCache {
+				if old != nil {
+					procDeleteObject.Call(old.bmp)
+				}
+				delete(borderCache, k)
+			}
+		}
+		r := windowRadiusL * c.scale
+		rx, ry := borderReach*float64(c.px(cornerGlow.radiusXL)), borderReach*float64(c.px(cornerGlow.radiusYL))
+		d = newDIB(borderPixels(int(w), int(h), r, rx, ry, windowBorder, borderLight, cornerGlow), w, h)
+		borderCache[key] = d
+	}
+	band := min(c.px(windowRadiusL)+2, h/2) // the rounded corners' rows and columns
+	c.blitPart(d, 0, 0, w, band)            // top
+	c.blitPart(d, 0, h-band, w, band)       // bottom
+	c.blitPart(d, 0, band, band, h-2*band)  // left
+	c.blitPart(d, w-band, band, band, h-2*band)
+}
+
+// blitPart alpha-blends the w×h part of d at (x, y) to the same place.
+func (c *canvas) blitPart(d *dib, x, y, w, h int32) {
+	if d == nil || c.dc == 0 || w <= 0 || h <= 0 {
+		return
+	}
+	src, _, _ := procCreateCompatibleDC.Call(c.dc)
+	old, _, _ := procSelectObject.Call(src, d.bmp)
+	const blend = 0 | 0<<8 | 255<<16 | 1<<24 // AC_SRC_OVER, constant alpha 255, AC_SRC_ALPHA
+	procAlphaBlend.Call(c.dc, uintptr(x), uintptr(y), uintptr(w), uintptr(h),
+		src, uintptr(x), uintptr(y), uintptr(w), uintptr(h), blend)
+	procSelectObject.Call(src, old)
+	procDeleteDC.Call(src)
+}
+
 // glow draws a bw×bh box of g's light centred at (cx, cy) inside the box,
 // with the box's top left corner at (x, y).
 func (c *canvas) glow(g glowSpec, bw, bh int32, cx, cy float64, x, y int32) {

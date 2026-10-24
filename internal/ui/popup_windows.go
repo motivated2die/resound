@@ -18,7 +18,7 @@ const (
 	// Flex row). Taller pages grow it, up to the work area.
 	popupMinL = 560
 	// popupMaxL is the maximum logical height; longer pages scroll. Small
-	// work areas lower it further, leaving room for the close tab.
+	// work areas lower it further, leaving room for the tab.
 	popupMaxL = 680
 )
 
@@ -40,7 +40,13 @@ type Popup struct {
 	height   int32
 	contentH int32
 	scroll   int32
-	anchor   point
+	anchor   point // the tray icon it docks at
+	work     rect  // work area of the screen it shows on
+	pos      point // its top left corner, screen pixels
+	// custom is where the user moved it by its tab; nil = docked at the
+	// taskbar. It is shown on its screen, kept inside the work area.
+	custom *point
+	move   *moveState // the panel being dragged by its tab, if any
 
 	hoverRow, hoverSeg int
 	pressRow, pressSeg int
@@ -48,9 +54,10 @@ type Popup struct {
 	lastHidden         time.Time
 
 	measureDC uintptr // memory DC for measuring text outside painting
+	rounded   bool    // Windows rounds its corners; it paints its border
 
 	shadow *shadow   // drop shadow window beneath the popup
-	tab    *closeTab // the "Close" tab above its top right corner
+	tab    *panelTab // the tab above it: move handle and "Close"
 
 	dd   *dropdownState // open dropdown list, if any
 	drag *dragState     // slider being dragged, if any
@@ -70,6 +77,12 @@ type Popup struct {
 	// while it accepts drops (see SetAcceptDrops), except on rows that are
 	// drop fields of their own (FolderDrop).
 	OnDrop func(DropData)
+	// OnMove runs when the user moved the panel by its tab (pos) or reset
+	// it to the taskbar (nil), so the app can keep the position.
+	OnMove func(pos *PanelPos)
+	// dockAnchor returns the tray icon's position, for docking the panel
+	// again without a click on the icon.
+	dockAnchor func() point
 
 	drops    bool
 	ole      bool       // registered as an OLE drop target (links too)
@@ -140,24 +153,26 @@ func newPopup() (*Popup, error) {
 	if err := registerClass(popupClass, 0, windows.NewCallback(p.wndProc)); err != nil {
 		return nil, err
 	}
+	// The drop shadow is a window of its own (CS_DROPSHADOW is too faint),
+	// and so is the tab. They own each other in a chain, shadow → tab →
+	// popup, so Windows keeps them stacked in that order and raises them
+	// together: when a click raises the popup, nothing can come between it
+	// and its tab or shadow.
+	var err error
+	if p.shadow, err = newShadow(); err != nil {
+		return nil, err
+	}
+	if p.tab, err = newPanelTab(p, p.shadow.hwnd); err != nil {
+		return nil, err
+	}
 	// Child windows (a TextField's control) are clipped out of painting.
-	h, err := createWindow(wsExToolWindow|wsExTopmost, wsPopup|wsClipChildren, popupClass)
+	h, err := createOwnedWindow(wsExToolWindow|wsExTopmost, wsPopup|wsClipChildren, popupClass, p.tab.hwnd)
 	if err != nil {
 		return nil, err
 	}
 	p.hwnd = h
 	p.ole = registerDropTarget(p)
-	if procDwmSetWindowAttribute.Find() == nil { // rounded corners on Windows 11
-		pref := uint32(dwmwcpRound)
-		procDwmSetWindowAttribute.Call(h, dwmwaWindowCornerPreference, uintptr(unsafe.Pointer(&pref)), 4)
-	}
-	// The drop shadow is a window of its own (CS_DROPSHADOW is too faint).
-	if p.shadow, err = newShadow(); err != nil {
-		return nil, err
-	}
-	if p.tab, err = newCloseTab(p); err != nil {
-		return nil, err
-	}
+	p.rounded = roundCorners(h, dwmColorNone) // its border is painted, lit by the glow
 	return p, nil
 }
 
@@ -212,6 +227,7 @@ func (p *Popup) Hide() {
 	p.dd = nil
 	p.hideTip()
 	unwatchEscape()
+	p.endMove(true) // hidden mid-move: it stays where it got to
 	procShowWindow.Call(p.hwnd, swHide)
 	p.shadow.hide()
 	p.tab.hide()
@@ -225,8 +241,26 @@ func (p *Popup) Hide() {
 // tray icon that closed it (by deactivation) does not reopen it.
 func (p *Popup) recentlyHidden() bool { return time.Since(p.lastHidden) < 300*time.Millisecond }
 
+// screen returns the work area and scale of the screen the popup shows on:
+// while it is dragged, the one under the mouse; where the user put it, if
+// that point is still on a screen; else, docked, the tray icon's.
+func (p *Popup) screen() (work rect, scale float64, docked bool) {
+	switch {
+	case p.move != nil:
+		work, scale = monitorAt(p.move.cursor)
+		return work, scale, false
+	case p.custom != nil:
+		if work, scale, ok := monitorInfoAt(*p.custom); ok {
+			return work, scale, false
+		}
+	}
+	work, scale = monitorAt(p.anchor)
+	return work, scale, true
+}
+
 func (p *Popup) layoutAndPlace() {
-	work, scale := monitorAt(p.anchor)
+	work, scale, docked := p.screen()
+	p.work = work
 	if p.fonts == nil || p.fonts.scale != scale {
 		if p.fonts != nil {
 			p.fonts.destroy()
@@ -254,7 +288,7 @@ func (p *Popup) layoutAndPlace() {
 	}
 	c = p.canvas(0)
 	gap := c.px(popupGapL)
-	tabRoom := c.px(closeTabHL - closeTabUnderL)
+	tabRoom := p.tab.visibleH(c)
 	maxH := min(c.px(popupMaxL), work.h()-2*gap-tabRoom)
 	if minH := min(c.px(popupMinL), maxH) - 2*c.px(popupPadL); y < minH {
 		p.grow(minH - y)
@@ -266,21 +300,32 @@ func (p *Popup) layoutAndPlace() {
 	p.height = min(p.contentH+2*c.px(popupPadL), maxH)
 	p.scroll = max(0, min(p.scroll, p.maxScroll()))
 
-	// Horizontally centred on the anchor, kept inside the work area.
-	x := p.anchor.X - p.width/2
-	x = max(work.Left+gap, min(x, work.Right-gap-p.width))
-	// Next to the taskbar: above it when the anchor is in the lower half.
-	var yPos int32
-	if p.anchor.Y > work.Top+work.h()/2 {
-		yPos = work.Bottom - gap - p.height
-	} else {
-		yPos = work.Top + gap + tabRoom
-	}
-	procSetWindowPos.Call(p.hwnd, hwndTopmost, uintptr(x), uintptr(yPos), uintptr(p.width), uintptr(p.height), swpShowWindow)
-	p.shadow.place(p.hwnd, rect{x, yPos, x + p.width, yPos + p.height}, p.scale)
-	p.tab.place(rect{x, yPos, x + p.width, yPos + p.height}) // between the popup and its shadow
+	p.pos = p.target(docked)
+	r := rect{p.pos.X, p.pos.Y, p.pos.X + p.width, p.pos.Y + p.height}
+	procSetWindowPos.Call(p.hwnd, hwndTopmost, uintptr(r.Left), uintptr(r.Top), uintptr(p.width), uintptr(p.height), swpShowWindow)
+	p.shadow.place(p.tab.hwnd, r, p.scale) // below the tab
+	p.tab.place(r)                         // below the popup
 	p.syncField()
 	procInvalidateRect.Call(p.hwnd, 0, 0)
+}
+
+// target is where the laid-out popup goes on p.work: docked at the tray
+// icon, under the mouse while it is dragged, or where the user put it. The
+// last two are kept fully inside the work area with the tab, so a page that
+// makes the panel taller pushes it back onto the screen (and a shorter one
+// lets it return to its place).
+func (p *Popup) target(docked bool) point {
+	c := p.canvas(0)
+	tabH := p.tab.visibleH(c)
+	switch {
+	case docked:
+		return dockedPos(p.anchor, p.work, p.width, p.height, c.px(popupGapL), tabH)
+	case p.move != nil:
+		m := p.move
+		want := point{m.cursor.X - int32(m.offX*p.scale+0.5), m.cursor.Y - int32(m.offY*p.scale+0.5)}
+		return clampPanel(want, p.work, p.width, p.height, tabH)
+	}
+	return clampPanel(*p.custom, p.work, p.width, p.height, tabH)
 }
 
 func (p *Popup) maxScroll() int32 {
@@ -334,6 +379,9 @@ func (p *Popup) wndProc(hwnd uintptr, m uint32, w, l uintptr) uintptr {
 		if m == wmXButtonDown || m == wmXButtonUp {
 			return 1 // documented return value for X buttons
 		}
+		return 0
+	}
+	if p.screenChanged(m, w) {
 		return 0
 	}
 	switch m {
@@ -446,10 +494,20 @@ func (p *Popup) wndProc(hwnd uintptr, m uint32, w, l uintptr) uintptr {
 		procInvalidateRect.Call(hwnd, 0, 0)
 		return 0
 	case wmKeyDown:
+		if w == vkBrowserBack {
+			break // DefWindowProc makes it a WM_APPCOMMAND, as for the mouse
+		}
 		if w == vkEscape {
 			p.escape()
 		}
 		return 0
+	case wmAppCommand:
+		// The mouse's back button (DefWindowProc turns its WM_XBUTTONUP into
+		// this, unless OnKey took the button), or a back key.
+		if uint16(l>>16)&^faAppCommandMask == appCommandBack { // GET_APPCOMMAND_LPARAM
+			p.back()
+			return 1
+		}
 	case wmGlobalEscape: // Esc while another window has the focus
 		if p.dd != nil {
 			p.closeDropdown()
@@ -462,9 +520,40 @@ func (p *Popup) wndProc(hwnd uintptr, m uint32, w, l uintptr) uintptr {
 }
 
 // escape lets the app go back a page; when it doesn't, the popup closes.
+// While the panel is being moved, Esc puts it back instead.
 func (p *Popup) escape() {
+	if p.move != nil {
+		p.cancelMove()
+		return
+	}
 	if p.OnEscape == nil || !p.OnEscape() {
 		p.Hide()
+	}
+}
+
+// backer is implemented by page headers with a back button.
+type backer interface {
+	// back runs the back button, if there is one, and reports whether it did.
+	back() bool
+}
+
+// back goes back a page as the page's back button would, for the mouse's
+// back button. Unlike Esc it never closes the panel: on pages without a
+// back button it does nothing. An open dropdown list just closes.
+func (p *Popup) back() {
+	if p.move != nil || p.drag != nil {
+		return
+	}
+	if p.dd != nil {
+		p.closeDropdown()
+		return
+	}
+	for _, s := range p.slots {
+		if b, ok := s.row.(backer); ok {
+			p.hideTip()
+			b.back() // may call SetRows
+			return
+		}
 	}
 }
 
@@ -516,6 +605,9 @@ func (p *Popup) paint() {
 	}
 	p.paintDropdown(c)
 	p.paintTip(c)
+	if p.rounded {
+		c.glowBorder(p.width, p.height)
+	}
 	procBitBlt.Call(hdc, 0, 0, uintptr(p.width), uintptr(p.height), mem, 0, 0, 0x00CC0020 /* SRCCOPY */)
 }
 

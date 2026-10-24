@@ -3,6 +3,7 @@ package config
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -35,5 +36,30 @@ func TestMuteDefaults(t *testing.T) {
 	write(`{"muteMicMinSeconds": 0.4}`) // under a second reads "always"
 	if c := Load(); c.MuteMicMinSeconds != 0 {
 		t.Errorf("0.4 s: threshold %v", c.MuteMicMinSeconds)
+	}
+}
+
+// The panel's position is kept across saves, negative coordinates (a screen
+// left of the main one) included; configs without one dock the panel.
+func TestPanelPos(t *testing.T) {
+	t.Setenv("LOCALAPPDATA", t.TempDir())
+	if c := Load(); c.PanelPos != nil {
+		t.Errorf("new config: %+v", c.PanelPos)
+	}
+	cfg := Default()
+	cfg.PanelPos = &PanelPos{X: -1700, Y: 220}
+	if err := Save(cfg); err != nil {
+		t.Fatal(err)
+	}
+	if c := Load(); c.PanelPos == nil || *c.PanelPos != (PanelPos{X: -1700, Y: 220}) {
+		t.Errorf("saved -1700,220, loaded %+v", c.PanelPos)
+	}
+	cfg.PanelPos = nil
+	if err := Save(cfg); err != nil {
+		t.Fatal(err)
+	}
+	data, _ := os.ReadFile(filepath.Join(Dir(), "config.json"))
+	if c := Load(); c.PanelPos != nil || strings.Contains(string(data), "panelPos") {
+		t.Errorf("reset: %+v, file %s", c.PanelPos, data)
 	}
 }

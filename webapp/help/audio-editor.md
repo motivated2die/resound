@@ -5,7 +5,7 @@ Resound can cut sounds out of videos and other files, and trim the sounds alread
 ## What you can do
 
 - **Cut sounds from a video or another audio file.** Drop a video, or audio in a format Resound doesn't play directly, onto a folder on the Sound library page. Cut as many clips from it as you like: each one becomes a sound in that folder.
-- **Trim or edit a sound in your library.** Open a folder's sound list and click a sound's **scissors**. Save, and the edited sound replaces the original.
+- **Trim or edit a sound in your library.** Open a folder's sound list and click a sound's **scissors**. Save, and the edited sound replaces the original; the editor window closes a moment later (press **Keep editing** to stay).
 
 The editor itself can do more than trimming: you can select and cut parts, add fades and change the volume. Whatever it plays back is what Resound saves.
 
@@ -30,7 +30,7 @@ Right after you accept, your browser may ask whether `getresound.app` may **acce
 3. A browser window opens with the file loaded. In the panel, the folder reads **Editing in your browser…**.
 4. Select the part you want (drag across the waveform) and press **Add to Resound**. The clip is saved into the folder, and the usual card opens in the panel to name it, preview it or discard it.
 5. Select the next part and press **Add to Resound** again for another clip. Each clip you add shows as a chip in the window's top bar; the newest is highlighted.
-6. When you're done, close the window, or press **Stop editing** under the folder in the panel.
+6. When you're done, press **Done** at the top of the window. The window closes, and the clips you added stay in the folder. **Stop editing** under the folder in the panel does the same.
 
 Up to three files open at once from one drop, each in its own window.
 

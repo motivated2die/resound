@@ -40,3 +40,33 @@ func TestGlowFalloff(t *testing.T) {
 		t.Errorf("halfway opacity: falloff 3 → %d, 5.5 → %d; want the tighter one dimmer", soft, tight)
 	}
 }
+
+// The border is one opaque pixel along the straight edges, nothing inside or
+// outside the rounded corners, and lighter near the glow's corner than far
+// from it.
+func TestBorderPixels(t *testing.T) {
+	const w, h, r = 200, 300, 8.0
+	base, light := rgb(0x38, 0x38, 0x38), rgb(0xA8, 0xEF, 0xD3)
+	pix := borderPixels(w, h, r, 150, 140, base, light, cornerGlow)
+	at := func(x, y int) [4]uint8 {
+		i := 4 * (y*w + x)
+		return [4]uint8{pix[i], pix[i+1], pix[i+2], pix[i+3]}
+	}
+	for _, p := range [][2]int{{0, h / 2}, {w - 1, h / 2}, {w / 2, 0}, {w / 2, h - 1}} {
+		if a := at(p[0], p[1])[3]; a != 255 {
+			t.Errorf("edge pixel %v opacity %d, want 255", p, a)
+		}
+	}
+	for _, p := range [][2]int{{1, h / 2}, {w / 2, 1}, {w / 2, h / 2}, {0, 0}, {w - 1, h - 1}} {
+		if a := at(p[0], p[1])[3]; a != 0 {
+			t.Errorf("pixel %v opacity %d, want transparent (inside, or outside a corner)", p, a)
+		}
+	}
+	near, far := at(0, 20), at(0, h-20)
+	if near[1] <= far[1]+20 {
+		t.Errorf("green near the glow %d, far from it %d; want clearly lighter near it", near[1], far[1])
+	}
+	if far != [4]uint8{0x38, 0x38, 0x38, 255} {
+		t.Errorf("far from the glow %v, want the plain border colour", far)
+	}
+}
