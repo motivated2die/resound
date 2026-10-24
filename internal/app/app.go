@@ -59,6 +59,7 @@ const (
 	pageBackup
 	pageDiagnostics
 	pageOverlay // the in-game overlay
+	pageAppKeys // one app's keybinds (App.keysApp)
 )
 
 // App holds the running host state. Everything except the event pump and
@@ -129,8 +130,16 @@ type App struct {
 
 	update updater // check for and install new releases (update.go)
 
-	hotkeys   *input.Watcher // pause and stop keys (hotkeys.go); nil while none is set
+	hotkeys   *input.Watcher // pause and stop keys, apps of their own (hotkeys.go); nil while none is set
 	hotkeyErr string
+	keys      input.Keymap // what the watcher matches
+
+	// Keybinds of single apps (keybinds.go).
+	fgApp       string          // the app in the foreground, as the watcher last said; Resound's own windows don't count
+	running     map[string]bool // the programs running, while some app has keybinds of its own
+	windowApps  []input.App     // programs with a window, to choose from (keybind pages)
+	keysApp     string          // the app pageAppKeys shows
+	removingApp bool            // its remove confirmation shows
 }
 
 // Run starts the host (or the elevated routing helper) and blocks until it
@@ -289,7 +298,8 @@ func Run() int {
 // onPanelOpen refreshes device state each time the panel opens. The page
 // is kept, so a setup in progress continues where the user left it.
 func (a *App) onPanelOpen() {
-	a.ptt.capturing = false // a capture ends when the panel closes
+	a.cancelCapture() // a capture ends when the panel closes
+	a.refreshRunning()
 	if !a.keepNote {
 		a.libNote, a.backupNote = "", ""
 		a.imports.clearFinished()
@@ -310,8 +320,7 @@ func (a *App) onPanelOpen() {
 func (a *App) onEscape() bool {
 	switch {
 	case a.ptt.capturing:
-		a.ptt.capturing = false
-		a.render()
+		a.cancelCapture()
 	case a.page == pageLibrary && a.imports.editing():
 		// Esc pressed in the editor's browser window reaches the panel too
 		// (escape_windows.go): the library page stays, with its editing
@@ -370,6 +379,12 @@ func (a *App) showPage(p page) {
 		a.parents = nil
 	}
 	a.page = p
+	switch p {
+	case pageKeys:
+		a.refreshWindowApps() // to add one of them
+	case pageAppKeys:
+		a.refreshRunning()
+	}
 	a.tray.Popup().ScrollToTop()
 	a.render()
 }

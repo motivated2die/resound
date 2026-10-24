@@ -51,6 +51,10 @@ type Config struct {
 	// PushToTalkKeys is the game's push-to-talk key combination (Windows
 	// virtual-key codes; 4-6 are mouse buttons 3-5). Empty = not used.
 	PushToTalkKeys []uint16 `json:"pushToTalkKeys"`
+	// PushToTalkExtra are further push-to-talk combinations, held together
+	// with PushToTalkKeys, e.g. a game's and Discord's. Only while
+	// PushToTalkKeys is set (versions before it read that one alone).
+	PushToTalkExtra [][]uint16 `json:"pushToTalkExtra,omitempty"`
 	// PushToTalkWhilePlaying holds the push-to-talk keys while sounds play.
 	// Talk-through always holds them.
 	PushToTalkWhilePlaying bool `json:"pushToTalkWhilePlaying"`
@@ -80,6 +84,10 @@ type Config struct {
 	// virtual-key combinations, like PushToTalkKeys.
 	PauseHotkeys [][]uint16 `json:"pauseHotkeys,omitempty"`
 	StopHotkeys  [][]uint16 `json:"stopHotkeys,omitempty"`
+	// AppKeybinds are programs with keybinds of their own: while one is in
+	// the foreground, each of its overrides replaces the global keys above
+	// for that function; functions without one keep the global keys.
+	AppKeybinds []AppKeybinds `json:"appKeybinds,omitempty"`
 	// NoPushToTalkHandOver passes pause and stop keys on at once, even while
 	// sounds hold push-to-talk. By default the key waits for Resound to let
 	// go of push-to-talk first (input.Watcher.LendPTT).
@@ -102,6 +110,27 @@ type Config struct {
 	// corner in screen pixels. nil = docked next to the tray icon. It is
 	// only used while that point is on a screen, kept inside its work area.
 	PanelPos *PanelPos `json:"panelPos,omitempty"`
+}
+
+// AppKeybinds are one program's keybinds. A nil override keeps the global
+// keys for that function.
+type AppKeybinds struct {
+	// Exe is the program's file name in lower case, e.g. "valorant.exe"
+	// (input.AppName), the same across updates and install folders.
+	Exe string `json:"exe"`
+	// Name is shown in the panel, e.g. "VALORANT".
+	Name       string       `json:"name,omitempty"`
+	PushToTalk *KeyOverride `json:"pushToTalk,omitempty"`
+	Pause      *KeyOverride `json:"pause,omitempty"`
+	Stop       *KeyOverride `json:"stop,omitempty"`
+}
+
+// KeyOverride replaces a global keybind in one program: with key
+// combinations of its own, or with none at all (Off), which turns the
+// function off there.
+type KeyOverride struct {
+	Off  bool       `json:"off,omitempty"`
+	Keys [][]uint16 `json:"keys,omitempty"`
 }
 
 // PanelPos is a position on the virtual screen, in pixels.
@@ -144,6 +173,7 @@ func Load() Config {
 		cfg.MuteMicMinSeconds = 0
 	}
 	cfg.MuteMicMinSeconds = min(cfg.MuteMicMinSeconds, 600)
+	cfg.cleanKeybinds()
 	cfg.MonitorVolume = clamp(cfg.MonitorVolume)
 	cfg.CableVolume = clamp(cfg.CableVolume)
 	return cfg

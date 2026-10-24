@@ -664,8 +664,8 @@ func (a *App) cableLine() ui.Pipe {
 			OnClick: a.flowFix(func() {})}}
 	case a.ptt.pressed != nil:
 		return ui.Pipe{State: ui.PipeOn, Level: a.flowLevel(&a.levels.others), Badge: &ui.Badge{
-			Icon: ui.IconKeyboard, Label: "Holding " + a.ptt.pressed.String(), Tone: ui.ToneGood,
-			Tip:     "Resound holds your game's push-to-talk key, so the game sends what plays. Click for push-to-talk settings.",
+			Icon: ui.IconKeyboard, Label: "Holding " + keysText(a.ptt.held), Tone: ui.ToneGood,
+			Tip:     "Resound holds your game's push-to-talk key, so the game sends what plays. Click for the keybinds.",
 			OnClick: func() { a.openPage(pageKeys) }}}
 	case a.ownRouting():
 		return ui.Pipe{State: ui.PipeOn, Level: a.flowLevel(&a.levels.others), Badge: &ui.Badge{Icon: ui.IconInfo, Label: "Your mixer",
