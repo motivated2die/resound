@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/motivated2die/resound/internal/audio"
+	"github.com/motivated2die/resound/internal/config"
 	"github.com/motivated2die/resound/internal/input"
 )
 
@@ -224,5 +225,45 @@ func TestTalkWithPauseKey(t *testing.T) {
 		if ta.playback.holdLive || ta.ptt.userTalk || ta.ptt.pauseKey {
 			t.Fatalf("talk let go first %v: still paused after both", talkFirst)
 		}
+	}
+}
+
+// holdingBadge is the label of the cable's push-to-talk badge, "" for none.
+func (ta *talkApp) holdingBadge() string {
+	if b := ta.cableLine().Badge; b != nil && strings.HasPrefix(b.Label, "Holding") {
+		return b.Label
+	}
+	return ""
+}
+
+// The flow shows push-to-talk held exactly while Resound holds it: never in
+// an app that turned push-to-talk off, and with the keys of the app in
+// front after a switch.
+func TestHoldingBadgeFollowsKeys(t *testing.T) {
+	ta := newTalkApp(t)
+	ta.cfg.AppKeybinds[0].PushToTalk = &config.KeyOverride{Off: true}
+	ta.fgApp = "game.exe"
+	ta.setPTT(pttTalk, true)
+	if got, badge := ta.sentSince(), ta.holdingBadge(); got != "" || badge != "" {
+		t.Fatalf("push-to-talk off in the game: sent %q, badge %q", got, badge)
+	}
+	ta.setForegroundApp("plain.exe")
+	if got, badge := ta.sentSince(), ta.holdingBadge(); got != "+Pause" || badge != "Holding Pause" {
+		t.Fatalf("in an app with the global keys: sent %q, badge %q", got, badge)
+	}
+	ta.setForegroundApp("game.exe")
+	if got, badge := ta.sentSince(), ta.holdingBadge(); got != "-Pause" || badge != "" {
+		t.Fatalf("back in the game: sent %q, badge %q", got, badge)
+	}
+}
+
+// While the user holds push-to-talk themselves, Resound holds nothing and
+// shows nothing held.
+func TestHoldingBadgeWhileUserTalks(t *testing.T) {
+	ta := newTalkApp(t)
+	ta.setPTT(pttTalk, true)
+	ta.onTalk(true, 0)
+	if badge := ta.holdingBadge(); badge != "" {
+		t.Fatalf("badge %q while the user holds the key", badge)
 	}
 }

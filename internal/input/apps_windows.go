@@ -47,9 +47,13 @@ var shellApps = map[string]bool{
 }
 
 // appOfWindow returns the file name, in lower case, of the program that
-// owns window hwnd ("" when it can't be told); own reports one of
-// Resound's own windows.
-func appOfWindow(hwnd uintptr) (app string, own bool) {
+// owns window hwnd ("" when it can't be told). keep reports a window that
+// doesn't make another app the one in front: Resound's own (the panel), and
+// Windows' shell UI that comes up over an app, such as the taskbar (a click
+// on the tray icon focuses it before the panel opens), Alt+Tab, the Start
+// menu and the notification area. Other windows of the shell's programs
+// count: File Explorer is an app like any other.
+func appOfWindow(hwnd uintptr) (app string, keep bool) {
 	var pid uint32
 	windows.GetWindowThreadProcessId(windows.HWND(hwnd), &pid)
 	switch {
@@ -58,7 +62,8 @@ func appOfWindow(hwnd uintptr) (app string, own bool) {
 	case pid == uint32(os.Getpid()):
 		return "", true
 	}
-	return AppName(processPath(pid)), false
+	app = AppName(processPath(pid))
+	return app, shellApps[app] && !appWindow(hwnd)
 }
 
 // AppName is the name a program is known by: its file name in lower case.

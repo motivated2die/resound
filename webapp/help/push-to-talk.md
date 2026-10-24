@@ -70,7 +70,7 @@ Valorant has its own push-to-talk key and no pause key, and keeps the global sto
 
 Good to know:
 
-- Resound follows the app in front. Clicking the Resound panel doesn't count: the keys of the app before it stay.
+- Resound follows the app in front. The Resound panel, the taskbar (also when you click the tray icon), Alt+Tab and the Start menu don't count: the keys of the app before them stay.
 - If you switch apps while a sound plays, Resound lets go of the old app's push-to-talk key and holds the new one's at once. A key both apps use stays held.
 - A pause key you hold while switching keeps the sounds paused until you let go of it.
 - While a game with its own keys runs, the home page says so under the logo, for example *Ready · Valorant keybinds*.

@@ -111,6 +111,8 @@ func (a *App) onHotkey(ev input.HotkeyEvent) {
 		if !ev.Down {
 			logx.Printf("hotkey: letting go of push-to-talk before the key failed")
 		}
+		a.syncPTTLoan() // the hook let go of the keys: the flow stops showing them held
+		a.render()
 		return
 	case input.ActionApp:
 		a.setForegroundApp(ev.App)
@@ -124,6 +126,7 @@ func (a *App) onHotkey(ev input.HotkeyEvent) {
 		a.onTalk(ev.Down, ev.Index)
 	case input.ActionStop:
 		logx.Printf("hotkey: stop")
+		a.reclaimPTT() // keys the hook let go of for the stop key aren't shown held
 		a.stopAll()
 	case input.ActionPause:
 		a.onPauseKey(ev.Down)

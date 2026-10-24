@@ -283,8 +283,9 @@ func (t *hookThread) followForeground() {
 }
 
 // checkForeground follows the foreground window to its app, and reports a
-// new app (ActionApp). Resound's own windows keep the app before them, so
-// opening the panel changes nothing; a window whose app can't be told (a
+// new app (ActionApp). Resound's own windows and Windows' shell UI keep the
+// app before them (appOfWindow), so opening the panel from the tray changes
+// nothing; a window whose app can't be told (a
 // protected process) counts as "" and gets the global bindings.
 func (t *hookThread) checkForeground() {
 	hwnd, _, _ := procGetForegroundWindow.Call()
@@ -292,8 +293,8 @@ func (t *hookThread) checkForeground() {
 		return
 	}
 	t.fgWnd = hwnd
-	app, own := appOfWindow(hwnd)
-	if own || app == t.fgApp {
+	app, keep := appOfWindow(hwnd)
+	if keep || app == t.fgApp {
 		return
 	}
 	t.fgApp = app
