@@ -328,10 +328,12 @@ kbd {
 
 /* --- Ask an AI (page.html's "ai" block, help.js) ---
    "side": the overview's right column, from 1200 px; "inline": in its place
-   in the overview below that; "strip": the end of every article. */
+   in the overview below that; "strip": the end of every article. The copy
+   button with the assistants' menu right below it, as wide as the button. */
 .icon[data-icon="auto_awesome"] { --icon: url("/assets/icons/auto_awesome.svg"); }
 .icon[data-icon="content_copy"] { --icon: url("/assets/icons/content_copy.svg"); }
 .icon[data-icon="open_in_new"] { --icon: url("/assets/icons/open_in_new.svg"); }
+.icon[data-icon="expand_more"] { --icon: url("/assets/icons/expand_more.svg"); }
 
 .hc-side { display: none; position: sticky; top: calc(var(--header) + 36px); align-self: start; padding: 0 20px 0 0; }
 @media (min-width: 1200px) {
@@ -350,7 +352,9 @@ kbd {
     border: 1px solid rgba(var(--accent-rgb), 0.28);
     font-size: 14px;
 }
+.hc-ai-inline, .hc-ai-strip { padding: 20px 22px; }
 .hc-article .hc-ai { margin: 28px 0 8px; }
+.hc-article .hc-ai-strip { margin-top: 44px; }
 .hc-article .hc-ai-title, .hc-ai-title {
     display: flex;
     align-items: center;
@@ -364,9 +368,10 @@ kbd {
 .hc-ai-title .icon { font-size: 18px; color: var(--accent); }
 .hc-article .hc-ai-text, .hc-ai-text { margin: 0 0 14px; color: var(--muted); font-size: 14px; line-height: 1.5; }
 
-.hc-ai-actions { display: flex; flex-wrap: wrap; gap: 8px; }
-.hc-ai-copy, .hc-ai-page {
-    display: inline-flex;
+.hc-ai-controls { display: grid; gap: 8px; }
+.hc-ai-inline .hc-ai-controls, .hc-ai-strip .hc-ai-controls { max-width: 320px; }
+.hc-ai-copy, .hc-ai-menu summary {
+    display: flex;
     align-items: center;
     justify-content: center;
     gap: 8px;
@@ -375,46 +380,75 @@ kbd {
     border-radius: 10px;
     font: inherit;
     font-weight: 600;
+    white-space: nowrap;
     cursor: pointer;
     transition: background-color 0.15s ease, border-color 0.15s ease;
 }
-.hc-ai-copy { flex: 1 1 auto; white-space: nowrap; border: none; background: var(--accent); color: var(--on-accent); }
-.hc-ai-copy:hover { background: var(--accent-light); }
+.hc-ai-copy { border: none; background: var(--accent); color: var(--on-accent); }
+.hc-ai-copy:hover, .hc-ai-copy[data-state="done"] { background: var(--accent-light); }
 .hc-ai-copy .icon { font-size: 18px; }
-.hc-ai-copy[data-state="done"] { background: var(--accent-light); }
-.hc-ai-page { border: 1px solid var(--control); background: transparent; color: var(--text); font-weight: 500; }
-.hc-ai-page:hover { border-color: rgba(var(--accent-rgb), 0.5); }
 
-.hc-article .hc-ai-label, .hc-ai-label { margin: 16px 0 8px; color: var(--caption); font-size: 12px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; }
-.hc-article .hc-ai-links, .hc-ai-links { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; margin: 0; padding: 0; list-style: none; }
+/* The menu: a disclosure (<details>) whose list opens over what follows. */
+.hc-ai-menu { position: relative; }
+.hc-ai-menu summary {
+    list-style: none;
+    justify-content: space-between;
+    border: 1px solid var(--control);
+    color: var(--text);
+    font-weight: 500;
+}
+.hc-ai-menu summary::-webkit-details-marker { display: none; }
+.hc-ai-menu summary:hover, .hc-ai-menu[open] summary { border-color: rgba(var(--accent-rgb), 0.5); }
+.hc-ai-menu summary .icon { color: var(--caption); transition: transform 0.15s ease; }
+.hc-ai-menu[open] summary .icon { transform: rotate(180deg); color: var(--accent); }
+.hc-article .hc-ai-links, .hc-ai-links {
+    position: absolute;
+    z-index: 5;
+    top: calc(100% + 6px);
+    left: 0;
+    right: 0;
+    display: grid;
+    gap: 2px;
+    margin: 0;
+    padding: 6px;
+    list-style: none;
+    border-radius: 12px;
+    background: var(--raised);
+    border: 1px solid var(--control);
+    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.45);
+}
 .hc-article .hc-ai-links li { margin: 0; }
 .hc-ai-links a {
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    gap: 6px;
-    padding: 7px 10px;
+    gap: 8px;
+    padding: 8px 10px;
     border-radius: 8px;
-    background: var(--raised);
-    border: 1px solid transparent;
     color: var(--text);
     font-weight: 500;
 }
-.hc-ai-links a:hover { border-color: rgba(var(--accent-rgb), 0.45); color: var(--text); text-decoration: none; }
+.hc-ai-links a:hover, .hc-ai-links a:focus-visible { background: var(--control); color: var(--text); text-decoration: none; }
+.hc-ai-links small { margin-left: auto; color: var(--caption); font-size: 12px; font-weight: 400; }
 .hc-ai-links .icon { font-size: 15px; color: var(--caption); }
 .hc-ai-links a:hover .icon { color: var(--accent); }
+
+.hc-ai-page {
+    justify-self: start;
+    padding: 2px 0;
+    border: none;
+    background: none;
+    color: var(--muted);
+    font: inherit;
+    font-size: 13px;
+    text-decoration: underline;
+    text-underline-offset: 3px;
+    cursor: pointer;
+}
+.hc-ai-page:hover, .hc-ai-page[data-state="done"] { color: var(--accent); }
 
 .hc-article .hc-ai-status, .hc-ai-status { margin: 12px 0 0; color: var(--accent); font-size: 13px; line-height: 1.45; }
 .hc-ai-status:empty { display: none; }
 .hc-ai-status[data-tone="error"] { color: var(--warning); }
-.hc-article .hc-ai-more, .hc-ai-more { margin: 12px 0 0; color: var(--caption); font-size: 12px; line-height: 1.5; }
-.hc-ai-more a { color: var(--muted); text-decoration: underline; text-underline-offset: 2px; }
-
-/* Wider than the right column: the assistants in one row. */
-.hc-ai-inline, .hc-ai-strip { padding: 20px 22px; }
-.hc-ai-inline .hc-ai-links, .hc-ai-strip .hc-ai-links { grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); }
-.hc-ai-inline .hc-ai-copy, .hc-ai-strip .hc-ai-copy { flex: 0 1 auto; }
-.hc-article .hc-ai-strip { margin-top: 44px; }
 
 /* --- Previous / next --- */
 .hc-pager { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 44px; }
@@ -478,7 +512,7 @@ kbd {
 @media (max-width: 560px) {
     .hc-brand span { display: none; }
     .hc-sections, .hc-pager { grid-template-columns: minmax(0, 1fr); }
-    .hc-ai .hc-ai-copy { flex: 1 1 100%; }
+    .hc-ai-inline .hc-ai-controls, .hc-ai-strip .hc-ai-controls { max-width: none; }
     .hc-next { grid-column: 1; }
     .hc-anchor { display: none; }
 }

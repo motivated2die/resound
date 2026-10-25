@@ -387,8 +387,7 @@
             clearTimeout(button.flashTimer);
             button.flashTimer = setTimeout(() => { label.textContent = label.dataset.label; delete button.dataset.state; }, 2500);
         };
-        const failed = (card, what) => status(card,
-            `Your browser didn't allow copying. Open llms-full.txt below, select all, copy it and ${what}.`, 'error');
+        const failed = (card) => status(card, "Your browser didn't allow copying. Try again, or in another browser.", 'error');
 
         // Fetch ahead once a card is close to the screen.
         const prefetch = () => get(aiContext);
@@ -410,7 +409,7 @@
                     flash(button, 'Copied');
                     status(card, `Copied all of Resound's help, with instructions for the AI. Paste it into any AI chat (${paste()}), then ask your question.`);
                 } catch (err) {
-                    failed(card, 'paste it into any AI chat');
+                    failed(card);
                 }
             });
 
@@ -421,13 +420,26 @@
                     flash(page, 'Copied');
                     status(card, 'Copied this article as Markdown.');
                 } catch (err) {
-                    status(card, "Your browser didn't allow copying.", 'error');
+                    failed(card);
                 }
             });
+
+            // The menu of assistants closes on a choice, a click elsewhere or Esc.
+            const menu = card.querySelector('[data-ai-menu]');
+            if (menu) {
+                const closeMenu = (focus) => {
+                    if (!menu.open) return;
+                    menu.open = false;
+                    if (focus) menu.querySelector('summary').focus();
+                };
+                document.addEventListener('click', (e) => { if (!menu.contains(e.target)) closeMenu(false); });
+                menu.addEventListener('keydown', (e) => { if (e.key === 'Escape') { e.stopPropagation(); closeMenu(true); } });
+            }
 
             // The link opens the assistant in a new tab by itself; this only copies.
             card.querySelectorAll('[data-ai-open]').forEach((a) => {
                 a.addEventListener('click', async () => {
+                    if (menu) menu.open = false;
                     const name = a.dataset.aiOpen;
                     const pasteOnly = a.hasAttribute('data-ai-paste');
                     try {
@@ -436,7 +448,7 @@
                             ? `Copied. Paste it into ${name} (${paste()}), then ask your question.`
                             : `${name} opens with the instructions and reads the help from getresound.app. If it can't, paste it (${paste()}): it's on your clipboard.`);
                     } catch (err) {
-                        if (pasteOnly) failed(card, `paste it into ${name}`);
+                        if (pasteOnly) failed(card);
                         else status(card, `${name} opens with the instructions and reads the help from getresound.app.`);
                     }
                 });

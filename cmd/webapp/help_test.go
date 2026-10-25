@@ -103,7 +103,7 @@ func TestHelpMarkdown(t *testing.T) {
 		"page.html":     {Data: []byte(`<h1>{{.Title}}</h1>{{.Body}}{{with .Next}}<a class="next" href="/help/{{.Slug}}">{{.Label}}</a>{{end}}`)},
 		"help.css":      {Data: []byte("")},
 		"help.js":       {Data: []byte("")},
-		"ai-prompt.txt": {Data: []byte("Help me with Resound.\n")},
+		"ai-prompt.txt": {Data: []byte("Help me with Resound.\n\n{{documentation}}\n\n## My question\n")},
 		"viz/demo.html": {Data: []byte(`<div class="demo"></div>`)},
 		"SUMMARY.md":    {Data: []byte("# Help\n\n## Start\n- [First steps](one.md)\n- [More](two.md)\n")},
 		"index.md":      {Data: []byte("# Help\n\nWelcome. See [one](one.md).\n")},
@@ -204,8 +204,12 @@ func TestHelpLLMs(t *testing.T) {
 	if m := relLink.FindString(full); m != "" {
 		t.Errorf("llms-full.txt has a relative link: %s", m)
 	}
-	if ctx := string(files["help/ai-context.txt"]); !strings.HasSuffix(ctx, full) || len(ctx) <= len(full) {
-		t.Error("ai-context.txt isn't the prompt followed by llms-full.txt")
+	ctx := string(files["help/ai-context.txt"])
+	if !strings.Contains(ctx, "<documentation>\n"+strings.TrimRight(full, "\n")+"\n</documentation>") || strings.Contains(ctx, aiSlot) {
+		t.Error("ai-context.txt doesn't have llms-full.txt in the prompt's slot")
+	}
+	if !strings.HasSuffix(ctx, "## My question\n\n") {
+		t.Errorf("ai-context.txt doesn't end with the reader's question: %q", ctx[len(ctx)-40:])
 	}
 
 	home := string(files["help/index.html"])
@@ -224,7 +228,8 @@ func TestHelpLLMs(t *testing.T) {
 		if len(href) > 4000 {
 			t.Errorf("%s: the link is %d characters long", a.Name, len(href))
 		}
-		if !strings.Contains(href, a.Param+"=") || !strings.Contains(href, url.QueryEscape(site+llmsFullPath)) {
+		if !strings.Contains(href, a.Param+"=") || !strings.Contains(href, url.QueryEscape(site+llmsFullPath)) ||
+			!strings.HasSuffix(href, "%0A%0A") || strings.Contains(href, url.QueryEscape(aiSlot)) {
 			t.Errorf("%s: the link doesn't carry the prompt with llms-full.txt: %s", a.Name, href)
 		}
 	}
@@ -235,7 +240,7 @@ func TestLLMsMarkdown(t *testing.T) {
 		"page.html":     {Data: []byte(`{{.Body}}`)},
 		"help.css":      {Data: []byte("")},
 		"help.js":       {Data: []byte("")},
-		"ai-prompt.txt": {Data: []byte("Help me with Resound.\n")},
+		"ai-prompt.txt": {Data: []byte("Help me with Resound.\n\n{{documentation}}\n\n## My question\n")},
 		"SUMMARY.md":    {Data: []byte("# Help\n\n## Start\n- [First steps](one.md)\n- [More](two.md)\n")},
 		"index.md":      {Data: []byte("# Help\n\nWelcome.\n")},
 		"one.md": {Data: []byte("# One\n\nSee [two](two.md#later), [here](#a-heading) and [the app](/connect).\n\n## A heading\n\n" +

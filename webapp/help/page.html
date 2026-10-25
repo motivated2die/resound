@@ -137,28 +137,31 @@
 </body>
 </html>
 {{- /* "Ask an AI": copy the whole help center with a prompt (help.js), or
-       open it in an assistant (llms.go). Three looks: "side" in the
-       overview's right column, "inline" in its place on narrower screens,
-       "strip" below each article. */ -}}
+       open an assistant from the menu below (llms.go). Three looks: "side"
+       in the overview's right column, "inline" in its place on narrower
+       screens, "strip" below each article. */ -}}
 {{define "ai"}}
 <section class="hc-ai hc-ai-{{.Look}}" data-ai>
     <h2 class="hc-ai-title"><span class="icon" data-icon="auto_awesome" aria-hidden="true"></span>{{if eq .Look "strip"}}Still have questions? Ask an AI{{else}}Ask an AI for help{{end}}</h2>
-    <p class="hc-ai-text">{{if eq .Look "strip"}}Give your favorite AI assistant all of Resound's help at once, and ask it anything about your setup.{{else}}Give ChatGPT, Claude or any other assistant all {{.Articles}} help articles at once, with instructions to walk you through setting up Resound. Then just ask your question.{{end}}</p>
-    <div class="hc-ai-actions">
+    <p class="hc-ai-text">{{if eq .Look "strip"}}Hand all of Resound's help to any AI assistant and ask it about your setup.{{else}}Hand all of Resound's help to ChatGPT, Claude or any AI assistant, then ask your question.{{end}}</p>
+    <div class="hc-ai-controls">
         <button class="hc-ai-copy" type="button" data-ai-copy>
             <span class="icon" data-icon="content_copy" aria-hidden="true"></span><span data-ai-copy-label>Copy for your AI</span>
         </button>
+        <details class="hc-ai-menu" data-ai-menu>
+            <summary>Open in an AI chat<span class="icon" data-icon="expand_more" aria-hidden="true"></span></summary>
+            <ul class="hc-ai-links">
+                {{- range .Links}}
+                <li><a href="{{.Href}}" target="_blank" rel="noopener" data-ai-open="{{.Name}}"{{if .Paste}} data-ai-paste{{end}}>
+                    <span>{{.Name}}</span><small>{{if .Paste}}Paste to start{{else}}Ready to go{{end}}</small><span class="icon" data-icon="open_in_new" aria-hidden="true"></span>
+                </a></li>
+                {{- end}}
+            </ul>
+        </details>
         {{- if eq .Look "strip"}}
-        <button class="hc-ai-page" type="button" data-ai-copy-page="/help/{{.Slug}}.md">Copy this page</button>
+        <button class="hc-ai-page" type="button" data-ai-copy-page="/help/{{.Slug}}.md"><span data-ai-copy-label>Or copy just this page</span></button>
         {{- end}}
     </div>
-    <p class="hc-ai-label" id="hc-ai-open-{{.Look}}">Or open it in</p>
-    <ul class="hc-ai-links" aria-labelledby="hc-ai-open-{{.Look}}">
-        {{- range .Links}}
-        <li><a href="{{.Href}}" target="_blank" rel="noopener" data-ai-open="{{.Name}}"{{if .Paste}} data-ai-paste title="Opens {{.Name}}: paste what was copied"{{end}}>{{.Name}}<span class="icon" data-icon="open_in_new" aria-hidden="true"></span></a></li>
-        {{- end}}
-    </ul>
     <p class="hc-ai-status" role="status" aria-live="polite" data-ai-status></p>
-    <p class="hc-ai-more">All of it is plain Markdown: <a href="/llms-full.txt">llms-full.txt</a>. What you ask goes to the assistant you pick, under its privacy terms.</p>
 </section>
 {{end}}

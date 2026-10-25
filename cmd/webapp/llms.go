@@ -8,17 +8,19 @@ package main
 //	/llms.txt             the index (llmstxt.org): every article, linked to its Markdown
 //	/llms-full.txt        all articles in reading order, in one file
 //	/help/<slug>.md       one article
-//	/help/ai-context.txt  ai-prompt.txt, then /llms-full.txt: what "Copy for AI" copies
+//	/help/ai-context.txt  ai-prompt.txt with /llms-full.txt in it: what "Copy for your AI" copies
 //
 // The Markdown is the articles' own, made readable outside the site: links
 // become absolute URLs, callouts become quotes, and visualizations keep
 // only their caption.
 //
-// Assistants that take a prompt in their address get ai-prompt.txt with a
-// link to /llms-full.txt, which they read with their web tools; the whole
-// help center is far too long for an address (Claude cuts it at about
+// ai-prompt.txt has a {{documentation}} slot for the documentation, and
+// ends with "## My question" and an empty line for the reader to write in.
+// Assistants that take a prompt in their address get it with a link to
+// /llms-full.txt in the slot, which they read with their web tools; the
+// whole help center is far too long for an address (Claude cuts it at about
 // 14,000 characters). The others open as they are, and the reader pastes
-// what "Copy for AI" copied. Nothing is sent anywhere by us: these are
+// what "Copy for your AI" copied. Nothing is sent anywhere by us: these are
 // plain links.
 
 import (
@@ -72,13 +74,20 @@ func aiView(ai helpAI, look, slug string) any {
 	}{ai, look, slug}
 }
 
+// aiSlot is where ai-prompt.txt takes the documentation.
+const aiSlot = "{{documentation}}"
+
 // buildAI adds the Markdown files to out and returns the card's links.
 func buildAI(fsys fs.FS, home *helpPage, sections []helpSection, order []*helpPage, pages map[string]*helpPage, out map[string][]byte) (helpAI, error) {
 	prompt, err := fs.ReadFile(fsys, "ai-prompt.txt")
 	if err != nil {
 		return helpAI{}, err
 	}
-	core := strings.TrimSpace(strings.ReplaceAll(string(prompt), "\r\n", "\n"))
+	// Two line breaks at the end: the reader's question goes below them.
+	core := strings.TrimSpace(strings.ReplaceAll(string(prompt), "\r\n", "\n")) + "\n\n"
+	if strings.Count(core, aiSlot) != 1 {
+		return helpAI{}, fmt.Errorf("ai-prompt.txt: wants %s once, where the documentation goes", aiSlot)
+	}
 
 	md := map[string]string{}
 	for _, p := range append([]*helpPage{home}, order...) {
@@ -105,12 +114,12 @@ func buildAI(fsys fs.FS, home *helpPage, sections []helpSection, order []*helpPa
 	}
 	out[strings.TrimPrefix(llmsFullPath, "/")] = []byte(full.String())
 
-	out[strings.TrimPrefix(aiContextPath, "/")] = []byte(core +
-		"\n\nResound's documentation follows below, all of it, from " + site + "/help/.\n\n" +
-		"---\n\n" + full.String())
+	// The articles' own # headings stay apart from the prompt's in a tag.
+	out[strings.TrimPrefix(aiContextPath, "/")] = []byte(strings.Replace(core, aiSlot,
+		"All of it, from "+site+"/help/:\n\n<documentation>\n"+strings.TrimRight(full.String(), "\n")+"\n</documentation>", 1))
 
-	linked := core + "\n\nResound's documentation, all of it in one file: " + site + llmsFullPath +
-		"\nRead it before you answer. If you can't open it, tell me, and I'll paste it here."
+	linked := strings.Replace(core, aiSlot, "All of it is in one file: "+site+llmsFullPath+
+		"\nRead it before you answer. If you can't open it, tell me, and I'll paste it here.", 1)
 	ai := helpAI{Articles: len(order)}
 	for _, a := range aiAssistants {
 		l := aiLink{Name: a.Name, Href: a.URL, Paste: a.Param == ""}
