@@ -56,6 +56,6 @@ The gear at the top opens the app's settings:
 | Vibrate on Tap | A short vibration on play and stop (Android) |
 | Menu Buttons on the Left | Moves the top bar's buttons to the left |
 | Reset | Page colours, Page layout, or All colours and layouts. Hold until it fills, then tap to confirm. Applies to all devices |
-| PC | **Switch PC**, **Tour** (a short walk through the app), **Install the app** |
+| PC | **Switch PC**, **Tour** (a short walk through the app, also offered from the ? at the top on first start), **Install the app** |
 
 A long press on the Resound logo in the bottom bar opens or closes the panel on your PC.

@@ -489,6 +489,71 @@ body {
   color: var(--on-primary);
 }
 
+/* The first-run callout below the help button (tutorial.js): offers the
+   tour. Its arrow points at the button (--arrow-x, from the callout's left). */
+.tour-callout {
+  position: fixed;
+  z-index: 120; /* above the top bar (its arrow), below sheets and dialogs */
+  padding: 14px 16px 12px;
+  border-radius: 14px;
+  background-color: var(--v-secondary-darken1);
+  border: 1px solid rgba(var(--accent-rgb), 0.45);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+  color: var(--text-secondary);
+  animation: tour-callout-in 0.25s ease-out;
+}
+.tour-callout::before {
+  content: "";
+  position: absolute;
+  top: -7px;
+  left: calc(var(--arrow-x, 50%) - 7px);
+  width: 12px;
+  height: 12px;
+  background: inherit;
+  border-left: 1px solid rgba(var(--accent-rgb), 0.45);
+  border-top: 1px solid rgba(var(--accent-rgb), 0.45);
+  transform: rotate(45deg);
+}
+.tour-callout-title {
+  margin: 0 0 4px;
+  color: var(--text-primary);
+  font-size: 1rem;
+  font-weight: 600;
+}
+.tour-callout-text {
+  margin: 0;
+  font-size: 0.9rem;
+  line-height: 1.4;
+}
+.tour-callout-buttons {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+.tour-callout-buttons button {
+  flex: 1;
+  padding: 8px 12px;
+  border: none;
+  border-radius: 8px;
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  background-color: var(--v-secondary-base);
+  color: var(--text-primary);
+}
+.tour-callout-buttons .tour-callout-start {
+  background-color: var(--v-primary-base);
+  color: var(--on-primary);
+}
+@keyframes tour-callout-in {
+  from { opacity: 0; transform: translateY(-6px); }
+  to { opacity: 1; transform: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .tour-callout { animation: none; }
+}
+
 /* --- Main Sound Grid --- */
 .sounds-grid {
   order: 1;

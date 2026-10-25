@@ -1,352 +1,313 @@
-// Soundux Remote Tutorial using Driver.js
+// The tour (Driver.js): a short walk through the remote, from Settings →
+// Tour or the help button in the top bar.
+//
+// Until the tour was started once (localStorage tutorialCompleted), the help
+// button shows in the top bar, and shortly after the app has loaded a callout
+// below it offers the tour: Start tour, or Later (asks again next time the
+// app is opened; the help button stays).
+//
+// Each step says whether edit mode and the sound sheet are open for it
+// (tourStep), and entering the step sets that, so Next and Previous both
+// find the app as the step describes it. Closing the tour leaves edit mode
+// and closes the sheet.
 
-// --- Global flag to prevent multiple instances ---
 let isTutorialRunning = false;
-// --- Global variable to hold the current driver instance ---
 let currentDriverInstance = null;
-// ---
+
+const TOUR_DONE_KEY = 'tutorialCompleted';
+const TOUR_LATER_KEY = 'resound.tourLater'; // sessionStorage: "Later" in the callout
+
+const tourDone = () => {
+    try { return localStorage.getItem(TOUR_DONE_KEY) === 'true'; } catch (e) { return false; }
+};
+
+const markTourDone = () => {
+    try { localStorage.setItem(TOUR_DONE_KEY, 'true'); } catch (e) { /* storage blocked: offered again next time */ }
+    document.getElementById('tutorial-help-button')?.classList.add('hidden');
+    tourCallout.hide();
+};
+
+const safeClick = (selector) => {
+    const element = document.querySelector(selector);
+    if (element && typeof element.click === 'function') {
+        element.click();
+        return true;
+    }
+    console.warn(`Element not found or not clickable: ${selector}`);
+    return false;
+};
+
+const setEditMode = (on) => {
+    if (typeof editMode !== 'undefined' && editMode.isActive() !== on) safeClick('#edit-mode-button');
+};
+
+// --- The sound sheet, shown as an example (no sound loaded into it) ---------
+
+const openSoundSettingsPanelVisually = () => {
+    const settingsOverlay = document.getElementById('sound-settings-overlay');
+    const settingsCard = document.getElementById('settings-card');
+    const settingsBackdrop = document.getElementById('settings-backdrop');
+    if (!settingsOverlay || !settingsCard || !settingsBackdrop) return false;
+    if (!settingsOverlay.classList.contains('hidden')) return true;
+    settingsCard.style.transition = 'none';
+    settingsBackdrop.style.transition = 'none';
+    settingsCard.style.transform = 'translateY(100%)';
+    settingsBackdrop.style.opacity = '0';
+    settingsOverlay.classList.remove('hidden');
+    requestAnimationFrame(() => {
+        settingsCard.style.transition = 'transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)';
+        settingsBackdrop.style.transition = 'opacity 0.3s ease';
+        settingsBackdrop.style.opacity = '1';
+        settingsCard.style.transform = 'translateY(0)';
+    });
+    return true;
+};
+
+const closeSoundSettingsPanelVisually = () => {
+    const settingsOverlay = document.getElementById('sound-settings-overlay');
+    const settingsCard = document.getElementById('settings-card');
+    const settingsBackdrop = document.getElementById('settings-backdrop');
+    if (!settingsOverlay || !settingsCard || !settingsBackdrop || settingsOverlay.classList.contains('hidden')) return false;
+    settingsCard.style.transition = 'transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)';
+    settingsBackdrop.style.transition = 'opacity 0.3s ease';
+    settingsCard.style.transform = 'translateY(100%)';
+    settingsBackdrop.style.opacity = '0';
+    setTimeout(() => {
+        settingsOverlay.classList.add('hidden');
+        settingsCard.style.transform = '';
+        settingsCard.style.transition = '';
+        settingsBackdrop.style.opacity = '';
+        settingsBackdrop.style.transition = '';
+    }, 300);
+    return true;
+};
+
+// --- The callout on the help button (first run) -----------------------------
+
+const tourCallout = (() => {
+    let el = null;
+    let anchor = null;
+
+    const place = () => {
+        if (!el || !anchor) return;
+        const r = anchor.getBoundingClientRect();
+        if (!r.width) { hide(); return; } // the help button went away
+        const margin = 12;
+        const width = Math.min(280, window.innerWidth - 2 * margin);
+        const center = r.left + r.width / 2;
+        const left = Math.max(margin, Math.min(center - width / 2, window.innerWidth - margin - width));
+        el.style.width = `${width}px`;
+        el.style.left = `${left}px`;
+        el.style.top = `${r.bottom + 10}px`;
+        el.style.setProperty('--arrow-x', `${center - left}px`);
+    };
+
+    const onKey = (e) => { if (e.key === 'Escape') later(); };
+
+    const hide = () => {
+        if (!el) return;
+        el.remove();
+        el = null;
+        window.removeEventListener('resize', place);
+        document.removeEventListener('keydown', onKey);
+    };
+
+    const later = () => {
+        try { sessionStorage.setItem(TOUR_LATER_KEY, '1'); } catch (e) { /* asked again on the next load */ }
+        hide();
+    };
+
+    const show = () => {
+        anchor = document.getElementById('tutorial-help-button');
+        if (el || !anchor || anchor.classList.contains('hidden') || tourDone() || isTutorialRunning) return;
+        try { if (sessionStorage.getItem(TOUR_LATER_KEY)) return; } catch (e) { /* show it */ }
+        // Not over the connection help, a search or edit mode.
+        if (state.searching || (typeof editMode !== 'undefined' && editMode.isActive())) return;
+        if (document.getElementById('connection-help')?.hidden === false) return;
+
+        el = document.createElement('div');
+        el.className = 'tour-callout';
+        el.setAttribute('role', 'dialog');
+        el.setAttribute('aria-labelledby', 'tour-callout-title');
+        el.innerHTML = `
+            <p class="tour-callout-title" id="tour-callout-title">New here?</p>
+            <p class="tour-callout-text">Take a one-minute tour of your soundboard.</p>
+            <div class="tour-callout-buttons">
+                <button type="button" class="tour-callout-later">Later</button>
+                <button type="button" class="tour-callout-start">Start tour</button>
+            </div>`;
+        el.querySelector('.tour-callout-later').addEventListener('click', later);
+        el.querySelector('.tour-callout-start').addEventListener('click', () => {
+            hide();
+            handleStartTutorialClick();
+        });
+        document.body.append(el);
+        place();
+        window.addEventListener('resize', place);
+        document.addEventListener('keydown', onKey);
+    };
+
+    return { show, hide };
+})();
+
+// --- Starting -----------------------------------------------------------------
 
 function initializeTutorialTrigger() {
-    // Initialize both tutorial buttons
     const startTutorialButton = document.getElementById('start-tutorial-button');
     const helpButton = document.getElementById('tutorial-help-button');
 
-    // Check if tutorial has been completed before
-    const tutorialCompleted = localStorage.getItem('tutorialCompleted') === 'true';
-    
-    // Show help button only on first run
     if (helpButton) {
-        helpButton.classList.toggle('hidden', tutorialCompleted);
-        if (!tutorialCompleted) {
-            helpButton.addEventListener('click', () => {
-                helpButton.classList.add('hidden');
-                localStorage.setItem('tutorialCompleted', 'true');
-                startSounduxTutorial();
-            });
-        }
+        helpButton.classList.toggle('hidden', tourDone());
+        helpButton.addEventListener('click', handleStartTutorialClick);
     }
+    startTutorialButton?.addEventListener('click', handleStartTutorialClick);
 
-    // Initialize settings modal tutorial button
-    if (startTutorialButton) {
-        startTutorialButton.removeEventListener('click', handleStartTutorialClick);
-        startTutorialButton.addEventListener('click', handleStartTutorialClick);
-    }
+    // The callout, once the board is there; it steps aside for edit mode.
+    document.addEventListener('appReady', () => setTimeout(tourCallout.show, 1500), { once: true });
+    document.addEventListener('editModeChanged', () => tourCallout.hide());
 }
 
 function handleStartTutorialClick() {
-    // console.log("Start Tutorial button clicked.");
-
-    // --- Prevent starting if already running ---
-    if (isTutorialRunning || document.documentElement.classList.contains('driver-active')) {
-        console.warn("Tutorial start prevented: Already running or driver active.");
-        return;
-    }
-    // ---
-
-    const appSettingsModalOverlay = document.getElementById('app-settings-modal-overlay');
+    if (isTutorialRunning || document.documentElement.classList.contains('driver-active')) return;
+    markTourDone();
 
     const attemptStartTutorial = () => {
-        // console.log("Attempting to start tutorial after delay...");
         if (typeof window.driver?.js?.driver === 'function') {
-            // console.log("Driver.js is ready. Starting tutorial.");
-            startSounduxTutorial(); // Call the main function
+            startTour();
         } else {
-            console.error('Driver.js library (window.driver.js.driver) is still not defined or not a function when attempting to start!');
-            isTutorialRunning = false; // Ensure flag is reset if driver isn't ready
-            alert('Tutorial feature could not be loaded. Please check the console.');
+            console.error('Driver.js (window.driver.js.driver) is not loaded.');
+            isTutorialRunning = false;
         }
     };
 
-    // Close the settings modal first
-    if (appSettingsModalOverlay && !appSettingsModalOverlay.classList.contains('hidden')) {
-        // console.log("Closing settings modal.");
-        const closeButton = document.getElementById('close-app-settings-button');
-        if (closeButton) {
-            closeButton.click();
-            setTimeout(attemptStartTutorial, 150); // Wait for modal animation
-        } else {
-            console.warn("Could not find close button for settings modal. Attempting to start tutorial immediately.");
-            attemptStartTutorial();
-        }
+    // From the settings: close them first.
+    const appSettingsModalOverlay = document.getElementById('app-settings-modal-overlay');
+    if (appSettingsModalOverlay && !appSettingsModalOverlay.classList.contains('hidden') && safeClick('#close-app-settings-button')) {
+        setTimeout(attemptStartTutorial, 150); // the sheet's animation
     } else {
-        // console.log("Settings modal already closed or not found. Attempting to start tutorial directly.");
         attemptStartTutorial();
     }
 }
 
+// --- The tour -------------------------------------------------------------------
 
-function startSounduxTutorial() {
-    console.log("Executing startSounduxTutorial function...");
+// tourStep is a step for which edit mode is on (edit) or off, and the sound
+// sheet open (sheet) or closed.
+const tourStep = ({ edit = false, sheet = false, ...step }) => ({
+    ...step,
+    onHighlightStarted: () => {
+        setEditMode(edit);
+        if (sheet) openSoundSettingsPanelVisually();
+        else closeSoundSettingsPanelVisually();
+    },
+});
 
-     // Double check active state before proceeding
-     if (isTutorialRunning || document.documentElement.classList.contains('driver-active')) {
-        console.warn("startSounduxTutorial called, but tutorial seems already active.");
-        return;
-    }
-     if (currentDriverInstance) {
-         console.warn("startSounduxTutorial called, but currentDriverInstance exists. Attempting cleanup first.");
-         try { currentDriverInstance.destroy(); } catch (e) { /* ignore */ }
-         currentDriverInstance = null;
-         isTutorialRunning = false;
-         document.documentElement.classList.remove('driver-active'); // Force remove class
-     }
+const tourSteps = () => [
+    tourStep({
+        popover: { title: 'Welcome to Resound', description: 'A quick tour of your soundboard. It takes about a minute.' },
+    }),
+    tourStep({
+        element: '#sounds-container',
+        popover: { title: 'Play sounds', description: 'Tap a button to play its sound on your PC. Sounds can overlap.', side: 'top', align: 'center' },
+    }),
+    tourStep({
+        element: '#stop-all',
+        popover: { title: 'Stop', description: 'Stops all sounds at once.', side: 'left', align: 'start' },
+    }),
+    tourStep({
+        element: '#talk-through-button',
+        popover: { title: 'Talk-through', description: 'Hold it to pause the sounds and talk. Let go, and they continue.', side: 'top', align: 'center' },
+    }),
+    tourStep({
+        element: '#tabs-container',
+        popover: { title: 'Tabs', description: 'Each sound folder is a tab. Tap one, or swipe left and right over the buttons.', side: 'top', align: 'center' },
+    }),
+    tourStep({
+        element: '#search-button',
+        popover: { title: 'Search', description: 'Find any sound in all tabs. Shortcut: <b>pull down with two fingers</b> on the buttons.', side: 'bottom', align: 'center' },
+    }),
+    tourStep({
+        element: '#edit-mode-button',
+        popover: { title: 'Edit mode', description: 'Tap the pencil to arrange and customize your board. Let\'s look inside.', side: 'bottom', align: 'center' },
+    }),
+    tourStep({
+        edit: true,
+        element: '#layout-mode-button',
+        popover: { title: 'Layout', description: 'Switches this tab between 3 columns, 2 columns and a list.', side: 'bottom', align: 'center' },
+    }),
+    tourStep({
+        edit: true,
+        element: '#sort-mode-button',
+        popover: { title: 'Sorting', description: 'Sorts this tab <b>A–Z</b> or <b>Z–A</b>, or back to your own order. Your own order is always kept.', side: 'bottom', align: 'center' },
+    }),
+    tourStep({
+        edit: true,
+        element: '#sounds-container',
+        popover: { title: 'Move buttons', description: 'In your own order, drag a button onto another to swap them.', side: 'top', align: 'center' },
+    }),
+    tourStep({
+        edit: true,
+        element: '#tabs-container',
+        popover: { title: 'Move tabs', description: '<b>Long-press a tab</b>, then drag it to a new place.', side: 'top', align: 'center' },
+    }),
+    tourStep({
+        edit: true,
+        sheet: true,
+        element: '#settings-card',
+        popover: { title: 'Customize a sound', description: 'Tap a button in edit mode, or long-press it any time: favorite, volume, color and emoji. Only you hear the preview.', side: 'top', align: 'center' },
+    }),
+    tourStep({
+        popover: { title: 'You\'re all set', description: 'Have fun! The tour is under Settings → <b>Tour</b> whenever you want it again.' },
+    }),
+];
 
-
-    if (typeof window.driver?.js?.driver !== 'function') {
-        console.error('Executing startSounduxTutorial, but window.driver.js.driver is unexpectedly not a function!');
-        return; // Don't proceed
+function startTour() {
+    if (isTutorialRunning || document.documentElement.classList.contains('driver-active')) return;
+    if (currentDriverInstance) {
+        try { currentDriverInstance.destroy(); } catch (e) { /* ignore */ }
+        currentDriverInstance = null;
     }
     const driver = window.driver.js.driver;
 
-    const safeClick = (selector) => {
-        const element = document.querySelector(selector);
-        if (element && typeof element.click === 'function') {
-            element.click();
-            return true;
-        } else {
-            console.warn(`Element not found or not clickable: ${selector}`);
-            return false;
-        }
-    };
-
-    // --- Helper Functions for Sound Settings Panel ---
-    const openSoundSettingsPanelVisually = () => {
-        console.log("Tutorial: Attempting to visually open sound settings panel...");
-        const settingsOverlay = document.getElementById('sound-settings-overlay');
-        const settingsCard = document.getElementById('settings-card');
-        const settingsBackdrop = document.getElementById('settings-backdrop');
-
-        if (settingsOverlay && settingsCard && settingsBackdrop) {
-             settingsCard.style.transition = 'none';
-             settingsBackdrop.style.transition = 'none';
-             settingsCard.style.transform = 'translateY(100%)';
-             settingsBackdrop.style.opacity = '0';
-             settingsOverlay.classList.add('hidden');
-
-             settingsOverlay.classList.remove('hidden');
-             requestAnimationFrame(() => {
-                 settingsCard.style.transition = 'transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)';
-                 settingsBackdrop.style.transition = 'opacity 0.3s ease';
-                 settingsBackdrop.style.opacity = '1';
-                 settingsCard.style.transform = 'translateY(0)';
-                 console.log("Tutorial: Sound settings panel open animation started.");
-             });
-             return true;
-        } else {
-            console.error("Tutorial: Failed to find necessary elements for sound settings panel.");
-            return false;
-        }
-    };
-
-    const closeSoundSettingsPanelVisually = () => {
-         console.log("Tutorial: Attempting to visually close sound settings panel...");
-         const settingsOverlay = document.getElementById('sound-settings-overlay');
-         const settingsCard = document.getElementById('settings-card');
-         const settingsBackdrop = document.getElementById('settings-backdrop');
-
-         if (settingsOverlay && settingsCard && settingsBackdrop && !settingsOverlay.classList.contains('hidden')) {
-              settingsCard.style.transition = 'transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)';
-              settingsBackdrop.style.transition = 'opacity 0.3s ease';
-              settingsCard.style.transform = 'translateY(100%)';
-              settingsBackdrop.style.opacity = '0';
-              console.log("Tutorial: Sound settings panel close animation started.");
-
-              setTimeout(() => {
-                   const currentOverlay = document.getElementById('sound-settings-overlay');
-                   if (currentOverlay && !currentOverlay.classList.contains('hidden')) {
-                        console.log("Tutorial: Hiding sound settings panel after animation.");
-                        currentOverlay.classList.add('hidden');
-                        const currentCard = document.getElementById('settings-card');
-                        const currentBackdrop = document.getElementById('settings-backdrop');
-                        if (currentCard) {
-                            currentCard.style.transform = '';
-                            currentCard.style.transition = '';
-                        }
-                        if (currentBackdrop) {
-                            currentBackdrop.style.opacity = '';
-                            currentBackdrop.style.transition = '';
-                        }
-                   } else {
-                       // console.log("Tutorial: Sound settings panel already hidden or removed before timeout completed.");
-                   }
-              }, 300);
-              return true;
-         } else {
-              // console.log("Tutorial: Sound settings panel already closed or elements not found.");
-              return false;
-         }
-    };
-    // --- End Helper Functions ---
-
-    // Define the driver instance configuration first
-    const driverConfig = {
+    currentDriverInstance = driver({
         stageRadius: 5,
         showProgress: true,
         allowClose: true,
         disableActiveInteraction: true,
         popoverClass: 'soundux-driver-popover',
-        // --- Central Cleanup Hook ---
+        doneBtnText: 'Done',
+        // Closed or finished: the app as before the tour.
         onDestroyStarted: () => {
-             console.log("--- Tutorial onDestroyStarted Hook Fired ---");
-             // *** Use flag to prevent double execution ***
-             if (!isTutorialRunning) {
-                console.warn("onDestroyStarted called, but tutorial flag was already false. Skipping cleanup and destroy.");
-                return; // Exit early if already processed
-             }
-             isTutorialRunning = false; // Set flag immediately on first run
-
-             // Perform custom cleanup
-             console.log("Tutorial Cleanup: Checking edit mode...");
-             if (document.body.classList.contains('edit-mode-active')) {
-                 if(safeClick('#edit-mode-button')) {
-                    console.log("Tutorial Cleanup: Exited edit mode.");
-                 } else {
-                    console.warn("Tutorial Cleanup: Failed to exit edit mode via click.");
-                 }
-             }
-
-             console.log("Tutorial Cleanup: Checking sound settings panel...");
-             closeSoundSettingsPanelVisually();
-             console.log("Tutorial Cleanup: Initiated sound settings panel close.");
-
-             // *** Attempt manual destruction ***
-             if (currentDriverInstance) {
-                 console.log("Tutorial Cleanup: Attempting manual driver destroy()...");
-                 try {
-                     // Important: Call destroy on the *captured* instance
-                     currentDriverInstance.destroy();
-                     currentDriverInstance = null; // Clear the global reference
-                     console.log("Tutorial Cleanup: Manual destroy() called successfully.");
-                 } catch (e) {
-                     console.error("Error calling driver destroy():", e);
-                     // Force cleanup of class just in case destroy failed internally
-                     document.documentElement.classList.remove('driver-active');
-                     currentDriverInstance = null; // Clear ref even on error
-                 }
-             } else {
-                 console.warn("onDestroyStarted: currentDriverInstance is null, cannot manually destroy.");
-                 // Force cleanup of class as fallback
-                 document.documentElement.classList.remove('driver-active');
-             }
-
-             console.log("--- Tutorial onDestroyStarted Hook Finished ---");
+            if (!isTutorialRunning) return;
+            isTutorialRunning = false;
+            setEditMode(false);
+            closeSoundSettingsPanelVisually();
+            const instance = currentDriverInstance;
+            currentDriverInstance = null;
+            try {
+                instance?.destroy();
+            } catch (e) {
+                console.error('Ending the tour:', e);
+                document.documentElement.classList.remove('driver-active');
+            }
         },
-        // --- Step Definitions ---
-        steps: [
-             // Step 1: Welcome
-             { popover: { title: 'Welcome to Resound', description: 'Let\'s get you familiarized with the main features! Click "Next" to begin.', side: "left", align: 'start' } },
-             // Step 2: Playing Sounds
-             { element: '#sounds-container', popover: { title: 'Playing Sounds', description: 'This is your sound grid. Simply tap any button to play the corresponding sound on your computer.', side: "top", align: 'center' } },
-             // Step 3: Stop All Button
-             { element: '#stop-all', popover: { title: 'Stop All Sounds', description: 'Need to stop playback? Tap this button to stop all sounds currently playing.', side: "left", align: 'start' } },
-             // Step 4: Talk-Through Button
-             { element: '#talk-through-button', popover: { title: 'Push-to-Talk', description: 'Hold this button to temporarily pause playback and talk through your default microphone output.', side: "top", align: 'center' } },
-             // Step 5: Sound Tabs
-             { element: '#tabs-container', popover: { title: 'Sound Tabs', description: 'Tabs from the desktop app get shown here. Click on a tab to switch between different pages of sounds, or simply swipe left and right on the soundboard buttons.', side: "top", align: 'center' } },
-             // Step 6: Edit Mode Button
-             { element: '#edit-mode-button', popover: { title: 'Edit Mode', description: 'Tap this button to enter Edit Mode for customizing sounds and rearranging the layout.', side: "bottom", align: 'center' } },
-             // Step 7: Top Bar Overview (Edit Mode Active)
-             {
-                 element: '.top-bar',
-                 popover: { title: 'Edit mode controls', description: 'When in edit mode, toggle through layout options, sort a tab by name or keep your own order, rearrange soundboard buttons via drag & drop, long-press a tab to drag it to another place, or tap on any sound to edit it. (pro tip: even when not in edit mode, you can long-press buttons to edit them)', side: "bottom", align: 'center' },
-                 userData: { enteredEditMode: false },
-                 onHighlightStarted: (element, step, { config, state }) => {
-                     // console.log("Step 7: Entering edit mode for highlight...");
-                     if (!document.body.classList.contains('edit-mode-active')) {
-                         if (safeClick('#edit-mode-button')) { step.userData.enteredEditMode = true; }
-                         else { console.warn("Failed to enter edit mode for Step 7."); step.userData.enteredEditMode = false; }
-                     } else { step.userData.enteredEditMode = false; }
-                 },
-                 onDeselected: (element, step, { config, state }) => {
-                     // console.log("Step 7: Exiting edit mode after highlight...");
-                     if (step.userData?.enteredEditMode) {
-                         if (document.body.classList.contains('edit-mode-active')) { safeClick('#edit-mode-button'); }
-                     }
-                     step.userData.enteredEditMode = false;
-                     closeSoundSettingsPanelVisually();
-                 },
-                 onNextClick: (element, step, { config, state }) => {
-                     // console.log("Step 7: onNextClick -> Opening sound settings panel for Step 8.");
-                     openSoundSettingsPanelVisually();
-                 }
-             },
-             // Step 8: Sound Settings Panel
-             {
-                 element: '#settings-card',
-                 popover: { title: 'Sound Settings', description: 'All settings for a soundboard button are here: toggle favorites, adjust volume, change button color, and add an emoji background. And the preview can only be heard by you!', side: "top", align: 'center' },
-                 onHighlightStarted: (element, step, { config, state }) => {
-                     // console.log("Step 8: Highlighting #settings-card.");
-                      const settingsOverlay = document.getElementById('sound-settings-overlay');
-                      if (!settingsOverlay || settingsOverlay.classList.contains('hidden')) {
-                          console.warn("Step 8 onHighlightStarted: Sound settings panel is NOT visible! Attempting recovery open.");
-                          openSoundSettingsPanelVisually();
-                      }
-                 },
-                 onDeselected: (element, step, { config, state }) => {
-                     // console.log("Step 8: onDeselected -> Closing sound settings panel.");
-                     closeSoundSettingsPanelVisually();
-                 }
-             },
-             // Step 9: Final Step
-             {
-                 popover: { title: 'Tour Complete!', description: 'You\'ve learned the basics of the Resound remote. Edit mode is still on, so feel free to explore and customize! Press ✅ when you\'re happy with your creation. Enjoy :)', side: "top", align: 'center' }
-             }
-        ]
-    }; // End driverConfig definition
+        steps: tourSteps(),
+    });
 
-    // Create the instance using the config and store it globally
-    currentDriverInstance = driver(driverConfig);
-
-    // --- Start the tour ---
     try {
-        if (document.documentElement.classList.contains('driver-active')) {
-             console.warn("Tutorial already active (driver-active class found), preventing new tour start.");
-             isTutorialRunning = true; // Sync flag
-             // Attempt cleanup of potential zombie instance
-             if (currentDriverInstance) { try { currentDriverInstance.destroy(); } catch(e){} }
-             currentDriverInstance = null;
-             document.documentElement.classList.remove('driver-active');
-             isTutorialRunning = false;
-             return; // Prevent starting a new one immediately
-        }
-        console.log("Calling driver drive()...");
-        isTutorialRunning = true; // Set flag *before* starting
-        currentDriverInstance.drive(); // Start the tour!
+        isTutorialRunning = true;
+        currentDriverInstance.drive();
     } catch (e) {
-        console.error("Error starting Driver.js tour:", e);
-        isTutorialRunning = false; // Reset flag on error
-        if (currentDriverInstance) {
-            try { currentDriverInstance.destroy(); } catch(err){} // Attempt cleanup on error too
-        }
-        currentDriverInstance = null; // Clear ref on error
-        document.documentElement.classList.remove('driver-active'); // Force remove class
-        alert("An error occurred while starting the tutorial. Please check the browser console.");
-    }
-} // End startSounduxTutorial function
-
-// --- Initialization ---
-document.addEventListener('DOMContentLoaded', () => {
-    console.log("DOM Content Loaded. Initializing tutorial trigger.");
-    initializeTutorialTrigger();
-    // Check initial state more carefully
-    if (document.documentElement.classList.contains('driver-active')) {
-        console.warn("DOM loaded, tutorial seems active from previous state (driver-active class found). Resetting state.");
-        // Force cleanup if class exists but JS state might be reset
-        document.documentElement.classList.remove('driver-active');
+        console.error('Starting the tour:', e);
         isTutorialRunning = false;
+        try { currentDriverInstance?.destroy(); } catch (err) { /* ignore */ }
         currentDriverInstance = null;
-        // Also ensure panels are hidden
-         const settingsOverlay = document.getElementById('sound-settings-overlay');
-         if (settingsOverlay && !settingsOverlay.classList.contains('hidden')) {
-             settingsOverlay.classList.add('hidden');
-             console.log("Cleaned up visible sound settings panel on load.");
-         }
-          if (document.body.classList.contains('edit-mode-active')) {
-              safeClick('#edit-mode-button');
-              console.log("Cleaned up active edit mode on load.");
-          }
-    } else {
-        isTutorialRunning = false; // Ensure flag is false if class isn't present
-        currentDriverInstance = null;
+        document.documentElement.classList.remove('driver-active');
     }
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    initializeTutorialTrigger();
+    // A tour can't survive a reload: no leftovers of one.
+    document.documentElement.classList.remove('driver-active');
 });
