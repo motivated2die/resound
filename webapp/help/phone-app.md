@@ -19,7 +19,7 @@ To arrange the tabs, enter edit mode (the pencil at the top), then long-press a 
 
 ## Search
 
-Tap the magnifier at the top, or pull down on the buttons with two fingers. Search finds sounds in every tab, also with parts of words or a typo, and the colored dots filter by button color. Results play like any button.
+Tap the magnifier at the top (it steps aside in edit mode), or pull down on the buttons with two fingers. Search finds sounds in every tab, also with parts of words or a typo, and the colored dots filter by button color. Results play like any button.
 
 ## Customize a sound
 

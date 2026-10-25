@@ -4,6 +4,7 @@ const editMode = (() => {
     const editButton = document.getElementById('edit-mode-button');
     const layoutButton = document.getElementById('layout-mode-button');
     const sortButton = document.getElementById('sort-mode-button');
+    const searchButton = document.getElementById('search-button');
     const topBar = document.getElementById('top-bar');
     const soundsContainer = document.getElementById('sounds-container');
     // --- NEW CODE START ---
@@ -42,6 +43,9 @@ const editMode = (() => {
         topBar?.classList.toggle('edit-mode-active', isEditModeActive);
         layoutButton?.classList.toggle('hidden', !isEditModeActive);
         sortButton?.classList.toggle('hidden', !isEditModeActive);
+        // Search and edit mode exclude each other (opening search leaves
+        // edit mode), so search has no button while editing.
+        searchButton?.classList.toggle('hidden', isEditModeActive);
         if (!isEditModeActive) endFlash();
         editButton?.classList.toggle('active', isEditModeActive);
 
