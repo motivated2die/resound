@@ -10,6 +10,25 @@
 /sw.js
   Cache-Control: no-cache
 
+# The help center as Markdown, for AI assistants (cmd/webapp/llms.go): in
+# UTF-8 (arrows, quotes), as text that browsers show rather than download,
+# readable by tools on other sites, and kept out of search results, where
+# the articles' pages belong.
+/llms.txt
+  Content-Type: text/plain; charset=utf-8
+  Access-Control-Allow-Origin: *
+/llms-full.txt
+  Content-Type: text/plain; charset=utf-8
+  Access-Control-Allow-Origin: *
+  X-Robots-Tag: noindex
+/help/*.md
+  Content-Type: text/plain; charset=utf-8
+  Access-Control-Allow-Origin: *
+  X-Robots-Tag: noindex
+/help/ai-context.txt
+  Content-Type: text/plain; charset=utf-8
+  X-Robots-Tag: noindex
+
 # The edit page talks to Resound on 127.0.0.1 and embeds the editor
 # (audiocutter.online). Its own, narrower policy is in a <meta> tag
 # (edit.html): it can't reach this host at all. Two policies would both

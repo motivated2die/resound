@@ -2,6 +2,7 @@ package main
 
 import (
 	"io/fs"
+	"net/url"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -15,7 +16,7 @@ var helpSrc = os.DirFS(filepath.Join("..", "..", "webapp", "help"))
 // The real help center builds: every article is in SUMMARY.md, and every
 // link, heading and visualization it uses exists.
 func TestHelpCenter(t *testing.T) {
-	mdLink := regexp.MustCompile(`href="[^":]*\.md[#"]`) // not https://…/PRIVACY.md
+	mdLink := regexp.MustCompile(`<a [^>]*href="[^":]*\.md[#"]`) // not https://…/PRIVACY.md, nor the Markdown <link>
 	files, err := buildHelp(helpSrc)
 	if err != nil {
 		t.Fatal(err)
@@ -102,6 +103,7 @@ func TestHelpMarkdown(t *testing.T) {
 		"page.html":     {Data: []byte(`<h1>{{.Title}}</h1>{{.Body}}{{with .Next}}<a class="next" href="/help/{{.Slug}}">{{.Label}}</a>{{end}}`)},
 		"help.css":      {Data: []byte("")},
 		"help.js":       {Data: []byte("")},
+		"ai-prompt.txt": {Data: []byte("Help me with Resound.\n")},
 		"viz/demo.html": {Data: []byte(`<div class="demo"></div>`)},
 		"SUMMARY.md":    {Data: []byte("# Help\n\n## Start\n- [First steps](one.md)\n- [More](two.md)\n")},
 		"index.md":      {Data: []byte("# Help\n\nWelcome. See [one](one.md).\n")},
@@ -164,5 +166,100 @@ func TestHelpMarkdown(t *testing.T) {
 	unlisted["three.md"] = &fstest.MapFile{Data: []byte("# Three\n")}
 	if _, err := buildHelp(unlisted); err == nil || !strings.Contains(err.Error(), "SUMMARY.md") {
 		t.Errorf("an article missing from SUMMARY.md: %v", err)
+	}
+}
+
+// The help center as Markdown (llms.go): every article, readable outside
+// the site, and the assistants' links with the prompt in their address.
+func TestHelpLLMs(t *testing.T) {
+	files, err := buildHelp(helpSrc)
+	if err != nil {
+		t.Fatal(err)
+	}
+	full := string(files["llms-full.txt"])
+	index := string(files["llms.txt"])
+	relLink := regexp.MustCompile(`\]\((?:[^h)][^)]*)\)`) // anything but https://…
+	for name, data := range files {
+		slug, ok := strings.CutPrefix(name, "help/")
+		if !ok || !strings.HasSuffix(slug, ".html") {
+			continue
+		}
+		slug = strings.TrimSuffix(slug, ".html")
+		md := string(files["help/"+slug+".md"])
+		switch {
+		case md == "":
+			t.Errorf("%s has no Markdown version", name)
+		case !strings.Contains(full, md):
+			t.Errorf("llms-full.txt lacks %s.md", slug)
+		case slug != "index" && !strings.Contains(index, site+"/help/"+slug+".md"):
+			t.Errorf("llms.txt doesn't list %s.md", slug)
+		}
+		if !strings.Contains(string(data), `href="/help/`+slug+`.md"`) {
+			t.Errorf("%s doesn't name its Markdown version", name)
+		}
+	}
+	if strings.Contains(full, ":::") {
+		t.Error("llms-full.txt has a ::: block left")
+	}
+	if m := relLink.FindString(full); m != "" {
+		t.Errorf("llms-full.txt has a relative link: %s", m)
+	}
+	if ctx := string(files["help/ai-context.txt"]); !strings.HasSuffix(ctx, full) || len(ctx) <= len(full) {
+		t.Error("ai-context.txt isn't the prompt followed by llms-full.txt")
+	}
+
+	home := string(files["help/index.html"])
+	for _, a := range aiAssistants {
+		re := regexp.MustCompile(`<a href="([^"]*)"[^>]*data-ai-open="` + a.Name + `"`)
+		m := re.FindStringSubmatch(home)
+		if m == nil {
+			t.Errorf("the overview has no link to %s", a.Name)
+			continue
+		}
+		href := strings.ReplaceAll(m[1], "&amp;", "&")
+		if a.Param == "" {
+			continue
+		}
+		// Far below what assistants and hosts accept (Claude: ~14,000 characters).
+		if len(href) > 4000 {
+			t.Errorf("%s: the link is %d characters long", a.Name, len(href))
+		}
+		if !strings.Contains(href, a.Param+"=") || !strings.Contains(href, url.QueryEscape(site+llmsFullPath)) {
+			t.Errorf("%s: the link doesn't carry the prompt with llms-full.txt: %s", a.Name, href)
+		}
+	}
+}
+
+func TestLLMsMarkdown(t *testing.T) {
+	base := fstest.MapFS{
+		"page.html":     {Data: []byte(`{{.Body}}`)},
+		"help.css":      {Data: []byte("")},
+		"help.js":       {Data: []byte("")},
+		"ai-prompt.txt": {Data: []byte("Help me with Resound.\n")},
+		"SUMMARY.md":    {Data: []byte("# Help\n\n## Start\n- [First steps](one.md)\n- [More](two.md)\n")},
+		"index.md":      {Data: []byte("# Help\n\nWelcome.\n")},
+		"one.md": {Data: []byte("# One\n\nSee [two](two.md#later), [here](#a-heading) and [the app](/connect).\n\n## A heading\n\n" +
+			":::tip Look\nA **tip**.\n\nSecond.\n:::\n\n```\n:::tip not a callout\n```\n")},
+		"two.md": {Data: []byte("# Two\n\n## Later\n\nText.\n")},
+	}
+	files, err := buildHelp(base)
+	if err != nil {
+		t.Fatal(err)
+	}
+	one := string(files["help/one.md"])
+	for _, want := range []string{
+		"# One\n\nSource: " + site + "/help/one\n",
+		"[two](" + site + "/help/two#later)",
+		"[here](" + site + "/help/one#a-heading)",
+		"[the app](" + site + "/connect)",
+		"> **Tip: Look**\n>\n> A **tip**.\n>\n> Second.\n\n",
+		"```\n:::tip not a callout\n```",
+	} {
+		if !strings.Contains(one, want) {
+			t.Errorf("one.md lacks %q:\n%s", want, one)
+		}
+	}
+	if ctx := string(files["help/ai-context.txt"]); !strings.HasPrefix(ctx, "Help me with Resound.") {
+		t.Errorf("ai-context.txt doesn't start with the prompt: %.80q", ctx)
 	}
 }

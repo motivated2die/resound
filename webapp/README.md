@@ -48,7 +48,8 @@ The help center at `/help/`: setup guides, features, troubleshooting, FAQ and un
 | `*.md` | One article each, at `/help/<file name>`. Starts with its `# Title`; the first paragraph is its summary (search, meta description) |
 | `viz/*.html` | Small visualizations, inserted where an article says `:::viz <name>` |
 | `page.html` | The page template (Go `html/template`) |
-| `help.css`, `help.js` | Styles (the landing page's palette) and behaviour: topics drawer, search, checklists, visualization switches |
+| `help.css`, `help.js` | Styles (the landing page's palette) and behaviour: topics drawer, search, checklists, visualization switches, "Ask an AI" |
+| `ai-prompt.txt` | The instructions for an AI assistant that "Ask an AI" hands over with the documentation |
 
 Writing articles, in GitHub Markdown:
 
@@ -57,6 +58,16 @@ Writing articles, in GitHub Markdown:
 - Visualizations: `:::viz audio-flow`, a caption, `:::`. Use them sparingly, where a picture explains what text can't.
 - Checklists: a list of `- [ ] Step` items becomes boxes readers tick off (kept only while the page is open). For troubleshooting steps.
 - Keys as `<kbd>Esc</kbd>`, UI labels in **bold**, paths in the panel as Settings → Audio & voice chat.
+
+### Ask an AI
+
+The overview (right column, or below the intro on narrower screens) and the end of every article have an **Ask an AI** card. It works without any integration with the AI providers; they are plain links:
+
+- **Copy for your AI** copies `ai-prompt.txt` plus every article as Markdown (`/help/ai-context.txt`, about 85 KB), to paste into any AI chat.
+- **ChatGPT, Claude, Perplexity, Grok** open with the prompt in their address (`?q=`), plus a link to `/llms-full.txt` that they read with their web tools. The whole help center is far too long for an address. The text is copied too, in case the assistant can't open the link.
+- **Gemini, Copilot** take no prompt in their address: they open empty, and the reader pastes what was copied.
+
+The build also writes the help center for AI assistants and tools ([llmstxt.org](https://llmstxt.org)): `/llms.txt` (the index), `/llms-full.txt` (everything) and `/help/<article>.md`. Links become absolute, callouts become quotes, and visualizations keep only their caption. Assistants and their address parameters are `aiAssistants` in `cmd/webapp/llms.go`; when a provider changes its parameter, change it there. `_headers` serves these files as UTF-8 text.
 
 The build fails on broken links and headings, unknown visualizations and articles missing from `SUMMARY.md`; `go test ./cmd/webapp` runs it.
 

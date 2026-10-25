@@ -1,7 +1,7 @@
 // The help center's pages (/help/): the topics drawer on small screens,
 // links to headings, checklists to tick off, search across all articles,
-// "On this page" following the reading position, and the visualizations'
-// switches. The only thing kept is the sidebar's scroll position, for this
+// "On this page" following the reading position, the visualizations'
+// switches, and "Ask an AI" (copying the help center for an assistant). The only thing kept is the sidebar's scroll position, for this
 // tab (sessionStorage); checklists start afresh. Not part of the installed
 // app.
 (() => {
@@ -330,7 +330,122 @@
         });
     };
 
+    // --- Ask an AI ------------------------------------------------------------
+
+    // "Copy for your AI" copies ai-context.txt: the prompt (ai-prompt.txt)
+    // and every article as Markdown. The assistants' links are plain links
+    // (llms.go). Those with the prompt in their address read the help from
+    // the site themselves, and get it on the clipboard too, in case they
+    // can't. The others open empty, ready for a paste. Browsers allow copying
+    // only during the click, so the text is fetched as soon as a card is
+    // near; until it has arrived, a ClipboardItem takes the pending text.
+    const aiContext = '/help/ai-context.txt';
+
+    const setupAI = () => {
+        const cards = [...document.querySelectorAll('[data-ai]')];
+        if (!cards.length) return;
+        const texts = new Map(); // url → { promise, text }
+        const get = (url) => {
+            let t = texts.get(url);
+            if (!t) {
+                t = { text: null };
+                t.promise = fetch(url)
+                    .then((r) => (r.ok ? r.text() : Promise.reject(new Error(r.status))))
+                    .then((text) => { t.text = text; return text; });
+                t.promise.catch(() => texts.delete(url)); // try again next time
+                texts.set(url, t);
+            }
+            return t;
+        };
+        const copy = async (url) => {
+            if (!navigator.clipboard) throw new Error('no clipboard');
+            const t = get(url);
+            if (t.text !== null) return navigator.clipboard.writeText(t.text);
+            if (window.ClipboardItem) {
+                try {
+                    const blob = t.promise.then((text) => new Blob([text], { type: 'text/plain' }));
+                    return await navigator.clipboard.write([new ClipboardItem({ 'text/plain': blob })]);
+                } catch (e) { /* not with a pending text: wait for it */ }
+            }
+            return navigator.clipboard.writeText(await t.promise);
+        };
+
+        const apple = /Mac|iPhone|iPad|iPod/.test(navigator.platform || navigator.userAgent);
+        const paste = () => (window.matchMedia('(pointer: coarse)').matches ? 'touch and hold, then Paste' : (apple ? '⌘V' : 'Ctrl+V'));
+
+        const status = (card, text, tone) => {
+            const el = card.querySelector('[data-ai-status]');
+            if (!el) return;
+            el.dataset.tone = tone || '';
+            el.textContent = text;
+        };
+        const flash = (button, text) => {
+            const label = button.querySelector('[data-ai-copy-label]') || button;
+            label.dataset.label ??= label.textContent;
+            label.textContent = text;
+            button.dataset.state = 'done';
+            clearTimeout(button.flashTimer);
+            button.flashTimer = setTimeout(() => { label.textContent = label.dataset.label; delete button.dataset.state; }, 2500);
+        };
+        const failed = (card, what) => status(card,
+            `Your browser didn't allow copying. Open llms-full.txt below, select all, copy it and ${what}.`, 'error');
+
+        // Fetch ahead once a card is close to the screen.
+        const prefetch = () => get(aiContext);
+        if ('IntersectionObserver' in window) {
+            const io = new IntersectionObserver((entries) => {
+                if (entries.some((e) => e.isIntersecting)) { prefetch(); io.disconnect(); }
+            }, { rootMargin: '600px 0px' });
+            cards.forEach((c) => io.observe(c));
+        } else prefetch();
+
+        cards.forEach((card) => {
+            card.addEventListener('pointerenter', prefetch, { once: true });
+            card.addEventListener('focusin', prefetch, { once: true });
+
+            card.querySelector('[data-ai-copy]')?.addEventListener('click', async (e) => {
+                const button = e.currentTarget;
+                try {
+                    await copy(aiContext);
+                    flash(button, 'Copied');
+                    status(card, `Copied all of Resound's help, with instructions for the AI. Paste it into any AI chat (${paste()}), then ask your question.`);
+                } catch (err) {
+                    failed(card, 'paste it into any AI chat');
+                }
+            });
+
+            const page = card.querySelector('[data-ai-copy-page]');
+            page?.addEventListener('click', async () => {
+                try {
+                    await copy(page.dataset.aiCopyPage);
+                    flash(page, 'Copied');
+                    status(card, 'Copied this article as Markdown.');
+                } catch (err) {
+                    status(card, "Your browser didn't allow copying.", 'error');
+                }
+            });
+
+            // The link opens the assistant in a new tab by itself; this only copies.
+            card.querySelectorAll('[data-ai-open]').forEach((a) => {
+                a.addEventListener('click', async () => {
+                    const name = a.dataset.aiOpen;
+                    const pasteOnly = a.hasAttribute('data-ai-paste');
+                    try {
+                        await copy(aiContext);
+                        status(card, pasteOnly
+                            ? `Copied. Paste it into ${name} (${paste()}), then ask your question.`
+                            : `${name} opens with the instructions and reads the help from getresound.app. If it can't, paste it (${paste()}): it's on your clipboard.`);
+                    } catch (err) {
+                        if (pasteOnly) failed(card, `paste it into ${name}`);
+                        else status(card, `${name} opens with the instructions and reads the help from getresound.app.`);
+                    }
+                });
+            });
+        });
+    };
+
     document.addEventListener('DOMContentLoaded', () => {
+        setupAI();
         setupMenu();
         setupAnchors();
         setupChecklists();
