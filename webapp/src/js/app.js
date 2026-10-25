@@ -396,12 +396,29 @@ function createRipple(event, targetButton, color = 'rgba(255, 255, 255, 0.2)', p
 
 // --- Event Listeners ---
 function setupEventListeners() {
-    // Stop All Button Listener (PointerDown for ripple)
+    // STOP acts on the press: one vibration then (none on release), the
+    // button pressed in while held (.pressed, like talk-through's), and no
+    // long press. Cancelling touchstart keeps the browser from treating a
+    // held touch as a long press (Android's own vibration, text selection)
+    // and from sending a click; the pointer events still arrive. Keys
+    // (Enter, Space) still click it.
     if (stopAllButton) {
+        const release = () => stopAllButton.classList.remove('pressed');
         stopAllButton.addEventListener('pointerdown', (e) => {
+            if (e.button !== 0) return;
+            window.haptics?.tap();
+            stopAllButton.classList.add('pressed');
             createRipple(e, stopAllButton, 'rgba(242, 65, 111, 0.5)'); // berry red, like the button
+            stopAllSounds({ haptic: false });
         });
-        stopAllButton.addEventListener('click', stopAllSounds); // Keep click for action
+        ['pointerup', 'pointercancel', 'pointerleave'].forEach(type => stopAllButton.addEventListener(type, release));
+        stopAllButton.addEventListener('click', (e) => {
+            if (e.detail === 0) stopAllSounds(); // from the keyboard; pointers stopped on the press
+        });
+        stopAllButton.addEventListener('contextmenu', (e) => e.preventDefault());
+        stopAllButton.addEventListener('touchstart', (e) => {
+            if (e.cancelable) e.preventDefault();
+        }, { passive: false });
     } else console.error("Stop All button not found");
 
 
@@ -1495,8 +1512,10 @@ function showPlayFailed(soundId, message) {
     setTimeout(() => card.classList.remove('play-failed'), 700);
 }
 
-async function stopAllSounds() {
-    if (window.haptics) window.haptics.tap();
+// stopAllSounds stops every sound; haptic: false when the caller vibrated
+// already (STOP, on its press).
+async function stopAllSounds({ haptic = true } = {}) {
+    if (haptic && window.haptics) window.haptics.tap();
     console.log("Stopping all sounds via API...");
     try {
         await apiFetch('/api/sounds/stop', { method: 'POST' });

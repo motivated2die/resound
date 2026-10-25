@@ -1309,10 +1309,29 @@ h1.brand {
   /* A darker ring, like the talk button's (.btn-round) */
   border: 2px solid #b53153; /* --error-color, a quarter darker */
   box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+  transition: background-color var(--transition-speed) ease,
+    box-shadow var(--transition-speed) ease,
+    transform var(--transition-speed) ease;
 }
 
 .btn-danger:hover {
   background-color: var(--error-hover);
+}
+
+/* STOP: pressed in while held, like talk-through (.btn-talk.active); the
+   touch is only a press, never a long press or a pan (app.js). */
+#stop-all {
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
+
+#stop-all.pressed {
+  background-color: var(--error-hover);
+  box-shadow: 0 0 10px rgba(242, 65, 111, 0.45), /* --error-color */
+    inset 0 2px 4px rgba(0, 0, 0, 0.3);
+  transform: scale(0.95);
 }
 
 .btn-danger .icon {
