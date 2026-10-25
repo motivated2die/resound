@@ -3199,6 +3199,53 @@ emoji-picker section#favorites
   /* Slightly stronger shadow */
 }
 
+/* Wide enough for Previous and Next on one line, whatever the text's length:
+   the screen's width less 16 px a side, up to 360 px. */
+.driver-popover.soundux-driver-popover {
+  min-width: min(360px, calc(100vw - 32px));
+  max-width: min(400px, calc(100vw - 32px));
+}
+
+.soundux-driver-popover .driver-popover-navigation-btns button {
+  white-space: nowrap;
+}
+
+/* On phones, nearly as wide as the screen: centred, with the same space on
+   either side (Driver.js would push it against an edge near a corner). */
+@media (max-width: 480px) {
+  .driver-popover.soundux-driver-popover {
+    left: 50% !important;
+    right: auto !important;
+    transform: translateX(-50%);
+  }
+}
+
+/* Steps on the whole grid: in the middle of the screen, so the tab bar and
+   the bottom bar stay in sight (Driver.js would put it over them). */
+.driver-popover.tour-popover-middle {
+  top: 50% !important;
+  bottom: auto !important;
+  transform: translateY(-50%);
+}
+@media (max-width: 480px) {
+  .driver-popover.tour-popover-middle {
+    transform: translate(-50%, -50%);
+  }
+}
+
+/* The sound sheet's step: at the top of the screen, above the sheet
+   (Driver.js sets top inline; this wins). */
+.driver-popover.tour-popover-top {
+  top: calc(env(safe-area-inset-top) + 12px) !important;
+  bottom: auto !important;
+}
+
+/* What a tour step shows when it is several parts at once (tutorial.js). */
+.tour-target {
+  position: fixed;
+  pointer-events: none;
+}
+
 .soundux-driver-popover .driver-popover-title {
   font-size: 1.1rem;
   font-weight: 600;

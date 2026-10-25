@@ -6,10 +6,10 @@
 // below it offers the tour: Start tour, or Later (asks again next time the
 // app is opened; the help button stays).
 //
-// Each step says whether edit mode and the sound sheet are open for it
+// Each step says what is open for it: search, edit mode, the sound sheet
 // (tourStep), and entering the step sets that, so Next and Previous both
-// find the app as the step describes it. Closing the tour leaves edit mode
-// and closes the sheet.
+// find the app as the step describes it. The tour ends in edit mode, with
+// its ✓ pointed out; closing it closes search and the sheet.
 
 let isTutorialRunning = false;
 let currentDriverInstance = null;
@@ -191,73 +191,128 @@ function handleStartTutorialClick() {
 
 // --- The tour -------------------------------------------------------------------
 
-// tourStep is a step for which edit mode is on (edit) or off, and the sound
-// sheet open (sheet) or closed.
-const tourStep = ({ edit = false, sheet = false, ...step }) => ({
-    ...step,
-    onHighlightStarted: () => {
-        setEditMode(edit);
-        if (sheet) openSoundSettingsPanelVisually();
-        else closeSoundSettingsPanelVisually();
-    },
-});
+// tourTargets are invisible boxes over several parts of the app, one per
+// step that shows them together (Driver.js highlights one element). A step
+// places its box when it starts, once its scene is open; the boxes follow
+// when the window changes size.
+const tourTargets = (() => {
+    const boxes = new Map(); // box -> the selectors it covers
+    const place = (box) => {
+        const rects = (boxes.get(box) || []).map((s) => document.querySelector(s)?.getBoundingClientRect()).filter((r) => r && r.width && r.height);
+        if (!rects.length) return;
+        const top = Math.min(...rects.map((r) => r.top));
+        const left = Math.min(...rects.map((r) => r.left));
+        Object.assign(box.style, {
+            top: `${top}px`,
+            left: `${left}px`,
+            width: `${Math.max(...rects.map((r) => r.right)) - left}px`,
+            height: `${Math.max(...rects.map((r) => r.bottom)) - top}px`,
+        });
+    };
+    const placeAll = () => boxes.forEach((_, box) => place(box));
+    const create = (selectors) => {
+        const box = document.createElement('div');
+        box.className = 'tour-target';
+        box.setAttribute('aria-hidden', 'true');
+        document.body.append(box);
+        if (!boxes.size) window.addEventListener('resize', placeAll);
+        boxes.set(box, selectors);
+        return box;
+    };
+    const removeAll = () => {
+        boxes.forEach((_, box) => box.remove());
+        boxes.clear();
+        window.removeEventListener('resize', placeAll);
+    };
+    return { create, place, removeAll };
+})();
+
+// setTourScene opens what a step shows: search, edit mode, the sound sheet.
+const setTourScene = ({ edit = false, sheet = false, search = false }) => {
+    const searchUI = window.soundSearch;
+    if (!search && searchUI?.isOpen()) searchUI.close();
+    if (search) searchUI?.open({ focus: false }); // no keyboard: the tour goes on
+    else setEditMode(edit);
+    if (sheet) openSoundSettingsPanelVisually();
+    else closeSoundSettingsPanelVisually();
+};
+
+// tourStep is a step with its scene ({edit, sheet, search}: see
+// setTourScene) and what it highlights: a selector, or a list of them shown
+// together. Driver.js finds the element first, then calls the step's
+// onHighlightStarted, then measures it: so the scene opens there, and
+// elements still hidden until then (the edit mode buttons, the search field)
+// are measured open. Entering the step sets the scene, so Next and Previous
+// both find the app as described.
+const tourStep = ({ edit = false, sheet = false, search = false, element, ...step }) => {
+    const box = Array.isArray(element) ? tourTargets.create(element) : null;
+    return {
+        ...step,
+        ...(element ? { element: box || element } : {}),
+        onHighlightStarted: () => {
+            setTourScene({ edit, sheet, search });
+            if (box) tourTargets.place(box);
+        },
+    };
+};
+
+// On the whole grid: in the middle, clear of the tab bar (styles.css).
+const MIDDLE = 'soundux-driver-popover tour-popover-middle';
 
 const tourSteps = () => [
     tourStep({
-        popover: { title: 'Welcome to Resound', description: 'A quick tour of your soundboard. It takes about a minute.' },
+        popover: { title: 'Welcome to Resound', description: 'Here\'s a quick tour of your soundboard and the tricks that make it yours. It takes about a minute.' },
     }),
     tourStep({
         element: '#sounds-container',
-        popover: { title: 'Play sounds', description: 'Tap a button to play its sound on your PC. Sounds can overlap.', side: 'top', align: 'center' },
+        popover: { title: 'Play sounds', description: 'Tap a button to play its sound on your PC, for you and everyone in your voice chat. Tap more buttons to play several sounds at once.', popoverClass: MIDDLE },
     }),
     tourStep({
         element: '#stop-all',
-        popover: { title: 'Stop', description: 'Stops all sounds at once.', side: 'left', align: 'start' },
+        popover: { title: 'Stop', description: 'Stops every sound that\'s playing right now, on your PC and in voice chat.', side: 'left', align: 'start' },
     }),
     tourStep({
         element: '#talk-through-button',
-        popover: { title: 'Talk-through', description: 'Hold it to pause the sounds and talk. Let go, and they continue.', side: 'top', align: 'center' },
+        popover: { title: 'Talk-through', description: 'Hold it to pause your sounds and talk freely. Let go, and they carry on where they stopped.', side: 'top', align: 'center' },
     }),
     tourStep({
         element: '#tabs-container',
-        popover: { title: 'Tabs', description: 'Each sound folder is a tab. Tap one, or swipe left and right over the buttons.', side: 'top', align: 'center' },
+        popover: { title: 'Tabs', description: 'Each sound folder on your PC is a tab down here. Tap a tab, or swipe left and right over the buttons to switch.', side: 'top', align: 'center' },
     }),
     tourStep({
-        element: '#search-button',
-        popover: { title: 'Search', description: 'Find any sound in all tabs. Shortcut: <b>pull down with two fingers</b> on the buttons.', side: 'bottom', align: 'center' },
-    }),
-    tourStep({
-        element: '#edit-mode-button',
-        popover: { title: 'Edit mode', description: 'Tap the pencil to arrange and customize your board. Let\'s look inside.', side: 'bottom', align: 'center' },
+        search: true,
+        element: ['#top-bar', '#search-panel'],
+        popover: { title: 'Search', description: 'Find any sound in all your tabs by typing part of its name, even with a typo. The colored dots filter by button color. Opens with the magnifier, or <b>pull down with two fingers</b> on the buttons.', side: 'bottom', align: 'center' },
     }),
     tourStep({
         edit: true,
-        element: '#layout-mode-button',
-        popover: { title: 'Layout', description: 'Switches this tab between 3 columns, 2 columns and a list.', side: 'bottom', align: 'center' },
+        element: '#top-bar',
+        popover: { title: 'Edit mode', description: 'The pencil at the top opens edit mode, where you arrange and customize your board. You\'re in it now: the top bar turns green.', side: 'bottom', align: 'center' },
     }),
     tourStep({
         edit: true,
-        element: '#sort-mode-button',
-        popover: { title: 'Sorting', description: 'Sorts this tab <b>A–Z</b> or <b>Z–A</b>, or back to your own order. Your own order is always kept.', side: 'bottom', align: 'center' },
+        element: ['#sort-mode-button', '#layout-mode-button'],
+        popover: { title: 'Sorting and layout', description: '<b>Sorting</b> (left) sorts this tab A–Z or Z–A, or back to your own order, which is always kept. <b>Layout</b> (right) switches between 3 columns, 2 columns and a list.', side: 'bottom', align: 'center' },
     }),
     tourStep({
         edit: true,
-        element: '#sounds-container',
-        popover: { title: 'Move buttons', description: 'In your own order, drag a button onto another to swap them.', side: 'top', align: 'center' },
-    }),
-    tourStep({
-        edit: true,
-        element: '#tabs-container',
-        popover: { title: 'Move tabs', description: '<b>Long-press a tab</b>, then drag it to a new place.', side: 'top', align: 'center' },
+        element: ['#sounds-container', '#tabs-container'],
+        popover: { title: 'Move buttons and tabs', description: '<b>Drag a button</b> onto another to swap them (in your own order). <b>Long-press a tab</b>, then drag it to a new place.', popoverClass: MIDDLE },
     }),
     tourStep({
         edit: true,
         sheet: true,
         element: '#settings-card',
-        popover: { title: 'Customize a sound', description: 'Tap a button in edit mode, or long-press it any time: favorite, volume, color and emoji. Only you hear the preview.', side: 'top', align: 'center' },
+        popover: {
+            title: 'Customize a sound',
+            description: 'Tap a button in edit mode, or long-press it any time, to make it a favorite, change its volume, color or emoji. Only you hear the preview.',
+            popoverClass: 'soundux-driver-popover tour-popover-top', // above the sheet, not over it (styles.css)
+        },
     }),
     tourStep({
-        popover: { title: 'You\'re all set', description: 'Have fun! The tour is under Settings → <b>Tour</b> whenever you want it again.' },
+        edit: true,
+        element: '#edit-mode-button',
+        popover: { title: 'You\'re all set', description: 'You\'re still in edit mode, so go ahead and try things out. Tap <b>✓</b> to leave it. The tour is under Settings → <b>Tour</b> whenever you want it again.', side: 'bottom', align: 'end' },
     }),
 ];
 
@@ -276,12 +331,15 @@ function startTour() {
         disableActiveInteraction: true,
         popoverClass: 'soundux-driver-popover',
         doneBtnText: 'Done',
-        // Closed or finished: the app as before the tour.
+        // Closed or finished: search and the sound sheet close; edit mode
+        // stays as it is (the last step leaves the user in it, with ✓
+        // pointed out).
         onDestroyStarted: () => {
             if (!isTutorialRunning) return;
             isTutorialRunning = false;
-            setEditMode(false);
+            if (window.soundSearch?.isOpen()) window.soundSearch.close();
             closeSoundSettingsPanelVisually();
+            tourTargets.removeAll();
             const instance = currentDriverInstance;
             currentDriverInstance = null;
             try {
@@ -299,6 +357,7 @@ function startTour() {
         currentDriverInstance.drive();
     } catch (e) {
         console.error('Starting the tour:', e);
+        tourTargets.removeAll();
         isTutorialRunning = false;
         try { currentDriverInstance?.destroy(); } catch (err) { /* ignore */ }
         currentDriverInstance = null;
