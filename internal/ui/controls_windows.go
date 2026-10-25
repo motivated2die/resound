@@ -259,13 +259,17 @@ type Action struct {
 	Disabled bool
 	// Closes closes the panel before OnClick runs, e.g. for actions that
 	// open a dialog or another window.
-	Closes  bool
+	Closes bool
+	// Weight is the button's share of the row's width against the others'
+	// in Buttons; 0 counts as 1.
+	Weight  int
 	OnClick func()
 }
 
 type buttonsRow struct{ actions []Action }
 
-// Buttons puts several buttons side by side in one row, equally wide.
+// Buttons puts several buttons side by side in one row, equally wide
+// unless an Action's Weight says otherwise.
 func Buttons(actions ...Action) Row { return buttonsRow{actions} }
 
 func (buttonsRow) height() int { return 38 }
@@ -274,11 +278,18 @@ func (b buttonsRow) boxes(c *canvas, r rect) []rect {
 	in := inset(c, r)
 	n := int32(max(1, len(b.actions)))
 	gap := c.px(8)
-	w := (in.w() - gap*(n-1)) / n
+	weight := func(a Action) int32 { return int32(max(1, a.Weight)) }
+	var total int32
+	for _, a := range b.actions {
+		total += weight(a)
+	}
+	room := in.w() - gap*(n-1)
 	out := make([]rect, len(b.actions))
-	for i := range b.actions {
-		left := in.Left + int32(i)*(w+gap)
+	left := in.Left
+	for i, a := range b.actions {
+		w := room * weight(a) / max(1, total)
 		out[i] = rect{left, r.Top + c.px(3), left + w, r.Bottom - c.px(3)}
+		left += w + gap
 	}
 	if len(out) > 0 {
 		out[len(out)-1].Right = in.Right // absorb rounding

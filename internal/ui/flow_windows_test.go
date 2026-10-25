@@ -453,3 +453,40 @@ func TestParagraphLinkRender(t *testing.T) {
 		})
 	}
 }
+
+// A Text value cut short shows in full on hover; the label takes only its
+// own width. Weighted buttons share the row by their weights.
+func TestTextTipAndWeightedButtons(t *testing.T) {
+	long := Text("Others hear", "CABLE Input (VB-Audio Virtual Cable) on a very long device name", ToneGood).(textRow)
+	short := Text("You hear", "Speakers", ToneGood).(textRow)
+	info := Text("", "48 kHz · 2 ch · float32 · buffer 10 ms · latency 3 ms", ToneMuted).(textRow)
+	buttons := Buttons(Action{Label: "Open log", Icon: IconExternalLink, Weight: 3}, Action{Label: "Copy log", Icon: IconCopy, Weight: 2})
+	rows := []Row{Section("Audio outputs"), short, info, long, info, Section("Files"), buttons,
+		Buttons(Action{Label: "Data folder", Icon: IconFolder}, Action{Label: "Program folder", Icon: IconFolder})}
+	for _, scale := range []float64{1, 1.5} {
+		name := "diagnostics"
+		if scale == 1.5 {
+			name += "@1.5x"
+		}
+		savePNG(t, renderRowsMeasured(t, rows, scale), name)
+		renderCanvas(t, 10, 10, scale, func(c *canvas) {
+			r := rect{0, 0, c.px(popupWidthL), c.px(22)}
+			if segs := long.segments(c, r); len(segs) != 1 || long.tip(c, r, 0) != long.value {
+				t.Errorf("@%vx: long value: %d segments, tip %q", scale, len(segs), long.tip(c, r, 0))
+			}
+			if segs := short.segments(c, r); segs != nil {
+				t.Errorf("@%vx: a value that fits has a tooltip", scale)
+			}
+			if segs := info.segments(c, r); segs != nil {
+				t.Errorf("@%vx: the output info should fit the full width", scale)
+			}
+			if label, _ := short.boxes(c, r); label.w() > c.textWidth("You hear", fontBody) {
+				t.Errorf("@%vx: label box %d wider than the label", scale, label.w())
+			}
+			boxes := buttons.(buttonsRow).boxes(c, rect{0, 0, c.px(popupWidthL), c.px(38)})
+			if w0, w1 := boxes[0].w(), boxes[1].w(); w0*2 < w1*3-c.px(4) || w0*2 > w1*3+c.px(4) {
+				t.Errorf("@%vx: buttons %d and %d, want 3:2", scale, w0, w1)
+			}
+		})
+	}
+}

@@ -95,22 +95,52 @@ type textRow struct {
 	tone         Tone
 }
 
-// Text shows a label and, optionally, a right-aligned value.
+// Text shows a label and, optionally, a right-aligned value. The value gets
+// all the room the label leaves (the label at most 42%); one that still
+// doesn't fit ends in "…" and shows in full while hovered.
 func Text(label, value string, tone Tone) Row { return textRow{label, value, tone} }
 
-func (textRow) height() int                   { return 22 }
-func (textRow) segments(*canvas, rect) []rect { return nil }
-func (textRow) click(int)                     {}
-func (textRow) keepsOpen() bool               { return true }
+func (textRow) height() int     { return 22 }
+func (textRow) click(int)       {}
+func (textRow) keepsOpen() bool { return true }
+
+// boxes are where the label and the value go in r.
+func (t textRow) boxes(c *canvas, r rect) (label, value rect) {
+	in := inset(c, r)
+	if t.label == "" {
+		return rect{in.Left, in.Top, in.Left, in.Bottom}, in
+	}
+	split := in.Left + min(c.textWidth(t.label, fontBody), in.w()*42/100)
+	return rect{in.Left, in.Top, split, in.Bottom}, rect{split + c.px(8), in.Top, in.Right, in.Bottom}
+}
+
+// segments is the value while it is cut short, for its tooltip.
+func (t textRow) segments(c *canvas, r rect) []rect {
+	if t.value == "" {
+		return nil
+	}
+	if _, box := t.boxes(c, r); c.textWidth(t.value, fontBody) > box.w() {
+		return []rect{box}
+	}
+	return nil
+}
+
+func (t textRow) tip(_ *canvas, _ rect, seg int) string {
+	if seg == 0 {
+		return t.value
+	}
+	return ""
+}
+
 func (t textRow) paint(c *canvas, r rect, _ rowState) {
 	in := inset(c, r)
 	if t.value == "" {
 		c.text(t.label, in, fontBody, t.tone.color(), dtLeft)
 		return
 	}
-	split := in.Left + in.w()*42/100
-	c.text(t.label, rect{in.Left, in.Top, split, in.Bottom}, fontBody, colMuted, dtLeft)
-	c.text(t.value, rect{split + c.px(8), in.Top, in.Right, in.Bottom}, fontBody, t.tone.color(), dtRight)
+	label, value := t.boxes(c, r)
+	c.text(t.label, label, fontBody, colMuted, dtLeft)
+	c.text(t.value, value, fontBody, t.tone.color(), dtRight)
 }
 
 // --- Button ----------------------------------------------------------------

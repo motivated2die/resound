@@ -3,7 +3,6 @@ package app
 import (
 	"fmt"
 	"slices"
-	"strings"
 	"sync"
 	"time"
 
@@ -146,20 +145,12 @@ func (a *App) replaceVoices(keep uint64) []uint64 {
 	return ids
 }
 
-// playTest plays the tone or the test sound from the panel.
-func (a *App) playTest(tone bool) {
+// playTest plays the test tone from the panel.
+func (a *App) playTest() {
 	pb := &a.playback
 	pb.lastError = ""
 	clear(pb.delays)
-	var (
-		p   *audio.Prepared
-		err error
-	)
-	if tone {
-		p, err = a.engine.PrepareTone()
-	} else {
-		p, err = a.engine.PrepareFile(a.cfg.TestSoundPath)
-	}
+	p, err := a.engine.PrepareTone()
 	var info audio.PlayInfo
 	if err == nil {
 		info, _, err = a.start(p, audio.PlayOptions{}, voiceMeta{name: "test"}, true)
@@ -495,28 +486,6 @@ func (a *App) setRouteMuted(id string, muted bool) {
 	if a.route.Mic != nil && a.route.Mic.ID == id {
 		a.route.Mic.Muted = muted
 	}
-}
-
-func (a *App) chooseTestSound() {
-	defer a.reopenPanel()
-	var patterns []string
-	for _, ext := range audio.SupportedExtensions {
-		patterns = append(patterns, "*"+ext)
-	}
-	path, ok, err := ui.OpenFileDialog(a.tray.Hwnd(), "Choose a test sound", []ui.FileFilter{
-		{Name: "Audio files", Pattern: strings.Join(patterns, ";")},
-		{Name: "All files", Pattern: "*.*"},
-	})
-	if err != nil {
-		logx.Printf("file dialog: %v", err)
-		return
-	}
-	if !ok {
-		return
-	}
-	a.cfg.TestSoundPath = path
-	a.save()
-	logx.Printf("test sound: %s", path)
 }
 
 // toggleOverlap lets sounds overlap or not. Sounds playing now keep

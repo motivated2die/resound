@@ -66,8 +66,6 @@ type Config struct {
 	// AppURL replaces the app's address (app.AppURL), e.g. for
 	// a test deployment. Usually empty.
 	AppURL string `json:"appURL,omitempty"`
-	// TestSoundPath is the file played by "Play test sound" (diagnostics).
-	TestSoundPath string `json:"testSoundPath"`
 	// SetupComplete is set once the guided first-run setup was finished or
 	// skipped; until then the panel opens on the setup.
 	SetupComplete bool `json:"setupComplete"`

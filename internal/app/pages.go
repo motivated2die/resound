@@ -200,7 +200,7 @@ func (a *App) openHelpAt(article string) {
 // testActions play the test tone on both outputs and stop everything.
 func (a *App) testActions() ui.Row {
 	return ui.Buttons(
-		ui.Action{Label: "Play test tone", Icon: ui.IconPlay, OnClick: func() { a.playTest(true) }},
+		ui.Action{Label: "Play test tone", Icon: ui.IconPlay, OnClick: a.playTest},
 		ui.Action{Label: "Stop all", Icon: ui.IconStop, OnClick: a.stopAll},
 	)
 }

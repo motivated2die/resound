@@ -444,7 +444,7 @@ The phone remote is a web app on an HTTPS host (`webapp/`, built by `cmd/webapp`
 | `vbcable-install.json` | A VB-Cable install waiting for the Windows restart (removed after it) |
 | `vbcable\` | The downloaded VB-Cable pack, only while its setup runs |
 | `backups\` | Backup zips (`Resound-backup-<date>_<time>.zip`) and `index.json`, which also lists backups saved elsewhere |
-| `debug.log` | Log and crash output; over 2 MB at start it moves to `debug.old.log` |
+| `debug.log` | Log and crash output; over 2 MB at start it moves to `debug.old.log`. Every line leaves out the user's name in paths (`C:\Users\<user>\…`), the computer's name, OneDrive organisations and email addresses (`logx.Scrub`); Diagnostics → Copy log scrubs the whole file again, crash output and older lines included. Sound, folder and device names stay |
 | `running.json` | Version, pid and start time of the running instance; left behind means the run ended without a clean exit, which the next start logs |
 
 ## Key technical choices

@@ -122,6 +122,8 @@ type App struct {
 	addresses        []server.Address // in the pairing QR code
 	linkCopied       int              // > 0 while "Link copied" shows; counts copies
 	linkCopyErr      string           // why the last copy failed
+	logCopied        int              // > 0 while "Copied" shows on Copy log; counts copies
+	logCopyErr       string           // why the last copy of the log failed
 
 	portable bool   // development build: never installs itself
 	fwBusy   bool   // waiting for the elevated firewall helper
