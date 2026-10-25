@@ -171,7 +171,7 @@ code { font-family: Consolas, "Cascadia Mono", monospace; background: var(--rais
 @media (hover: hover) { .btn:hover { transform: translateY(-1px); } }
 
 /* --- Hero --- */
-.hero { padding: 64px 0 40px; }
+.hero { padding: 104px 0 88px; } /* room above and below on wide screens; less on narrow ones (below) */
 .hero-inner { display: grid; grid-template-columns: 1.1fr 0.9fr; gap: 48px; align-items: center; }
 .eyebrow { color: var(--accent); font-weight: 600; font-size: 14px; letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 14px; }
 h1 { font-size: clamp(32px, 5vw, 52px); line-height: 1.1; font-weight: 700; letter-spacing: -0.02em; margin-bottom: 18px; text-wrap: balance; }
@@ -493,6 +493,7 @@ h1 { font-size: clamp(32px, 5vw, 52px); line-height: 1.1; font-weight: 700; lett
 .picon[data-picon="external-link"] { --picon: url("../assets/panel-icons/external-link.svg"); }
 .picon[data-picon="fa-solid-volume-high"] { --picon: url("../assets/panel-icons/fa-solid-volume-high.svg"); }
 .picon[data-picon="file-music-filled"] { --picon: url("../assets/panel-icons/file-music-filled.svg"); }
+.picon[data-picon="grip-horizontal"] { --picon: url("../assets/panel-icons/grip-horizontal.svg"); }
 .picon[data-picon="help-circle"] { --picon: url("../assets/panel-icons/help-circle.svg"); }
 .picon[data-picon="info-circle"] { --picon: url("../assets/panel-icons/info-circle.svg"); }
 .picon[data-picon="keyboard"] { --picon: url("../assets/panel-icons/keyboard.svg"); }
@@ -531,7 +532,8 @@ h1 { font-size: clamp(32px, 5vw, 52px); line-height: 1.1; font-weight: 700; lett
     display: flex;
     flex-direction: column;
     align-items: center;
-    padding-top: 30px; /* the close tab */
+    padding-top: 30px; /* the tab above the panel */
+    isolation: isolate; /* the tab and the glow stay behind the panel, within the picture */
     -webkit-user-select: none;
     user-select: none;
     -webkit-touch-callout: none;
@@ -566,28 +568,41 @@ h1 { font-size: clamp(32px, 5vw, 52px); line-height: 1.1; font-weight: 700; lett
     color: var(--text);
     text-align: left;
 }
-.dp-close {
+/* The tab above the panel (internal/ui/paneltab_windows.go), at the
+   picture's scale (about 1.15): as wide as the panel, 28 px peeking out
+   and as much again tucked under it (behind its background), so its lower
+   corners hide in the panel's. The handle on the left, Close on the right;
+   Close's button face only shows under the mouse, so not here. */
+.dp-tab {
     position: absolute;
-    right: 17px;
-    bottom: 100%;
-    height: 30px;
+    z-index: -1;
+    top: -29px; /* above the panel's 1 px border */
+    left: -1px;
+    right: -1px;
+    height: 56px;
+    border-radius: 10px;
+    background: var(--dp-control);
     display: flex;
-    align-items: center;
-    gap: 7px;
-    padding: 0 9px 0 22px;
-    border-radius: 9px 9px 0 0;
-    background: #33353c;
-    font-size: 14px;
+    align-items: flex-start;
+    justify-content: space-between;
+    padding: 0 14px;
+    font-size: 11.5px;
     font-weight: 600;
+    line-height: 28px;
 }
-.dp-close .picon { font-size: 16px; margin-right: 2px; }
-.dp-close kbd {
+.dp-tab-move, .dp-tab-close { display: flex; align-items: center; height: 28px; }
+.dp-tab-move { gap: 7px; color: var(--muted); }
+.dp-tab-move .picon { font-size: 18px; }
+.dp-tab-close { gap: 5px; }
+.dp-tab-close .picon { font-size: 14px; margin-top: 1px; } /* a pixel down to the capitals, as in the panel */
+.dp-tab-close kbd {
     font: inherit;
-    font-size: 12px;
-    margin-left: 5px;
-    padding: 1px 6px;
-    border-radius: 4px;
-    background: var(--dp-field);
+    font-size: 11.5px;
+    line-height: 16px;
+    margin-left: 2px;
+    padding: 1px 5px 0;
+    border-radius: 7px;
+    background: #24272f; /* --dp-control, 22 darker per channel (shade) */
     color: var(--muted);
 }
 
@@ -1259,7 +1274,7 @@ h3 { font-size: 18px; line-height: 1.3; margin-bottom: 6px; }
     .site-nav { display: none; }
     .header-help { margin-left: auto; }
     .hero-inner { grid-template-columns: 1fr; gap: 40px; }
-    .hero { padding-top: 40px; }
+    .hero { padding-top: 40px; padding-bottom: 40px; }
     .features { grid-template-columns: repeat(2, 1fr); }
     /* Nine cards in two columns: the last one takes the whole row. */
     .feature:last-child:nth-child(odd) { grid-column: 1 / -1; }
