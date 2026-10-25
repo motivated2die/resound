@@ -4,7 +4,10 @@ package ui
 // guided-setup header. Like all rows they are immutable values rebuilt on
 // every render; sliders keep their drag attached by id (see dragger).
 
-import "math"
+import (
+	"math"
+	"strings"
+)
 
 // --- Slider ------------------------------------------------------------------
 
@@ -256,13 +259,17 @@ type Action struct {
 	Disabled bool
 	// Closes closes the panel before OnClick runs, e.g. for actions that
 	// open a dialog or another window.
-	Closes  bool
+	Closes bool
+	// Weight is the button's share of the row's width against the others'
+	// in Buttons; 0 counts as 1.
+	Weight  int
 	OnClick func()
 }
 
 type buttonsRow struct{ actions []Action }
 
-// Buttons puts several buttons side by side in one row, equally wide.
+// Buttons puts several buttons side by side in one row, equally wide
+// unless an Action's Weight says otherwise.
 func Buttons(actions ...Action) Row { return buttonsRow{actions} }
 
 func (buttonsRow) height() int { return 38 }
@@ -271,11 +278,18 @@ func (b buttonsRow) boxes(c *canvas, r rect) []rect {
 	in := inset(c, r)
 	n := int32(max(1, len(b.actions)))
 	gap := c.px(8)
-	w := (in.w() - gap*(n-1)) / n
+	weight := func(a Action) int32 { return int32(max(1, a.Weight)) }
+	var total int32
+	for _, a := range b.actions {
+		total += weight(a)
+	}
+	room := in.w() - gap*(n-1)
 	out := make([]rect, len(b.actions))
-	for i := range b.actions {
-		left := in.Left + int32(i)*(w+gap)
+	left := in.Left
+	for i, a := range b.actions {
+		w := room * weight(a) / max(1, total)
 		out[i] = rect{left, r.Top + c.px(3), left + w, r.Bottom - c.px(3)}
+		left += w + gap
 	}
 	if len(out) > 0 {
 		out[len(out)-1].Right = in.Right // absorb rounding
@@ -413,6 +427,131 @@ func (p paragraphRow) measure(c *canvas, width int32) int32 {
 func (p paragraphRow) paint(c *canvas, r rect, _ rowState) {
 	in := inset(c, r)
 	c.textWrapped(p.text, rect{in.Left, r.Top + c.px(3), in.Right, r.Bottom}, fontBody, p.tone.color())
+}
+
+// --- Paragraph with a link ---------------------------------------------------
+
+type paragraphLinkRow struct {
+	text, link, tipText string
+	onClick             func()
+}
+
+// ParagraphLink is a muted Paragraph that ends in an accent link, e.g. a
+// shortcut to the page where more can be set. The link flows with the text
+// and may wrap onto the next line. tip is the link's tooltip.
+func ParagraphLink(text, link, tip string, onClick func()) Row {
+	return paragraphLinkRow{text, link, tip, onClick}
+}
+
+// inlineRun is words on one line of a ParagraphLink, all text or all link,
+// at x from the line's start.
+type inlineRun struct {
+	s    string
+	line int
+	x, w int32
+	link bool
+}
+
+// layout word-wraps the text and the link to width, greedily like
+// DrawText, and returns the runs and the line height. No runs without a
+// device context to measure with.
+func (p paragraphLinkRow) layout(c *canvas, width int32) ([]inlineRun, int32) {
+	lineH := c.wrapHeight("Ag", width, fontBody)
+	if lineH == 0 {
+		return nil, 0
+	}
+	space := c.textWidth("a b", fontBody) - c.textWidth("ab", fontBody)
+	var runs []inlineRun
+	line, x := 0, int32(0)
+	for i, words := range [][]string{strings.Fields(p.text), strings.Fields(p.link)} {
+		link := i == 1
+		for _, word := range words {
+			w := c.textWidth(word, fontBody)
+			gap := space
+			if x == 0 {
+				gap = 0
+			}
+			if x > 0 && x+gap+w > width {
+				line, x, gap = line+1, 0, 0
+			}
+			if n := len(runs); n > 0 && runs[n-1].line == line && runs[n-1].link == link {
+				r := &runs[n-1]
+				r.s += " " + word
+				r.w = c.textWidth(r.s, fontBody)
+			} else {
+				runs = append(runs, inlineRun{s: word, line: line, x: x + gap, w: w, link: link})
+			}
+			x += gap + w
+		}
+	}
+	return runs, lineH
+}
+
+func (paragraphLinkRow) height() int { return 22 }
+func (p paragraphLinkRow) measure(c *canvas, width int32) int32 {
+	runs, lineH := p.layout(c, width-2*c.px(padX))
+	if len(runs) == 0 {
+		return c.px(p.height())
+	}
+	return int32(runs[len(runs)-1].line+1)*lineH + c.px(8)
+}
+
+// runBox is where a run is drawn in the row r.
+func runBox(c *canvas, r rect, run inlineRun, lineH int32) rect {
+	in := inset(c, r)
+	top := r.Top + c.px(3) + int32(run.line)*lineH
+	return rect{in.Left + run.x, top, in.Left + run.x + run.w, top + lineH}
+}
+
+func (p paragraphLinkRow) segments(c *canvas, r rect) []rect {
+	if p.onClick == nil {
+		return nil
+	}
+	runs, lineH := p.layout(c, inset(c, r).w())
+	var segs []rect
+	for _, run := range runs {
+		if run.link {
+			segs = append(segs, runBox(c, r, run, lineH))
+		}
+	}
+	return segs
+}
+
+func (p paragraphLinkRow) tip(_ *canvas, _ rect, seg int) string {
+	if seg >= 0 {
+		return p.tipText
+	}
+	return ""
+}
+
+func (p paragraphLinkRow) click(int) {
+	if p.onClick != nil {
+		p.onClick()
+	}
+}
+func (paragraphLinkRow) keepsOpen() bool { return true }
+
+func (p paragraphLinkRow) paint(c *canvas, r rect, st rowState) {
+	runs, lineH := p.layout(c, inset(c, r).w())
+	col := colAccent
+	switch { // every part of a wrapped link reacts together
+	case st.press >= 0:
+		col = shade(colAccent, -30)
+	case st.hover >= 0:
+		col = shade(colAccent, 30)
+	}
+	for _, run := range runs {
+		box := runBox(c, r, run, lineH)
+		if !run.link {
+			c.text(run.s, box, fontBody, ToneMuted.color(), dtLeft)
+			continue
+		}
+		c.text(run.s, box, fontBody, col, dtLeft)
+		if st.hover >= 0 { // underline while hovered, like a link
+			y := box.Top + box.h()/2 + c.px(8)
+			c.fill(rect{box.Left, y, box.Right, y + max(1, c.px(1))}, col)
+		}
+	}
 }
 
 // --- Guided-setup header -----------------------------------------------------

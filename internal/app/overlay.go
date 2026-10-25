@@ -2,7 +2,9 @@ package app
 
 import (
 	"slices"
+	"strings"
 
+	"github.com/motivated2die/resound/internal/config"
 	"github.com/motivated2die/resound/internal/input"
 	"github.com/motivated2die/resound/internal/library"
 	"github.com/motivated2die/resound/internal/logx"
@@ -16,7 +18,8 @@ import (
 // meanwhile. It never takes the focus from
 // the game, and only its key, Esc and the wheel are kept from the game
 // while it is open (input.Filter decides that in the keyboard hook). It is
-// on while a key is set for it.
+// on while a key is set for it: the global one, or an app's own while that
+// app is in the foreground (keybinds.go), which can also turn it off there.
 //
 // The highlight comes back where it was left (cfg.OverlayLast), so a sound
 // can be picked ahead and played later with two presses; the very first
@@ -118,7 +121,20 @@ func (a *App) closeOverlay() {
 		a.applyHotkeys() // the watcher may only have run for the preview
 		a.render()
 	}
-	o.win.Hide(nil)
+	if o.win != nil {
+		o.win.Hide(nil)
+	}
+}
+
+// closeOverlayWithoutKey closes the overlay when the app in front has no key
+// for it any more (removed, turned off there, or another app came to the
+// front), as then only Esc could close it.
+func (a *App) closeOverlayWithoutKey() {
+	if a.overlay.open && !a.overlay.preview && len(a.keysFor(a.fgApp, fnOverlay)) == 0 {
+		logx.Printf("overlay: no key for it in front, closing")
+		a.closeOverlay()
+		a.tellHookOverlay(false)
+	}
 }
 
 func (a *App) rememberOverlaySelection() {
@@ -239,11 +255,52 @@ func (a *App) setOverlaySide(left bool) {
 
 func (a *App) overlayKeyText() string { return input.Combo(a.cfg.OverlayKeys).String() }
 
-func (a *App) overlaySummary() (string, ui.Tone) {
-	if len(a.cfg.OverlayKeys) == 0 {
-		return "Off", ui.ToneMuted
+// overlayApps are the apps with an overlay setting of their own: a key, or
+// the overlay turned off there.
+func (a *App) overlayApps() []string {
+	var exes []string
+	for _, e := range a.cfg.AppKeybinds {
+		if e.Overlay != nil {
+			exes = append(exes, e.Exe)
+		}
 	}
-	return a.overlayKeyText(), ui.ToneGood
+	return exes
+}
+
+// overlayUsed reports whether the overlay has a key anywhere.
+func (a *App) overlayUsed() bool {
+	return len(a.cfg.OverlayKeys) > 0 || slices.ContainsFunc(a.cfg.AppKeybinds, func(e config.AppKeybinds) bool {
+		return e.Overlay != nil && len(e.Overlay.Keys) > 0
+	})
+}
+
+func (a *App) overlaySummary() (string, ui.Tone) {
+	switch {
+	case len(a.cfg.OverlayKeys) > 0:
+		return a.overlayKeyText(), ui.ToneGood
+	case a.overlayUsed():
+		return "In some apps", ui.ToneGood
+	}
+	return "Off", ui.ToneMuted
+}
+
+// overlayAppsRow is the note under the global key: apps can have their own
+// key or none, and which do, with a link to the app keybinds.
+func (a *App) overlayAppsRow() ui.Row {
+	text := "A game can have an overlay key of its own, or no overlay at all."
+	if exes := a.overlayApps(); len(exes) > 0 {
+		parts := make([]string, len(exes))
+		for i, exe := range exes {
+			state := "off"
+			if kb := a.keybind(keyTarget{exe, fnOverlay}); !kb.off {
+				state = keysText(kb.keys)
+			}
+			parts[i] = a.appName(exe) + " (" + state + ")"
+		}
+		text = "Own setting in " + strings.Join(parts, ", ") + ": it replaces this key while that app is in front."
+	}
+	return ui.ParagraphLink(text, "Set it in App keybinds", "Opens the Keybinds page with the apps that have keys of their own",
+		func() { a.openPage(pageKeys) })
 }
 
 // overlayPreviewRow is the small picture of the overlay (always the same
@@ -265,12 +322,13 @@ func (a *App) overlayPage() []ui.Row {
 			"Your game keeps the focus: only the key, Esc and the mouse wheel are kept from it while the bar shows."),
 		ui.Section("Key"),
 		a.keybindCard(keyTarget{fn: fnOverlay}),
+		a.overlayAppsRow(),
 	}
 	rows = append(rows,
 		ui.Section("Screen edge"),
-		// Greyed out while the overlay is off (no key).
+		// Greyed out while the overlay is off (no key anywhere).
 		ui.Segmented([]string{"Left", "Right"}, map[bool]int{false: 0, true: 1}[a.cfg.OverlayRight],
-			len(a.cfg.OverlayKeys) == 0, func(i int) { a.setOverlaySide(i == 0) }),
+			!a.overlayUsed(), func(i int) { a.setOverlaySide(i == 0) }),
 		ui.Section("Try it"),
 		ui.Paragraph("See the bar with your favorites on this screen, no game needed. It works as in a game: scroll through it, press your key to play a sound, Esc to close it.", ui.ToneMuted),
 	)

@@ -66,8 +66,6 @@ type Config struct {
 	// AppURL replaces the app's address (app.AppURL), e.g. for
 	// a test deployment. Usually empty.
 	AppURL string `json:"appURL,omitempty"`
-	// TestSoundPath is the file played by "Play test sound" (diagnostics).
-	TestSoundPath string `json:"testSoundPath"`
 	// SetupComplete is set once the guided first-run setup was finished or
 	// skipped; until then the panel opens on the setup.
 	SetupComplete bool `json:"setupComplete"`
@@ -98,6 +96,10 @@ type Config struct {
 	// after it is let go (app.onTalk): the user's release has ended it in the
 	// game.
 	NoPushToTalkPauses bool `json:"noPushToTalkPauses,omitempty"`
+	// NoSoundOverlap plays one sound at a time: a sound played for others
+	// stops every sound playing (app.replaceVoices). By default (false)
+	// sounds overlap freely.
+	NoSoundOverlap bool `json:"noSoundOverlap,omitempty"`
 	// NoUpdateCheck turns off the automatic check for new releases on
 	// GitHub ("Check now" still works).
 	NoUpdateCheck bool `json:"noUpdateCheck,omitempty"`
@@ -129,6 +131,9 @@ type AppKeybinds struct {
 	PushToTalk *KeyOverride `json:"pushToTalk,omitempty"`
 	Pause      *KeyOverride `json:"pause,omitempty"`
 	Stop       *KeyOverride `json:"stop,omitempty"`
+	// Overlay replaces OverlayKeys (one combination) or, Off, turns the
+	// overlay off in the program.
+	Overlay *KeyOverride `json:"overlay,omitempty"`
 }
 
 // KeyOverride replaces a global keybind in one program: with key

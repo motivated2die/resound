@@ -34,11 +34,18 @@ func (a *App) keymap() input.Keymap {
 // bindingsFor is what pause, stop and the overlay's key are while app is in
 // the foreground. While a key is recorded in the panel, the overlay key
 // isn't taken from it, so it can be recorded again. Nor does the user's
-// push-to-talk count then.
+// push-to-talk count then. The overlay's preview in the panel plays with
+// the global key its page names, whatever app was in front before.
 func (a *App) bindingsFor(app string) input.Bindings {
 	b := input.Bindings{Pause: combos(a.keysFor(app, fnPause)), Stop: combos(a.keysFor(app, fnStop))}
 	if !a.ptt.capturing {
-		b.Overlay = input.Combo(a.cfg.OverlayKeys)
+		overlay := a.keysFor(app, fnOverlay)
+		if a.overlay.preview {
+			overlay = a.globalKeys(fnOverlay)
+		}
+		if len(overlay) > 0 {
+			b.Overlay = input.Combo(overlay[0])
+		}
 		if a.talkPauses() {
 			b.Talk = combos(a.keysFor(app, fnPTT)) // the user's own presses pause (talk.go)
 		}
@@ -146,6 +153,7 @@ func (a *App) setForegroundApp(app string) {
 		logx.Printf("keybinds: %s in the foreground", app)
 	}
 	a.syncPTTKeys()
+	a.closeOverlayWithoutKey()
 	a.refreshRunning()
 }
 

@@ -42,9 +42,9 @@ body:
     attributes:
       label: Log
       description: |
-        In Resound: Settings → Diagnostics → **Open log**, or open `%LOCALAPPDATA%\Resound\debug.log`. If Resound crashed or restarted, `debug.old.log` next to it helps too. Drag the file(s) into this box.
+        In Resound: Settings → Diagnostics → **Copy log**, then paste it here. Or use **Open log** (`%LOCALAPPDATA%\Resound\debug.log`) and drag the file into this box. If Resound crashed or restarted, `debug.old.log` next to it helps too.
 
-        **Before you upload, read the log through.** It is posted publicly. It never contains keystrokes, pairing codes or keys, but it can contain your Windows user name (in folder paths), folder and sound names, audio device names, your PC's name and local network addresses. Replace anything you'd rather not share with `***`.
+        **Before you upload, read the log through.** It is posted publicly. It never contains keystrokes, pairing codes or keys, and Resound leaves out your Windows user name, your PC's name and email addresses (Copy log also from older lines; `debug.old.log` may still have them). It does contain folder and sound names, audio device names and local network addresses. Replace anything you'd rather not share with `***`.
       placeholder: Drop debug.log here
     validations:
       required: false

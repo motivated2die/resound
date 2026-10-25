@@ -433,7 +433,7 @@ func (a *App) micDevice() ui.FlowDevice {
 
 // soundsSource is the soundboard: what plays, and the test button.
 func (a *App) soundsSource() ui.FlowSounds {
-	s := ui.FlowSounds{Caption: "Soundboard", OnTest: func() { a.playTest(true) }, OnStop: a.stopAll,
+	s := ui.FlowSounds{Caption: "Soundboard", OnTest: a.playTest, OnStop: a.stopAll,
 		Level: a.flowLevel(&a.levels.sounds)}
 	// "Playing" needs no word here: the header says what plays, and the
 	// button turns into Stop. Paused and preview add something.

@@ -391,7 +391,7 @@ func (a *App) previewImport(job *soundImport) {
 			if err == nil && job.state == importNaming && job.path == path {
 				id, _ := a.lib.FindPath(path)
 				var info audio.PlayInfo
-				info, err = a.start(p, audio.PlayOptions{Roles: []string{audio.RoleMonitor}, Volume: map[string]float32{}},
+				info, _, err = a.start(p, audio.PlayOptions{Roles: []string{audio.RoleMonitor}, Volume: map[string]float32{}},
 					voiceMeta{soundID: id, name: name, preview: true}, false)
 				if err == nil {
 					job.voice = info.VoiceID

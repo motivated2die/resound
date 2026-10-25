@@ -249,11 +249,16 @@ func (s *Server) handlePlay(w http.ResponseWriter, r *http.Request, preview bool
 		writeError(w, http.StatusInternalServerError, "Failed to play sound")
 		return
 	}
+	stopped := started.Replaced // the phone stops showing these at once
+	if stopped == nil {
+		stopped = []uint64{}
+	}
 	writeJSON(w, http.StatusOK, map[string]any{
 		"success":    true,
 		"id":         id,
 		"playingId":  started.PlayingID,
 		"lengthInMs": started.Length.Milliseconds(),
+		"stopped":    stopped,
 	})
 }
 

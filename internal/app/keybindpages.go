@@ -38,10 +38,14 @@ func (a *App) keysPage() []ui.Row {
 	return append(rows, ui.Spacer(4))
 }
 
-// keybindCards are the cards of every function in one scope.
+// keybindCards are the cards of every function in one scope. The global
+// overlay key has its card on the overlay's page.
 func (a *App) keybindCards(app string) []ui.Row {
 	var rows []ui.Row
 	for _, fn := range appKeyFuncs {
+		if fn == fnOverlay && app == "" {
+			continue
+		}
 		t := keyTarget{app, fn}
 		rows = append(rows, a.keybindCard(t))
 	}

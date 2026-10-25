@@ -10,14 +10,16 @@ import (
 	"github.com/motivated2die/resound/internal/logx"
 )
 
-// Keybinds: what keys and mouse buttons do, everywhere and per app. Three
+// Keybinds: what keys and mouse buttons do, everywhere and per app. Four
 // functions can be bound: push-to-talk (Resound presses its keys while
 // sounds play), pause (held: the sounds pause, push-to-talk and the mic are
-// let go) and stop (pressed: all sounds stop). The global keys apply
-// everywhere. An app the user added (config.AppKeybinds) can replace them
-// function by function while it is in the foreground: with keys of its own,
-// or with none, which turns the function off there. Functions it leaves
-// alone keep the global keys. The overlay's key is global only.
+// let go), stop (pressed: all sounds stop) and the overlay's key (opens the
+// in-game overlay, overlay.go). The global keys apply everywhere. An app
+// the user added (config.AppKeybinds) can replace them function by function
+// while it is in the foreground: with keys of its own, or with none, which
+// turns the function off there. Functions it leaves alone keep the global
+// keys. The global overlay key is set on the overlay's page, the others on
+// the Keybinds page.
 //
 // Each function takes several combinations. Push-to-talk presses all of
 // them together (a game's and Discord's, say); any one of the others
@@ -35,7 +37,7 @@ const (
 
 // appKeyFuncs are the functions an app can bind for itself, in the panel's
 // order.
-var appKeyFuncs = []keyFunc{fnPTT, fnPause, fnStop}
+var appKeyFuncs = []keyFunc{fnPTT, fnPause, fnStop, fnOverlay}
 
 func (f keyFunc) title() string { return [...]string{"Push-to-talk", "Pause", "Stop", "Overlay"}[f] }
 
@@ -128,7 +130,7 @@ func (a *App) appKeybinds(exe string) *config.AppKeybinds {
 }
 
 // override returns where an app's entry keeps its override of fn; nil
-// without an entry, or for the overlay (global only).
+// without an entry.
 func override(e *config.AppKeybinds, fn keyFunc) **config.KeyOverride {
 	if e == nil {
 		return nil
@@ -140,13 +142,15 @@ func override(e *config.AppKeybinds, fn keyFunc) **config.KeyOverride {
 		return &e.Pause
 	case fnStop:
 		return &e.Stop
+	case fnOverlay:
+		return &e.Overlay
 	}
 	return nil
 }
 
 // hasOverrides reports whether an app replaces any of the global keys.
 func hasOverrides(e *config.AppKeybinds) bool {
-	return e.PushToTalk != nil || e.Pause != nil || e.Stop != nil
+	return e.PushToTalk != nil || e.Pause != nil || e.Stop != nil || e.Overlay != nil
 }
 
 // keybind is a function's keys in one scope, as they apply there: an app
@@ -251,7 +255,7 @@ func (a *App) appName(exe string) string {
 }
 
 // addKeys adds a recorded or chosen combination to t, unless it can't be;
-// the note on its card says why. The overlay's key is replaced.
+// the note on its card says why. An overlay key is replaced.
 func (a *App) addKeys(t keyTarget, c input.Combo) {
 	a.ptt.note, a.ptt.noteFor = "", t
 	if msg := a.keyConflict(t, c); msg != "" {
@@ -271,7 +275,7 @@ func (a *App) addKeys(t keyTarget, c input.Combo) {
 		if o == nil {
 			return
 		}
-		if *o == nil || (*o).Off {
+		if *o == nil || (*o).Off || t.fn == fnOverlay {
 			*o = &config.KeyOverride{}
 		}
 		(*o).Keys = append((*o).Keys, c)
@@ -291,9 +295,6 @@ func (a *App) removeKeys(t keyTarget, i int) {
 		}
 		logx.Printf("keybinds: %s removed from %s", input.Combo(keys[i]), t)
 		a.setGlobalKeys(t.fn, slices.Delete(slices.Clone(keys), i, i+1))
-		if t.fn == fnOverlay && a.overlay.open && !a.overlay.preview {
-			a.closeOverlay() // its key is gone: nothing could close it in a game
-		}
 	} else {
 		o := override(a.appKeybinds(t.app), t.fn)
 		if o == nil || *o == nil || i < 0 || i >= len((*o).Keys) {
@@ -334,6 +335,7 @@ func (a *App) keybindsChanged() {
 	a.save()
 	a.applyHotkeys()
 	a.syncPTTKeys()
+	a.closeOverlayWithoutKey()
 	a.render()
 }
 

@@ -97,21 +97,22 @@ func (a *App) playSound(soundID uint64, preview bool) (server.Started, error) {
 		opts.Roles = []string{audio.RoleMonitor}
 	}
 	var (
-		info audio.PlayInfo
+		info     audio.PlayInfo
+		replaced []uint64
 	)
 	if !a.onUI(func() {
 		// The volumes are read here, not before decoding: a change saved
 		// meanwhile is either read now or applied by SetSoundVolume, which
 		// runs on this thread after the voice is known.
 		opts.Volume = a.soundVolumes(soundID)
-		info, err = a.start(p, opts, voiceMeta{soundID: soundID, name: snd.Name}, !preview)
+		info, replaced, err = a.start(p, opts, voiceMeta{soundID: soundID, name: snd.Name}, !preview)
 	}) {
 		return server.Started{}, errUIBusy
 	}
 	if err != nil {
 		return server.Started{}, err
 	}
-	return server.Started{PlayingID: info.VoiceID, Length: info.Length}, nil
+	return server.Started{PlayingID: info.VoiceID, Length: info.Length, Replaced: replaced}, nil
 }
 
 func (r remotePlayer) StopAll() { r.a.onUI(r.a.stopAll) }

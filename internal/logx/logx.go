@@ -14,9 +14,10 @@ import (
 )
 
 var (
-	mu     sync.Mutex
-	logger = log.New(os.Stderr, "", log.LstdFlags|log.Lmicroseconds)
-	file   *os.File
+	mu      sync.Mutex
+	logger  = log.New(os.Stderr, "", log.LstdFlags|log.Lmicroseconds)
+	file    *os.File
+	logPath string // the log file, "" before Init
 )
 
 // Init opens <dir>/debug.log and returns a function that closes it. A log
@@ -43,7 +44,7 @@ func Init(dir string) (func(), error) {
 		fmt.Fprintf(f, "SetCrashOutput: %v\n", err)
 	}
 	mu.Lock()
-	file = f
+	file, logPath = f, path
 	// The file comes first: with -H=windowsgui stderr is invalid and
 	// io.MultiWriter stops at the first failing writer.
 	logger = log.New(io.MultiWriter(f, os.Stderr), "", log.LstdFlags|log.Lmicroseconds)
@@ -61,10 +62,10 @@ func Init(dir string) (func(), error) {
 	}, nil
 }
 
-// Printf logs a formatted line.
+// Printf logs a formatted line, without personal details (Scrub).
 func Printf(format string, args ...any) {
 	mu.Lock()
 	l := logger
 	mu.Unlock()
-	_ = l.Output(2, fmt.Sprintf(format, args...))
+	_ = l.Output(2, Scrub(fmt.Sprintf(format, args...)))
 }

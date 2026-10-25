@@ -25,6 +25,7 @@ type fakePlayer struct {
 	err       error  // returned by Play when set
 	volume    []*int // last SetSoundVolume call: local, remote
 	panelOpen bool
+	replaced  []uint64 // returned by Play as the sounds it stopped
 }
 
 func (f *fakePlayer) Play(id uint64, preview bool) (Started, error) {
@@ -35,7 +36,7 @@ func (f *fakePlayer) Play(id uint64, preview bool) (Started, error) {
 		return Started{}, f.err
 	}
 	f.played = append(f.played, id)
-	return Started{PlayingID: 7, Length: 1500 * time.Millisecond}, nil
+	return Started{PlayingID: 7, Length: 1500 * time.Millisecond, Replaced: f.replaced}, nil
 }
 func (f *fakePlayer) StopAll()             {}
 func (f *fakePlayer) Progress() []Progress { return nil }
@@ -335,6 +336,21 @@ func TestPlayErrors(t *testing.T) {
 	player.err = errors.New("no output is running")
 	if rec := do(t, h, "POST", path, "", c); rec.Code != http.StatusInternalServerError {
 		t.Fatalf("other error: %d", rec.Code)
+	}
+}
+
+// A play tells the phone which sounds it stopped (sounds not overlapping),
+// always as a list.
+func TestPlayReportsStopped(t *testing.T) {
+	s, player, soundID := newTestServer(t)
+	h, c := s.Handler(), login(t, s)
+	path := "/api/sounds/" + strconv.FormatUint(soundID, 10) + "/play"
+	for _, want := range []string{`"stopped":[]`, `"stopped":[3,5]`} {
+		rec := do(t, h, "POST", path, "", c)
+		if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), want) {
+			t.Fatalf("play: %d %s, want %s", rec.Code, rec.Body, want)
+		}
+		player.replaced = []uint64{3, 5}
 	}
 }
 

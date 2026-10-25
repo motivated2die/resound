@@ -8,6 +8,7 @@ import (
 
 	"github.com/motivated2die/resound/internal/audio"
 	"github.com/motivated2die/resound/internal/config"
+	"github.com/motivated2die/resound/internal/logx"
 	"github.com/motivated2die/resound/internal/ui"
 )
 
@@ -34,16 +35,7 @@ func (a *App) diagnosticsPage() []ui.Row {
 	}
 	rows = append(rows, ui.Button("Restart outputs", ui.ButtonNormal, false, a.restartOutputs))
 
-	rows = append(rows, ui.Section("Latency test"))
-	soundLabel := "Play test sound"
-	if a.cfg.TestSoundPath != "" {
-		soundLabel = "Play “" + filepath.Base(a.cfg.TestSoundPath) + "”"
-	}
-	rows = append(rows,
-		a.testActions(),
-		ui.Button(soundLabel, ui.ButtonNormal, a.cfg.TestSoundPath == "", func() { a.playTest(false) }),
-		ui.ClosingButton("Choose test sound…", ui.ButtonNormal, a.chooseTestSound),
-	)
+	rows = append(rows, ui.Section("Latency test"), a.testActions())
 	rows = append(rows, a.resultRows()...)
 
 	_, sounds := a.lib.Stats()
@@ -72,18 +64,56 @@ func (a *App) diagnosticsPage() []ui.Row {
 	if a.portable {
 		mode = "portable"
 	}
+	copyLabel, copyIcon := "Copy log", ui.IconCopy
+	if a.logCopied > 0 {
+		copyLabel, copyIcon = "Copied", ui.IconCheck
+	}
 	rows = append(rows,
 		ui.Section("Files"),
 		ui.Text("Version", Version+" · "+mode, ui.ToneNormal),
 		ui.Buttons(
-			ui.Action{Label: "Open log", Closes: true, OnClick: func() { _ = ui.ShellOpen(filepath.Join(config.Dir(), "debug.log")) }},
-			ui.Action{Label: "Data folder", Closes: true, OnClick: func() { _ = ui.ShellOpen(config.Dir()) }},
+			ui.Action{Label: "Open log", Icon: ui.IconExternalLink, Weight: 3, Closes: true, OnClick: func() { _ = ui.ShellOpen(filepath.Join(config.Dir(), "debug.log")) }},
+			ui.Action{Label: copyLabel, Icon: copyIcon, Weight: 2, OnClick: a.copyLog},
 		),
 	)
-	if exe, err := os.Executable(); err == nil {
-		rows = append(rows, ui.ClosingButton("Open program folder", ui.ButtonNormal, func() { _ = ui.ShellOpen(filepath.Dir(exe)) }))
+	if a.logCopyErr != "" {
+		rows = append(rows, ui.Paragraph(a.logCopyErr, ui.ToneBad))
 	}
+	folders := []ui.Action{{Label: "Data folder", Icon: ui.IconFolder, Closes: true, OnClick: func() { _ = ui.ShellOpen(config.Dir()) }}}
+	if exe, err := os.Executable(); err == nil {
+		folders = append(folders, ui.Action{Label: "Program folder", Icon: ui.IconFolder, Closes: true, OnClick: func() { _ = ui.ShellOpen(filepath.Dir(exe)) }})
+	}
+	rows = append(rows, ui.Buttons(folders...))
 	return append(rows, ui.Spacer(4))
+}
+
+// copyLog puts the log on the clipboard for sharing, scrubbed of personal
+// details again (logx.ScrubbedLog): lines from crashes and older versions
+// didn't go through the logger's scrubbing.
+func (a *App) copyLog() {
+	text, err := logx.ScrubbedLog()
+	if err == nil {
+		err = ui.SetClipboardText(a.tray.Hwnd(), text)
+	}
+	if err != nil {
+		logx.Printf("copying the log: %v", err)
+		a.logCopyErr = "Couldn't copy the log: " + err.Error()
+		a.render()
+		return
+	}
+	logx.Printf("log copied (%s)", audio.FormatBytes(int64(len(text))))
+	a.logCopyErr = ""
+	a.logCopied++
+	n := a.logCopied
+	time.AfterFunc(linkCopiedTime, func() {
+		a.tray.Post(func() {
+			if a.logCopied == n { // not copied again meanwhile
+				a.logCopied = 0
+				a.render()
+			}
+		})
+	})
+	a.render()
 }
 
 // resultRows report the last test play: decode time and, per output, the
