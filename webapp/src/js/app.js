@@ -1493,9 +1493,29 @@ function trackPlaying(soundId, data) {
         repeat: false,
     };
     soundProgress.activeSounds.set(data.playingId, newSoundData);
+    // With sounds not overlapping, the play stopped the others: they go now,
+    // not at the next poll. A restarted sound keeps its card (finishTracked).
+    (data.stopped || []).forEach(id => { soundProgress.replaced.add(id); finishTracked(id); });
     updatePlayingStateVisuals(); // Update 'playing' class on cards
     handleSoundPlayedVisuals(newSoundData); // Update global UI (play icon)
     startProgressPolling(); // Start or ensure polling is active
+}
+
+// finishTracked forgets a sound instance that ended or was stopped. Its card
+// stops playing unless another instance of the same sound still plays (e.g.
+// the sound was just played again), which then owns the card.
+function finishTracked(playingId) {
+    const soundData = soundProgress.activeSounds.get(playingId);
+    if (!soundData) return;
+    console.log(`Sound instance ${playingId} (Sound ${soundData.soundId}) finished.`);
+    soundProgress.activeSounds.delete(playingId);
+    const other = [...soundProgress.activeSounds.values()].find(s => s.soundId === soundData.soundId);
+    if (other) {
+        state.currentlyPlaying.set(soundData.soundId, other.id);
+        return;
+    }
+    state.currentlyPlaying.delete(soundData.soundId);
+    handleSoundFinishVisuals(soundData); // Reset individual card visuals
 }
 
 const announceProgress = () => document.dispatchEvent(new CustomEvent('soundprogress'));
@@ -1548,6 +1568,7 @@ const soundProgress = {
     errorCount: 0,
     maxErrors: 5,
     discover: false, // next poll runs even with nothing tracked
+    replaced: new Set(), // playingIds a play stopped: a poll answered before it can't bring them back
 };
 
 function startProgressPolling() {
@@ -1564,6 +1585,7 @@ function stopProgressPolling(reason = "No active sounds") {
     if (!soundProgress.polling) return; // Already stopped
     console.log(`Stopping progress polling. Reason: ${reason}`);
     soundProgress.polling = false;
+    soundProgress.replaced.clear();
     if (soundProgress.interval) {
         clearInterval(soundProgress.interval);
         soundProgress.interval = null;
@@ -1591,7 +1613,7 @@ async function fetchSoundProgress() {
         const currentPlayingIdsFromServer = new Set(playingSoundsData.map(s => s.id));
         let maxProgressPercentage = 0;
         // Determine overall playing state *from the latest API data*
-        let anyPlayingNow = playingSoundsData.some(sound => !sound.paused);
+        let anyPlayingNow = playingSoundsData.some(sound => !sound.paused && !soundProgress.replaced.has(sound.id));
 
         // 2. Update tracked sounds based on API response
         playingSoundsData.forEach(soundUpdate => {
@@ -1601,6 +1623,7 @@ async function fetchSoundProgress() {
                 return;
             }
 
+            if (soundProgress.replaced.has(soundUpdate.id)) return;
             let existingSound = soundProgress.activeSounds.get(soundUpdate.id);
 
             // Add if new, or update if existing
@@ -1657,15 +1680,7 @@ async function fetchSoundProgress() {
             }
         });
 
-        finishedSoundPlayingIds.forEach(playingId => {
-            const soundData = soundProgress.activeSounds.get(playingId);
-            if (soundData) {
-                console.log(`Sound instance ${playingId} (Sound ${soundData.soundId}) finished.`);
-                state.currentlyPlaying.delete(soundData.soundId);
-                soundProgress.activeSounds.delete(playingId);
-                handleSoundFinishVisuals(soundData); // Reset individual card visuals
-            }
-        });
+        finishedSoundPlayingIds.forEach(finishTracked);
 
         // 4. Update Global State & UI
         // Update overall playing state based on the fetched data

@@ -98,6 +98,10 @@ type Config struct {
 	// after it is let go (app.onTalk): the user's release has ended it in the
 	// game.
 	NoPushToTalkPauses bool `json:"noPushToTalkPauses,omitempty"`
+	// NoSoundOverlap plays one sound at a time: a sound played for others
+	// stops every sound playing (app.replaceVoices). By default (false)
+	// sounds overlap freely.
+	NoSoundOverlap bool `json:"noSoundOverlap,omitempty"`
 	// NoUpdateCheck turns off the automatic check for new releases on
 	// GitHub ("Check now" still works).
 	NoUpdateCheck bool `json:"noUpdateCheck,omitempty"`

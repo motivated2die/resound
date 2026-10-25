@@ -86,6 +86,10 @@ Good to know:
 
 Wherever a key works, it does one thing: it can't be both a pause and a stop key, and it can't be a push-to-talk key Resound presses. That counts for the global keys and for every app that keeps them; Resound says so under the card when you add one. Left and right <kbd>Ctrl</kbd>, <kbd>Shift</kbd> and <kbd>Alt</kbd> count as the same key.
 
+## One sound at a time
+
+On by default, sounds overlap: each plays to its end, however many you start. Turn off Settings → Audio & voice chat → **Allow sounds to overlap** to play one at a time: a new sound stops the one playing, also a paused one. Push-to-talk stays held from one sound to the next, so the game never sees it let go in between. Previews that only you hear don't stop anything.
+
 ## Mute your microphone while sounds play
 
 Off by default. Turn it on under Settings → Audio & voice chat → **Mute my microphone while sounds play**. Others then hear the sound clearly, without you talking or typing in the background. The audio flow shows **Muted for sounds** meanwhile.

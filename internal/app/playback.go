@@ -2,6 +2,7 @@ package app
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -82,28 +83,67 @@ func (p *playbackState) dropVoice(id uint64) {
 
 // start queues a prepared sound. When forOthers is true (not a preview),
 // push-to-talk is pressed and, for a sound long enough (muteFor), the mic
-// muted first — after decoding, so neither happens early. Runs on the UI
-// thread.
-func (a *App) start(p *audio.Prepared, opts audio.PlayOptions, meta voiceMeta, forOthers bool) (audio.PlayInfo, error) {
+// muted first — after decoding, so neither happens early. With sounds not
+// overlapping (config.NoSoundOverlap), such a sound then stops all others;
+// replaced are their voice IDs. Runs on the UI thread.
+func (a *App) start(p *audio.Prepared, opts audio.PlayOptions, meta voiceMeta, forOthers bool) (info audio.PlayInfo, replaced []uint64, err error) {
 	pb := &a.playback
 	meta.length = p.Length()
 	if forOthers {
 		a.holdPlayback(a.muteFor(meta.length))
 	}
-	info, err := a.engine.Start(p, opts)
+	info, err = a.engine.Start(p, opts)
 	if err != nil {
 		if len(pb.remaining) == 0 {
 			a.releasePlayback()
 		}
-		return info, err
+		return info, nil, err // what played keeps playing
+	}
+	if forOthers && a.cfg.NoSoundOverlap {
+		replaced = a.replaceVoices(info.VoiceID)
 	}
 	pb.remaining[info.VoiceID] = info.Outputs
 	meta.preview = !forOthers
 	pb.setVoice(info.VoiceID, meta)
+	if len(replaced) > 0 && pb.mutedMic != "" && !a.longPlaying() {
+		a.releaseMic() // a long sound was replaced by a short one
+	}
 	a.animate()
 	logx.Printf("play #%d %q (%v) on %d output(s) with %d decoder(s), ready in %v",
 		info.VoiceID, info.Name, info.Length.Round(time.Millisecond), info.Outputs, info.Decoders, info.Decode.Round(100*time.Microsecond))
-	return info, nil
+	if len(replaced) > 0 {
+		logx.Printf("play #%d replaced %v", info.VoiceID, replaced)
+	}
+	return info, replaced, nil
+}
+
+// replaceVoices stops every sound but keep, which was just queued and
+// plays alone (config.NoSoundOverlap), paused ones too. Their bookkeeping
+// goes now, not with their EventFinished: keep takes their place in the
+// same UI-thread step, so remaining never empties between the sounds and
+// push-to-talk (already held for keep by holdPlayback) stays down without
+// a bounce the game could miss. The mic is judged again by the caller.
+func (a *App) replaceVoices(keep uint64) []uint64 {
+	pb := &a.playback
+	var ids []uint64
+	for id := range pb.remaining {
+		if id != keep {
+			ids = append(ids, id)
+		}
+	}
+	slices.Sort(ids)
+	for _, id := range ids {
+		a.engine.Stop(id) // its EventFinished still ends an import card's preview
+		delete(pb.remaining, id)
+		pb.dropVoice(id)
+	}
+	if len(ids) > 0 && pb.pausedActive {
+		// What the play/pause toggle paused is gone: the next press pauses
+		// the new sound. Talk-through and pause keys stay on; their lists
+		// only name stopped voices now, which resume skips.
+		pb.paused, pb.pausedActive, pb.wasHolding = nil, false, false
+	}
+	return ids
 }
 
 // playTest plays the tone or the test sound from the panel.
@@ -122,7 +162,7 @@ func (a *App) playTest(tone bool) {
 	}
 	var info audio.PlayInfo
 	if err == nil {
-		info, err = a.start(p, audio.PlayOptions{}, voiceMeta{name: "test"}, true)
+		info, _, err = a.start(p, audio.PlayOptions{}, voiceMeta{name: "test"}, true)
 	}
 	if err != nil {
 		logx.Printf("play failed: %v", err)
@@ -477,6 +517,25 @@ func (a *App) chooseTestSound() {
 	a.cfg.TestSoundPath = path
 	a.save()
 	logx.Printf("test sound: %s", path)
+}
+
+// toggleOverlap lets sounds overlap or not. Sounds playing now keep
+// playing; the next sound played replaces them.
+func (a *App) toggleOverlap() {
+	a.cfg.NoSoundOverlap = !a.cfg.NoSoundOverlap
+	a.save()
+	logx.Printf("sounds overlap: %v", !a.cfg.NoSoundOverlap)
+	a.render()
+}
+
+// overlapRows are the option to let sounds overlap and, while it is off,
+// what happens instead.
+func (a *App) overlapRows() []ui.Row {
+	rows := []ui.Row{ui.Toggle("Allow sounds to overlap", !a.cfg.NoSoundOverlap, a.toggleOverlap)}
+	if a.cfg.NoSoundOverlap {
+		rows = append(rows, ui.Paragraph("One sound at a time: playing a sound stops the one playing. Push-to-talk stays down from one sound to the next.", ui.ToneMuted))
+	}
+	return rows
 }
 
 // setVolume applies a role's volume at once; done saves it (the end of a

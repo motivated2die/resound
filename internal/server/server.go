@@ -26,6 +26,9 @@ var ErrUnplayable = errors.New("sound file unplayable")
 type Started struct {
 	PlayingID uint64
 	Length    time.Duration
+	// Replaced are the sounds (playing IDs) the play stopped, as sounds
+	// don't overlap: the phone stops showing them at once.
+	Replaced []uint64
 }
 
 // Progress is one playing sound, as the phone's progress bars need it.

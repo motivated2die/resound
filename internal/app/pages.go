@@ -288,6 +288,7 @@ func (a *App) audioPage() []ui.Row {
 	}
 
 	rows = append(rows, ui.Section("While sounds play"))
+	rows = append(rows, a.overlapRows()...)
 	rows = append(rows, a.muteMicRows()...)
 	keys, keysTone := a.keysSummary()
 	rows = append(rows, ui.Nav("Keybinds", keys, keysTone, func() { a.openPage(pageKeys) }))
