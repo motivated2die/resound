@@ -80,14 +80,24 @@ func (s SoundSettings) empty() bool {
 type Layout struct {
 	// Mode is the phone's layout mode ("grid-3", "grid-2", "list"; "" = default).
 	Mode string `json:"mode,omitempty"`
+	// Sort is how the phone sorts the tab: "" by its custom order (Orders),
+	// SortNameAsc or SortNameDesc by name. Sorting never changes Orders, so
+	// the custom order is back when the phone switches to it again.
+	Sort string `json:"sort,omitempty"`
 	// Orders holds a custom sound order (sound IDs) per layout mode.
 	Orders map[string][]uint64 `json:"orders,omitempty"`
 }
 
-func (l Layout) empty() bool { return l.Mode == "" && len(l.Orders) == 0 }
+// The phone's sort modes besides the custom order (Layout.Sort).
+const (
+	SortNameAsc  = "name-asc"
+	SortNameDesc = "name-desc"
+)
+
+func (l Layout) empty() bool { return l.Mode == "" && l.Sort == "" && len(l.Orders) == 0 }
 
 func (l Layout) clone() Layout {
-	out := Layout{Mode: l.Mode}
+	out := Layout{Mode: l.Mode, Sort: l.Sort}
 	if len(l.Orders) > 0 {
 		out.Orders = make(map[string][]uint64, len(l.Orders))
 		for k, v := range l.Orders {

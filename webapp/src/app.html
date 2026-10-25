@@ -53,6 +53,11 @@
             <button id="play-pause-toggle-button" class="icon-button top-bar-button hidden" aria-label="Toggle Play/Pause">
                 <span class="icon" data-icon="play_arrow" aria-hidden="true"></span>
             </button>
+            <!-- Sorting of the open tab (sort.js): the sort icon for the custom order, the letters in their order -->
+            <button id="sort-mode-button" class="icon-button top-bar-button hidden" aria-label="Sorting: Custom order" data-sort="custom">
+                <span class="icon" data-icon="sort" aria-hidden="true"></span>
+                <span class="sort-letters" aria-hidden="true"><b>A</b><b>Z</b></span>
+            </button>
             <button id="layout-mode-button" class="icon-button top-bar-button hidden" aria-label="Change Layout">
                 <span class="icon" data-icon="view_module" aria-hidden="true"></span>
             </button>
@@ -367,6 +372,7 @@
     <script src="js/install.js" defer></script>
     <script src="js/editMode.js" defer></script>
     <script src="js/layout.js" defer></script>
+    <script src="js/sort.js" defer></script>
     <script src="js/dragDrop.js" defer></script>
     <script src="js/tab-order.js" defer></script>
     <script src="js/sound-settings.js" defer></script>

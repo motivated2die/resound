@@ -24,6 +24,7 @@ Nothing here is embedded into `Resound.exe`.
 | `js/fullscreen.js` | Fullscreen in a browser tab, on by default on phones and tablets only; the installed app opens fullscreen by itself (`manifest.json`) |
 | `js/platform.js` | What kind of device this is, before the first paint: iPhones and iPads (their status bar never hides, so the top bar moves below it) and phones and tablets in general (fullscreen by default) |
 | `js/device.js` | Vibration on play and stop, persistent storage for the pairing keys |
+| `js/sort.js` | Sorting a tab in edit mode (custom order, A–Z, Z–A by name), saved per tab on the PC; the custom order is never changed by it |
 | `js/search.js` | Search across all tabs: fuzzy by name, a colour filter; opened from the top bar or by pulling down with two fingers. Results fill the usual grid; the bottom bar stays above the virtual keyboard |
 | `js/install.js` | The "Install app" pill in the top bar and its sheet: why, and how in this browser (one tap where Chromium offers it, steps elsewhere) |
 | `manifest.json`, `sw.js` | Installation and offline start; the build fills in the service worker's file list (the help center is left out) |
@@ -48,7 +49,8 @@ The help center at `/help/`: setup guides, features, troubleshooting, FAQ and un
 | `*.md` | One article each, at `/help/<file name>`. Starts with its `# Title`; the first paragraph is its summary (search, meta description) |
 | `viz/*.html` | Small visualizations, inserted where an article says `:::viz <name>` |
 | `page.html` | The page template (Go `html/template`) |
-| `help.css`, `help.js` | Styles (the landing page's palette) and behaviour: topics drawer, search, checklists, visualization switches |
+| `help.css`, `help.js` | Styles (the landing page's palette) and behaviour: topics drawer, search, checklists, visualization switches, "Ask an AI" |
+| `ai-prompt.txt` | The instructions for an AI assistant that "Ask an AI" hands over: `{{documentation}}` marks where the documentation goes, and it ends with "My question" and an empty line for the reader |
 
 Writing articles, in GitHub Markdown:
 
@@ -57,6 +59,16 @@ Writing articles, in GitHub Markdown:
 - Visualizations: `:::viz audio-flow`, a caption, `:::`. Use them sparingly, where a picture explains what text can't.
 - Checklists: a list of `- [ ] Step` items becomes boxes readers tick off (kept only while the page is open). For troubleshooting steps.
 - Keys as `<kbd>Esc</kbd>`, UI labels in **bold**, paths in the panel as Settings → Audio & voice chat.
+
+### Ask an AI
+
+The overview (right column, or below the intro on narrower screens) and the end of every article have an **Ask an AI** card: a copy button, and below it a menu of assistants to open. It works without any integration with the AI providers; they are plain links:
+
+- **Copy for your AI** copies `ai-prompt.txt` with every article as Markdown in its slot (`/help/ai-context.txt`, about 85 KB), to paste into any AI chat and write the question below.
+- **ChatGPT, Claude, Perplexity, Grok** open with the prompt in their address (`?q=`), with a link to `/llms-full.txt` in the slot that they read with their web tools. The whole help center is far too long for an address. The text is copied too, in case the assistant can't open the link.
+- **Gemini, Copilot** take no prompt in their address: they open empty, and the reader pastes what was copied.
+
+The build also writes the help center for AI assistants and tools ([llmstxt.org](https://llmstxt.org)): `/llms.txt` (the index), `/llms-full.txt` (everything) and `/help/<article>.md`. Links become absolute, callouts become quotes, and visualizations keep only their caption. Assistants and their address parameters are `aiAssistants` in `cmd/webapp/llms.go`; when a provider changes its parameter, change it there. `_headers` serves these files as UTF-8 text.
 
 The build fails on broken links and headings, unknown visualizations and articles missing from `SUMMARY.md`; `go test ./cmd/webapp` runs it.
 

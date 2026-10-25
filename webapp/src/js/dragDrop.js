@@ -67,6 +67,10 @@ const dragDropManager = (() => {
         return { start, stop };
     })();
 
+    // Buttons move only in edit mode, and only on a tab in its custom
+    // order: a sorted tab (sort.js) is arranged by its sorting.
+    const canDrag = () => editMode.isActive() && sortManager.isCustom(state.currentTab);
+
     const initSortable = () => {
         if (!soundsContainer || typeof Sortable === 'undefined') {
             console.error("Drag & Drop Error: Sounds container or SortableJS library not found.");
@@ -96,7 +100,7 @@ const dragDropManager = (() => {
             delayOnTouchOnly: true,
             touchStartThreshold: 8,         // Pixels tolerance for touch start
 
-            disabled: !editMode.isActive(), // Start disabled if edit mode isn't active
+            disabled: !canDrag(), // only in edit mode, on a tab in its custom order
 
             onStart: function (evt) {
                 soundsContainer.style.cursor = 'grabbing';
@@ -120,75 +124,23 @@ const dragDropManager = (() => {
 
                 console.log(`Swap drag ended. Item at index ${evt.oldIndex} swapped with item at index ${evt.newIndex}.`);
 
-                // Get the current tab and layout context
-                const currentTabId = state.currentTab; // Assumes state.currentTab is string 'favorites' or tab ID string
+                // The swap is in the page already (Sortable's swap plugin
+                // runs before onEnd), so the new custom order is the order on
+                // screen. Sounds of the saved order that aren't on screen
+                // (missing on the PC for now) stay in it, at the end.
+                const currentTabId = state.currentTab; // 'favorites' or a tab ID string
                 const currentLayout = persistence.getCurrentLayoutMode(currentTabId);
-
                 if (currentTabId === null || typeof currentTabId === 'undefined' || !currentLayout) {
                     console.error("Cannot save swapped order: Invalid current tab or layout.", { currentTabId, currentLayout });
                     return;
                 }
-
-                // --- Get the CURRENT persisted order ---
-                const persistedOrderPaths = persistence.getLayoutOrder(currentTabId, currentLayout); // sound IDs
-
-                // --- Check if persisted order exists before attempting swap ---
-                if (!Array.isArray(persistedOrderPaths)) {
-                     console.warn(`Cannot save swapped order: No persisted order found for tab ${currentTabId}, layout ${currentLayout}. Initializing order from current DOM.`);
-                     // Fallback: Read from DOM if persistence is missing (less ideal but recovers)
-                     const soundCards = soundsContainer.querySelectorAll('.sound-card');
-                     const currentDomPaths = Array.from(soundCards).map(card => card.dataset.soundId).filter(id => id);
-                     if (currentDomPaths.length > 0) {
-                         persistence.setLayoutOrder(currentTabId, currentLayout, currentDomPaths);
-                         // Now try the swap again *if indices are valid* for the DOM order
-                         if (evt.oldIndex < currentDomPaths.length && evt.newIndex < currentDomPaths.length) {
-                             const temp = currentDomPaths[evt.oldIndex];
-                             currentDomPaths[evt.oldIndex] = currentDomPaths[evt.newIndex];
-                             currentDomPaths[evt.newIndex] = temp;
-                             persistence.setLayoutOrder(currentTabId, currentLayout, currentDomPaths);
-                             console.log("Initialized and saved swapped order from DOM.");
-                         } else {
-                             console.error("Swap indices out of bounds even for DOM order. Cannot save.");
-                         }
-                     } else {
-                         console.error("Cannot initialize order from DOM: No sound paths found.");
-                     }
-                     return; // Stop here if we had to initialize
-                }
-
-
-                // --- Perform the swap on the PERSISTED order array ---
-                const newOrderPaths = [...persistedOrderPaths]; // Create a copy
-
-                // Validate indices against the persisted array length
-                 if (evt.oldIndex < 0 || evt.oldIndex >= newOrderPaths.length || evt.newIndex < 0 || evt.newIndex >= newOrderPaths.length) {
-                     console.error(`Cannot save swapped order: Indices (old: ${evt.oldIndex}, new: ${evt.newIndex}) are out of bounds for persisted order length (${newOrderPaths.length}).`);
-                     // Optionally reload to fix visual state if it desynced
-                     // window.app?.reloadSoundsForCurrentTab();
-                     return;
-                 }
-
-                console.log(`Original persisted order for [${currentTabId}-${currentLayout}]:`, persistedOrderPaths);
-                console.log(`Swapping indices ${evt.oldIndex} ('${newOrderPaths[evt.oldIndex]}') and ${evt.newIndex} ('${newOrderPaths[evt.newIndex]}')`);
-
-                // The actual swap
-                const temp = newOrderPaths[evt.oldIndex];
-                newOrderPaths[evt.oldIndex] = newOrderPaths[evt.newIndex];
-                newOrderPaths[evt.newIndex] = temp;
-
-                console.log(`Saving swapped order for [${currentTabId}-${currentLayout}]:`, newOrderPaths);
-
-                // --- Save the modified order back to persistence ---
-                try {
-                    persistence.setLayoutOrder(currentTabId, currentLayout, newOrderPaths);
-                    console.log("Successfully saved swapped layout order.");
-                } catch (error) {
-                    console.error("Failed to save swapped layout order:", error);
-                    // If saving fails, the visual state might be desynced from persistent state.
-                    // Reloading is a safe way to recover.
-                    // alert("Error saving layout change. Reloading sounds.");
-                    // window.app?.reloadSoundsForCurrentTab();
-                }
+                const shown = Array.from(soundsContainer.querySelectorAll('.sound-card'))
+                    .map(card => card.dataset.soundId)
+                    .filter(id => id);
+                if (!shown.length) return;
+                const onScreen = new Set(shown);
+                const saved = persistence.getLayoutOrder(currentTabId, currentLayout) || [];
+                persistence.setLayoutOrder(currentTabId, currentLayout, [...shown, ...saved.filter(id => !onScreen.has(id))]);
 
                 // IMPORTANT: Do NOT call evt.preventDefault(). Let SortableJS finalize the visual swap.
                 // The persisted data now matches the visual outcome of the swap.
@@ -223,23 +175,10 @@ const dragDropManager = (() => {
             console.log("App ready, initializing SortableJS for Drag & Drop...");
             if (typeof Sortable !== 'undefined' && document.getElementById('sounds-container')) {
                 initSortable();
-                // Listen for edit mode changes AFTER initializing sortable
-                document.addEventListener('editModeChanged', (event) => {
-                    const isActive = event.detail.isActive;
-                    if (sortableInstance) { // Check instance exists before enabling/disabling
-                        if (isActive) {
-                            enable();
-                        } else {
-                            disable();
-                        }
-                    }
-                });
-                // Initialize state based on current editMode status
-                if (editMode.isActive() && sortableInstance) {
-                     enable();
-                 } else if (sortableInstance){
-                     disable();
-                 }
+                // Edit mode, the open tab or its sorting changed.
+                const update = () => { if (sortableInstance) (canDrag() ? enable : disable)(); };
+                ['editModeChanged', 'tabChanged', 'sortModeChanged', 'libraryChanged', 'settingsReset'].forEach(name => document.addEventListener(name, update));
+                update();
             } else {
                 console.error("SortableJS library not loaded or sounds-container not found when appReady fired.");
             }

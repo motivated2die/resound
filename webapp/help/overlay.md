@@ -8,7 +8,7 @@ Play your favorites without leaving the game: one key slides a bar of your favor
 2. Choose the **Screen edge**: Left (default) or Right.
 3. Click **Show the overlay** to try it right there, without a game.
 
-The bar shows your [favorites](phone-app.md#customize-a-sound), in the order of the phone's Favorites tab. No favorites yet? It tells you how to add some.
+The bar shows your [favorites](phone-app.md#customize-a-sound), in the order of the phone's Favorites tab: your own order, or by name if you [sorted the tab](phone-app.md#layouts-and-sorting). No favorites yet? It tells you how to add some.
 
 ## Use it in a game
 

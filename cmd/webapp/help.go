@@ -45,7 +45,8 @@ import (
 	"github.com/yuin/goldmark/util"
 )
 
-// helpAssets are copied to /help/ as they are.
+// helpAssets are copied to /help/ as they are. ai-prompt.txt is read by
+// buildAI (llms.go).
 var helpAssets = []string{"help.css", "help.js"}
 
 type helpSection struct {
@@ -78,6 +79,7 @@ type helpView struct {
 	Sections []helpSection
 	Site     string // site, for link previews
 	URL      string // the page's address there, its canonical URL
+	AI       helpAI // the "Ask an AI" card (llms.go)
 }
 
 // helpPath is an article's path on the site: /help/ for the overview,
@@ -173,12 +175,16 @@ func buildHelp(fsys fs.FS) (map[string][]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	tmpl, err := template.New("page.html").Parse(string(tmplSrc))
+	tmpl, err := template.New("page.html").Funcs(template.FuncMap{"aiView": aiView}).Parse(string(tmplSrc))
 	if err != nil {
 		return nil, err
 	}
 
 	out := map[string][]byte{}
+	ai, err := buildAI(fsys, home, sections, order, pages, out)
+	if err != nil {
+		return nil, err
+	}
 	type entry struct {
 		Slug, Title, Section, Text string
 		Headings                   []helpHeading
@@ -189,7 +195,7 @@ func buildHelp(fsys fs.FS) (map[string][]byte, error) {
 			return nil, fmt.Errorf("%s.md: %w", p.Slug, err)
 		}
 		var buf bytes.Buffer
-		view := helpView{helpPage: p, Home: p == home, Sections: sections, Site: site, URL: site + helpPath(p.Slug)}
+		view := helpView{helpPage: p, Home: p == home, Sections: sections, Site: site, URL: site + helpPath(p.Slug), AI: ai}
 		if err := tmpl.Execute(&buf, view); err != nil {
 			return nil, fmt.Errorf("%s.md: %w", p.Slug, err)
 		}

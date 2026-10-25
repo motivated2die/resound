@@ -260,8 +260,8 @@
                     </article>
                     <article class="card feature">
                         <span class="icon feature-icon" data-icon="headset_mic" aria-hidden="true"></span>
-                        <h3>Mic mute and push-to-talk</h3>
-                        <p>While a sound plays, Resound can mute your microphone and hold your game's push-to-talk key. "Talk through" lets you speak any time.</p>
+                        <h3>Push-to-talk and keybinds</h3>
+                        <p>While a sound plays, Resound holds your game's push-to-talk key and can mute your mic. Pause and stop keys too, on keyboard or mouse, for every game or just one.</p>
                     </article>
                     <article class="card feature">
                         <span class="icon feature-icon" data-icon="keyboard" aria-hidden="true"></span>
@@ -340,7 +340,11 @@
                 <!-- The panel's home page, drawn like internal/ui (not a screenshot), animated by landing.js -->
                 <div class="desktop-visual" aria-hidden="true">
                     <div class="dp" data-desk-panel>
-                        <div class="dp-close"><span class="picon" data-picon="x"></span>CLOSE<kbd>ESC</kbd></div>
+                        <!-- The tab above the panel (internal/ui/paneltab_windows.go): the handle that moves it, and Close -->
+                        <div class="dp-tab">
+                            <span class="dp-tab-move"><span class="picon" data-picon="grip-horizontal"></span>DRAG TO MOVE</span>
+                            <span class="dp-tab-close"><span class="picon" data-picon="x"></span>CLOSE<kbd>ESC</kbd></span>
+                        </div>
 
                         <div class="dp-brand">
                             <img src="assets/resound-192.png" alt="" width="48" height="48">
@@ -597,6 +601,14 @@
                         <div class="news-meta">
                             <span class="icon" data-icon="newspaper" aria-hidden="true"></span>
                             <span class="badge">New</span>
+                            <span class="news-version">Version 0.15</span>
+                        </div>
+                        <h3>Cut sounds from any clip, keybinds for every game</h3>
+                        <p>A built-in editor cuts sounds out of videos and audio files and saves them straight to your library, without uploading anything, and the new Sound library lets you browse and trim your sounds. Keybinds got a rework: push-to-talk, pause and stop keys now work with mouse buttons too, and each game can have keys of its own. Press your own push-to-talk key and your sounds pause, so you can talk.</p>
+                    </article>
+                    <article class="card news-item">
+                        <div class="news-meta">
+                            <span class="icon" data-icon="newspaper" aria-hidden="true"></span>
                             <span class="news-version">Version 0.14</span>
                         </div>
                         <h3>Your favorites inside your game, every sound equally loud</h3>

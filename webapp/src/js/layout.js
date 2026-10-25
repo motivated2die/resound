@@ -3,6 +3,7 @@ const layoutManager = (() => {
     const soundsContainer = document.getElementById('sounds-container');
     const layoutButton = document.getElementById('layout-mode-button');
     const layoutModes = ['grid-3', 'grid-2', 'list']; // Order matters for cycling
+    const layoutLabels = { 'grid-3': '3 columns', 'grid-2': '2 columns', list: 'List' }; // shown briefly in the top bar
 
     const getCurrentLayoutModeForTab = (tabId) => {
         // Ensure tabId is treated consistently (string)
@@ -59,6 +60,7 @@ const layoutManager = (() => {
 
         // Apply the new mode visually
         applyLayoutMode(nextMode);
+        editMode.flash(layoutLabels[nextMode]);
 
         // Reload sounds to potentially apply a layout-specific order
         if (typeof window.app !== 'undefined' && typeof window.app.reloadSoundsForCurrentTab === 'function') {

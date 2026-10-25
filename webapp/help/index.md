@@ -10,7 +10,3 @@ How to set up, use and fix Resound, the soundboard for Windows that you control 
 - [Sounds cut out or sound muffled in Discord](discord.md)
 - [The phone can't connect to the PC](phone-cant-connect.md)
 - [Push-to-talk or hotkeys don't work in a game](keys-in-games.md)
-
-:::tip The panel shows you what's wrong
-Open Resound from its tray icon. Problems appear at the top of the panel, and the audio flow marks the exact spot on its lines: hover over a marker to see why, click it to get to the fix. See [The Resound panel](panel.md#the-audio-flow).
-:::

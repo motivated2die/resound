@@ -396,12 +396,29 @@ function createRipple(event, targetButton, color = 'rgba(255, 255, 255, 0.2)', p
 
 // --- Event Listeners ---
 function setupEventListeners() {
-    // Stop All Button Listener (PointerDown for ripple)
+    // STOP acts on the press: one vibration then (none on release), the
+    // button pressed in while held (.pressed, like talk-through's), and no
+    // long press. Cancelling touchstart keeps the browser from treating a
+    // held touch as a long press (Android's own vibration, text selection)
+    // and from sending a click; the pointer events still arrive. Keys
+    // (Enter, Space) still click it.
     if (stopAllButton) {
+        const release = () => stopAllButton.classList.remove('pressed');
         stopAllButton.addEventListener('pointerdown', (e) => {
+            if (e.button !== 0) return;
+            window.haptics?.tap();
+            stopAllButton.classList.add('pressed');
             createRipple(e, stopAllButton, 'rgba(242, 65, 111, 0.5)'); // berry red, like the button
+            stopAllSounds({ haptic: false });
         });
-        stopAllButton.addEventListener('click', stopAllSounds); // Keep click for action
+        ['pointerup', 'pointercancel', 'pointerleave'].forEach(type => stopAllButton.addEventListener(type, release));
+        stopAllButton.addEventListener('click', (e) => {
+            if (e.detail === 0) stopAllSounds(); // from the keyboard; pointers stopped on the press
+        });
+        stopAllButton.addEventListener('contextmenu', (e) => e.preventDefault());
+        stopAllButton.addEventListener('touchstart', (e) => {
+            if (e.cancelable) e.preventDefault();
+        }, { passive: false });
     } else console.error("Stop All button not found");
 
 
@@ -1095,10 +1112,10 @@ async function fetchTabSounds(tabId) {
     return sounds;
 }
 
-// orderSounds applies the tab's saved order for its current layout. Sound IDs
+// customOrder applies the tab's saved order for its current layout. Sound IDs
 // stay the same when files are renamed or moved on the PC, so the order
 // survives that; sounds not in the saved order are appended.
-function orderSounds(tabId, soundsFromApi) {
+function customOrder(tabId, soundsFromApi) {
     const currentLayout = persistence.getCurrentLayoutMode(tabId);
     const persistedOrderIds = persistence.getLayoutOrder(tabId, currentLayout);
     if (!Array.isArray(persistedOrderIds) || persistedOrderIds.length === 0) return soundsFromApi;
@@ -1111,6 +1128,22 @@ function orderSounds(tabId, soundsFromApi) {
         }
     });
     return [...ordered, ...byId.values()];
+}
+
+// orderSounds is the tab as shown: its custom order, or sorted by name when
+// the tab is set to that (sort.js). Sorting happens here only; the saved
+// custom order stays as it is.
+function orderSounds(tabId, soundsFromApi) {
+    return sortManager.sort(customOrder(tabId, soundsFromApi), persistence.getSortMode(tabId));
+}
+
+// keepCustomOrder saves the order a tab is shown in when it has none saved
+// yet, so sounds added later go to the end instead of where the PC lists
+// them (newest first): the buttons on screen stay where they are.
+function keepCustomOrder(tabId, sounds) {
+    const layout = persistence.getCurrentLayoutMode(tabId);
+    if (!sounds.length || persistence.getLayoutOrder(tabId, layout)) return;
+    persistence.setLayoutOrder(tabId, layout, sounds.map(sound => String(sound.id)));
 }
 
 const soundListKey = (sounds) => JSON.stringify((sounds || []).map(s => [s.id, s.name]));
@@ -1137,6 +1170,7 @@ async function loadSounds(tabId) {
 
     try {
         const fresh = await fetchTabSounds(id);
+        keepCustomOrder(id, fresh);
         if (String(state.currentTab) !== id || state.searching) return; // the user moved on meanwhile
         if (!cached || soundListKey(fresh) !== soundListKey(cached)) {
             displaySounds(orderSounds(id, fresh), !cached);
@@ -1478,8 +1512,10 @@ function showPlayFailed(soundId, message) {
     setTimeout(() => card.classList.remove('play-failed'), 700);
 }
 
-async function stopAllSounds() {
-    if (window.haptics) window.haptics.tap();
+// stopAllSounds stops every sound; haptic: false when the caller vibrated
+// already (STOP, on its press).
+async function stopAllSounds({ haptic = true } = {}) {
+    if (haptic && window.haptics) window.haptics.tap();
     console.log("Stopping all sounds via API...");
     try {
         await apiFetch('/api/sounds/stop', { method: 'POST' });

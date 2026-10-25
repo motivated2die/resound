@@ -287,6 +287,7 @@ body {
 .icon[data-icon="search"] { --icon: url("../assets/icons/search.svg"); }
 .icon[data-icon="settings"] { --icon: url("../assets/icons/settings.svg"); }
 .icon[data-icon="smartphone"] { --icon: url("../assets/icons/smartphone.svg"); }
+.icon[data-icon="sort"] { --icon: url("../assets/icons/sort.svg"); }
 .icon[data-icon="stop_circle"] { --icon: url("../assets/icons/stop_circle.svg"); }
 .icon[data-icon="view_comfy"] { --icon: url("../assets/icons/view_comfy.svg"); }
 .icon[data-icon="view_list"] { --icon: url("../assets/icons/view_list.svg"); }
@@ -439,6 +440,36 @@ body {
   background-color: rgba(0, 0, 0, 0.2);
 }
 
+/* Sorting (sort.js): the sort icon for the custom order; A over Z, or Z
+   over A, when the tab is sorted by name. */
+#sort-mode-button .sort-letters {
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 10px;
+  letter-spacing: 0;
+}
+#sort-mode-button:not([data-sort="custom"]) .icon { display: none; }
+#sort-mode-button:not([data-sort="custom"]) .sort-letters { display: flex; }
+#sort-mode-button[data-sort="name-desc"] .sort-letters { flex-direction: column-reverse; }
+
+/* What a top bar button just switched to, briefly instead of EDIT MODE
+   (editMode.flash). */
+.edit-mode-info.flashing span {
+  color: white;
+  font-weight: 700;
+  animation: edit-mode-flash 0.2s ease-out;
+}
+@keyframes edit-mode-flash {
+  from { opacity: 0.3; }
+  to { opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .edit-mode-info.flashing span { animation: none; }
+}
+
 .icon-button.top-bar-button .icon {
   font-size: 20px;
 }
@@ -456,6 +487,71 @@ body {
 #tutorial-help-button.active {
   background-color: var(--v-primary-base);
   color: var(--on-primary);
+}
+
+/* The first-run callout below the help button (tutorial.js): offers the
+   tour. Its arrow points at the button (--arrow-x, from the callout's left). */
+.tour-callout {
+  position: fixed;
+  z-index: 120; /* above the top bar (its arrow), below sheets and dialogs */
+  padding: 14px 16px 12px;
+  border-radius: 14px;
+  background-color: var(--v-secondary-darken1);
+  border: 1px solid rgba(var(--accent-rgb), 0.45);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+  color: var(--text-secondary);
+  animation: tour-callout-in 0.25s ease-out;
+}
+.tour-callout::before {
+  content: "";
+  position: absolute;
+  top: -7px;
+  left: calc(var(--arrow-x, 50%) - 7px);
+  width: 12px;
+  height: 12px;
+  background: inherit;
+  border-left: 1px solid rgba(var(--accent-rgb), 0.45);
+  border-top: 1px solid rgba(var(--accent-rgb), 0.45);
+  transform: rotate(45deg);
+}
+.tour-callout-title {
+  margin: 0 0 4px;
+  color: var(--text-primary);
+  font-size: 1rem;
+  font-weight: 600;
+}
+.tour-callout-text {
+  margin: 0;
+  font-size: 0.9rem;
+  line-height: 1.4;
+}
+.tour-callout-buttons {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+.tour-callout-buttons button {
+  flex: 1;
+  padding: 8px 12px;
+  border: none;
+  border-radius: 8px;
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  background-color: var(--v-secondary-base);
+  color: var(--text-primary);
+}
+.tour-callout-buttons .tour-callout-start {
+  background-color: var(--v-primary-base);
+  color: var(--on-primary);
+}
+@keyframes tour-callout-in {
+  from { opacity: 0; transform: translateY(-6px); }
+  to { opacity: 1; transform: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .tour-callout { animation: none; }
 }
 
 /* --- Main Sound Grid --- */
@@ -1213,10 +1309,29 @@ h1.brand {
   /* A darker ring, like the talk button's (.btn-round) */
   border: 2px solid #b53153; /* --error-color, a quarter darker */
   box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+  transition: background-color var(--transition-speed) ease,
+    box-shadow var(--transition-speed) ease,
+    transform var(--transition-speed) ease;
 }
 
 .btn-danger:hover {
   background-color: var(--error-hover);
+}
+
+/* STOP: pressed in while held, like talk-through (.btn-talk.active); the
+   touch is only a press, never a long press or a pan (app.js). */
+#stop-all {
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
+
+#stop-all.pressed {
+  background-color: var(--error-hover);
+  box-shadow: 0 0 10px rgba(242, 65, 111, 0.45), /* --error-color */
+    inset 0 2px 4px rgba(0, 0, 0, 0.3);
+  transform: scale(0.95);
 }
 
 .btn-danger .icon {
@@ -3101,6 +3216,53 @@ emoji-picker section#favorites
   /* Subtle border */
   box-shadow: 0 5px 20px rgba(0, 0, 0, 0.5);
   /* Slightly stronger shadow */
+}
+
+/* Wide enough for Previous and Next on one line, whatever the text's length:
+   the screen's width less 16 px a side, up to 360 px. */
+.driver-popover.soundux-driver-popover {
+  min-width: min(360px, calc(100vw - 32px));
+  max-width: min(400px, calc(100vw - 32px));
+}
+
+.soundux-driver-popover .driver-popover-navigation-btns button {
+  white-space: nowrap;
+}
+
+/* On phones, nearly as wide as the screen: centred, with the same space on
+   either side (Driver.js would push it against an edge near a corner). */
+@media (max-width: 480px) {
+  .driver-popover.soundux-driver-popover {
+    left: 50% !important;
+    right: auto !important;
+    transform: translateX(-50%);
+  }
+}
+
+/* Steps on the whole grid: in the middle of the screen, so the tab bar and
+   the bottom bar stay in sight (Driver.js would put it over them). */
+.driver-popover.tour-popover-middle {
+  top: 50% !important;
+  bottom: auto !important;
+  transform: translateY(-50%);
+}
+@media (max-width: 480px) {
+  .driver-popover.tour-popover-middle {
+    transform: translate(-50%, -50%);
+  }
+}
+
+/* The sound sheet's step: at the top of the screen, above the sheet
+   (Driver.js sets top inline; this wins). */
+.driver-popover.tour-popover-top {
+  top: calc(env(safe-area-inset-top) + 12px) !important;
+  bottom: auto !important;
+}
+
+/* What a tour step shows when it is several parts at once (tutorial.js). */
+.tour-target {
+  position: fixed;
+  pointer-events: none;
 }
 
 .soundux-driver-popover .driver-popover-title {

@@ -95,7 +95,7 @@ func layoutJSON(l library.Layout) map[string]any {
 	for k, v := range l.Orders {
 		orders[k] = v
 	}
-	return map[string]any{"mode": l.Mode, "orders": orders}
+	return map[string]any{"mode": l.Mode, "sort": l.Sort, "orders": orders}
 }
 
 // appearanceBody: a field that is absent stays as it is; "" or null clears it.
@@ -151,9 +151,11 @@ func (s *Server) handleAppearance(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"success": true, "color": snd.Color, "emoji": snd.Emoji})
 }
 
-// layoutBody replaces a layout: its mode and its custom orders.
+// layoutBody replaces a layout: its mode, sorting and custom orders. Without
+// "sort" (an app from before sorting) the sorting stays as it is.
 type layoutBody struct {
 	Mode   string              `json:"mode"`
+	Sort   *string             `json:"sort"`
 	Orders map[string][]uint64 `json:"orders"`
 }
 
@@ -162,6 +164,13 @@ func (b layoutBody) layout() (library.Layout, error) {
 		return library.Layout{}, fmt.Errorf("invalid layout mode")
 	}
 	out := library.Layout{Mode: b.Mode}
+	if b.Sort != nil {
+		// Like the mode, any short name: a newer app's sort mode is kept.
+		if *b.Sort != "" && !layoutPattern.MatchString(*b.Sort) {
+			return library.Layout{}, fmt.Errorf("invalid sort mode")
+		}
+		out.Sort = *b.Sort
+	}
 	if len(b.Orders) > 8 {
 		return library.Layout{}, fmt.Errorf("too many orders")
 	}
@@ -195,7 +204,12 @@ func (s *Server) handleSetLayout(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, err.Error())
 		return
 	}
-	saved, err := s.lib.UpdateLayout(key, func(l *library.Layout) { *l = lay })
+	saved, err := s.lib.UpdateLayout(key, func(l *library.Layout) {
+		if body.Sort == nil {
+			lay.Sort = l.Sort
+		}
+		*l = lay
+	})
 	if err != nil {
 		s.logf("server: saving layout: %v", err)
 	}
