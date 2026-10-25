@@ -417,7 +417,8 @@ func TestBadgeHitArea(t *testing.T) {
 	}
 }
 
-// The link of a ParagraphLink sits below the wrapped text, inside the row.
+// A ParagraphLink's link follows the text on its last line, wraps with it
+// and stays inside the row; each of its lines is a clickable segment.
 func TestParagraphLinkRender(t *testing.T) {
 	p := ParagraphLink("Own setting in Valorant (F9), Counter-Strike 2 (off): it replaces this key while that app is in front.",
 		"Set it in App keybinds", "tip", func() {})
@@ -430,12 +431,24 @@ func TestParagraphLinkRender(t *testing.T) {
 		savePNG(t, renderRowsMeasured(t, rows, scale), name)
 		renderCanvas(t, 10, 10, scale, func(c *canvas) {
 			pr := p.(paragraphLinkRow)
-			h := pr.measure(c, c.px(popupWidthL))
-			r := rect{0, 0, c.px(popupWidthL), h}
-			link := pr.linkBox(c, r)
-			text := paragraphRow{pr.text, ToneMuted}.measure(c, r.w())
-			if link.Top < text || link.Bottom > r.Bottom || link.w() <= 0 {
-				t.Errorf("@%vx: link %+v outside the row below the text (text %d, row %d)", scale, link, text, h)
+			width := c.px(popupWidthL)
+			runs, _ := pr.layout(c, width)
+			if len(runs) < 2 || !runs[len(runs)-1].link || runs[0].link {
+				t.Fatalf("@%vx: runs %+v, want text then the link", scale, runs)
+			}
+			for _, run := range runs {
+				if run.x < 0 || run.x+run.w > width {
+					t.Errorf("@%vx: %q at %d+%d past %d", scale, run.s, run.x, run.w, width)
+				}
+			}
+			// Narrow: the link breaks over two lines, two segments.
+			short := ParagraphLink("Go to", "the keybinds page", "tip", func() {}).(paragraphLinkRow)
+			narrow := c.textWidth("Go to the keybinds", fontBody) + 1
+			r := rect{0, 0, narrow + 2*c.px(padX), short.measure(c, narrow+2*c.px(padX))}
+			if segs := short.segments(c, r); len(segs) != 2 {
+				t.Errorf("@%vx: %d link segments at %d px, want the link wrapped", scale, len(segs), narrow)
+			} else if last := segs[len(segs)-1]; last.Bottom > r.Bottom {
+				t.Errorf("@%vx: link %+v below the row (%d)", scale, last, r.Bottom)
 			}
 		})
 	}
