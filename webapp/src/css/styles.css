@@ -287,6 +287,7 @@ body {
 .icon[data-icon="search"] { --icon: url("../assets/icons/search.svg"); }
 .icon[data-icon="settings"] { --icon: url("../assets/icons/settings.svg"); }
 .icon[data-icon="smartphone"] { --icon: url("../assets/icons/smartphone.svg"); }
+.icon[data-icon="sort"] { --icon: url("../assets/icons/sort.svg"); }
 .icon[data-icon="stop_circle"] { --icon: url("../assets/icons/stop_circle.svg"); }
 .icon[data-icon="view_comfy"] { --icon: url("../assets/icons/view_comfy.svg"); }
 .icon[data-icon="view_list"] { --icon: url("../assets/icons/view_list.svg"); }
@@ -437,6 +438,36 @@ body {
 .top-bar.edit-mode-active .icon-button.top-bar-button:hover,
 .top-bar.edit-mode-active .icon-button.top-bar-button.active {
   background-color: rgba(0, 0, 0, 0.2);
+}
+
+/* Sorting (sort.js): the sort icon for the custom order; A over Z, or Z
+   over A, when the tab is sorted by name. */
+#sort-mode-button .sort-letters {
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 10px;
+  letter-spacing: 0;
+}
+#sort-mode-button:not([data-sort="custom"]) .icon { display: none; }
+#sort-mode-button:not([data-sort="custom"]) .sort-letters { display: flex; }
+#sort-mode-button[data-sort="name-desc"] .sort-letters { flex-direction: column-reverse; }
+
+/* What a top bar button just switched to, briefly instead of EDIT MODE
+   (editMode.flash). */
+.edit-mode-info.flashing span {
+  color: white;
+  font-weight: 700;
+  animation: edit-mode-flash 0.2s ease-out;
+}
+@keyframes edit-mode-flash {
+  from { opacity: 0.3; }
+  to { opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .edit-mode-info.flashing span { animation: none; }
 }
 
 .icon-button.top-bar-button .icon {

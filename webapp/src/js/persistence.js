@@ -3,7 +3,7 @@
 // Device-only preferences (fullscreen, keep the screen on,
 // vibration, button position) are kept in this browser's localStorage.
 // Everything about sounds and tabs -
-// card colors, emoji, layout modes and custom orders - is stored on the PC
+// card colors, emoji, layout modes, sorting and custom orders - is stored on the PC
 // and shared by every paired phone. It is keyed by stable sound and tab IDs,
 // so it survives renaming or moving files and folders on the PC.
 //
@@ -21,6 +21,7 @@ const persistence = (() => {
     const LEGACY_KEYS = ['sounduxRemoteSettings_v2', 'sounduxRemoteSettings_v1', 'sounduxRemoteSettings'];
     const LEGACY_DONE_KEY = 'resoundLegacySettingsImported';
     const DEFAULT_LAYOUT = 'grid-3';
+    const CUSTOM_SORT = ''; // the PC's value for a tab in its custom order
 
     // fullscreen is only stored once chosen; until then the device decides
     // (fullscreen.js).
@@ -31,7 +32,7 @@ const persistence = (() => {
         swapButtonPosition: false,
         // Mirror of the PC's data (also cached here for a fast first paint).
         soundSettings: {}, // key: sound ID (string) -> { color, emoji, favorite, hasCustomVolume, volumeDown }
-        tabLayouts: {},    // key: tab ID (string) | 'favorites' -> { currentLayoutMode }
+        tabLayouts: {},    // key: tab ID (string) | 'favorites' -> { currentLayoutMode, sortMode }
         layoutOrders: {},  // key: `${tabKey}-${layoutMode}` -> [sound IDs as strings]
     });
 
@@ -156,7 +157,7 @@ const persistence = (() => {
         s.tabLayouts = {};
         s.layoutOrders = {};
         Object.entries(data.layouts || {}).forEach(([key, layout]) => {
-            if (layout.mode) s.tabLayouts[key] = { currentLayoutMode: layout.mode };
+            if (layout.mode || layout.sort) s.tabLayouts[key] = { currentLayoutMode: layout.mode || '', sortMode: layout.sort || '' };
             Object.entries(layout.orders || {}).forEach(([mode, ids]) => {
                 if (Array.isArray(ids) && ids.length) s.layoutOrders[`${key}-${mode}`] = ids.map(String);
             });
@@ -223,6 +224,9 @@ const persistence = (() => {
 
     const getLayoutOrder = (tabKey, layoutMode) => ensure().layoutOrders[`${tabKey}-${layoutMode}`] || null;
 
+    // A tab's sorting: CUSTOM_SORT (its custom order) or by name (sort.js).
+    const getSortMode = (tabKey) => ensure().tabLayouts[String(tabKey)]?.sortMode || CUSTOM_SORT;
+
     // --- Sound settings ------------------------------------------------------
 
     // Local mirror only (favorites and volumes are changed through their own
@@ -286,13 +290,27 @@ const persistence = (() => {
             Object.entries(s.layoutOrders).forEach(([k, ids]) => {
                 if (k.startsWith(`${key}-`)) orders[k.slice(key.length + 1)] = ids.map(Number);
             });
-            return { mode: s.tabLayouts[key]?.currentLayoutMode || '', orders };
+            return {
+                mode: s.tabLayouts[key]?.currentLayoutMode || '',
+                sort: s.tabLayouts[key]?.sortMode || CUSTOM_SORT,
+                orders,
+            };
         });
     };
 
     const setCurrentLayoutMode = (tabKey, layoutMode) => {
         const key = String(tabKey);
-        ensure().tabLayouts[key] = { currentLayoutMode: layoutMode };
+        const s = ensure();
+        s.tabLayouts[key] = { ...s.tabLayouts[key], currentLayoutMode: layoutMode };
+        saveLocal();
+        pushLayout(key);
+    };
+
+    // Sorting only changes how the tab is shown: its custom orders stay.
+    const setSortMode = (tabKey, sortMode) => {
+        const key = String(tabKey);
+        const s = ensure();
+        s.tabLayouts[key] = { ...s.tabLayouts[key], sortMode: sortMode || CUSTOM_SORT };
         saveLocal();
         pushLayout(key);
     };
@@ -338,6 +356,8 @@ const persistence = (() => {
         getSoundSettings,
         getCurrentLayoutMode,
         getLayoutOrder,
+        getSortMode,
+        CUSTOM_SORT,
 
         setSoundSetting,
         removeSoundSetting,
@@ -346,6 +366,7 @@ const persistence = (() => {
         setSoundFavorite,
         setSoundCustomVolume,
         setCurrentLayoutMode,
+        setSortMode,
         setLayoutOrder,
 
         clearLayoutOrder,

@@ -24,6 +24,7 @@ Nothing here is embedded into `Resound.exe`.
 | `js/fullscreen.js` | Fullscreen in a browser tab, on by default on phones and tablets only; the installed app opens fullscreen by itself (`manifest.json`) |
 | `js/platform.js` | What kind of device this is, before the first paint: iPhones and iPads (their status bar never hides, so the top bar moves below it) and phones and tablets in general (fullscreen by default) |
 | `js/device.js` | Vibration on play and stop, persistent storage for the pairing keys |
+| `js/sort.js` | Sorting a tab in edit mode (custom order, A–Z, Z–A by name), saved per tab on the PC; the custom order is never changed by it |
 | `js/search.js` | Search across all tabs: fuzzy by name, a colour filter; opened from the top bar or by pulling down with two fingers. Results fill the usual grid; the bottom bar stays above the virtual keyboard |
 | `js/install.js` | The "Install app" pill in the top bar and its sheet: why, and how in this browser (one tap where Chromium offers it, steps elsewhere) |
 | `manifest.json`, `sw.js` | Installation and offline start; the build fills in the service worker's file list (the help center is left out) |

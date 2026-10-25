@@ -1095,10 +1095,10 @@ async function fetchTabSounds(tabId) {
     return sounds;
 }
 
-// orderSounds applies the tab's saved order for its current layout. Sound IDs
+// customOrder applies the tab's saved order for its current layout. Sound IDs
 // stay the same when files are renamed or moved on the PC, so the order
 // survives that; sounds not in the saved order are appended.
-function orderSounds(tabId, soundsFromApi) {
+function customOrder(tabId, soundsFromApi) {
     const currentLayout = persistence.getCurrentLayoutMode(tabId);
     const persistedOrderIds = persistence.getLayoutOrder(tabId, currentLayout);
     if (!Array.isArray(persistedOrderIds) || persistedOrderIds.length === 0) return soundsFromApi;
@@ -1111,6 +1111,22 @@ function orderSounds(tabId, soundsFromApi) {
         }
     });
     return [...ordered, ...byId.values()];
+}
+
+// orderSounds is the tab as shown: its custom order, or sorted by name when
+// the tab is set to that (sort.js). Sorting happens here only; the saved
+// custom order stays as it is.
+function orderSounds(tabId, soundsFromApi) {
+    return sortManager.sort(customOrder(tabId, soundsFromApi), persistence.getSortMode(tabId));
+}
+
+// keepCustomOrder saves the order a tab is shown in when it has none saved
+// yet, so sounds added later go to the end instead of where the PC lists
+// them (newest first): the buttons on screen stay where they are.
+function keepCustomOrder(tabId, sounds) {
+    const layout = persistence.getCurrentLayoutMode(tabId);
+    if (!sounds.length || persistence.getLayoutOrder(tabId, layout)) return;
+    persistence.setLayoutOrder(tabId, layout, sounds.map(sound => String(sound.id)));
 }
 
 const soundListKey = (sounds) => JSON.stringify((sounds || []).map(s => [s.id, s.name]));
@@ -1137,6 +1153,7 @@ async function loadSounds(tabId) {
 
     try {
         const fresh = await fetchTabSounds(id);
+        keepCustomOrder(id, fresh);
         if (String(state.currentTab) !== id || state.searching) return; // the user moved on meanwhile
         if (!cached || soundListKey(fresh) !== soundListKey(cached)) {
             displaySounds(orderSounds(id, fresh), !cached);

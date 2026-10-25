@@ -273,6 +273,29 @@ func TestLayoutAndLegacyImport(t *testing.T) {
 		t.Fatal("accepted a bad layout key")
 	}
 
+	// Sorting: kept beside the custom order, which it never changes; an app
+	// from before sorting (no "sort") leaves it as it is.
+	rec = do(t, h, "POST", "/api/layouts/favorites", `{"mode":"list","sort":"name-desc","orders":{"list":[`+jsonID(soundID)+`]}}`, c)
+	if lay := s.lib.Layout("favorites"); rec.Code != http.StatusOK || lay.Sort != library.SortNameDesc || len(lay.Orders["list"]) != 1 ||
+		!strings.Contains(rec.Body.String(), `"sort":"name-desc"`) {
+		t.Fatalf("sort: %d %s", rec.Code, rec.Body)
+	}
+	do(t, h, "POST", "/api/layouts/favorites", `{"mode":"grid-2","orders":{"list":[`+jsonID(soundID)+`]}}`, c)
+	if lay := s.lib.Layout("favorites"); lay.Sort != library.SortNameDesc || lay.Mode != "grid-2" {
+		t.Fatalf("a layout without sort changed it: %+v", lay)
+	}
+	if rec := do(t, h, "POST", "/api/layouts/favorites", `{"mode":"list","sort":"a;b"}`, c); rec.Code != http.StatusBadRequest {
+		t.Fatalf("accepted a bad sort mode: %d", rec.Code)
+	}
+	do(t, h, "POST", "/api/layouts/favorites", `{"mode":"list","sort":"","orders":{"list":[`+jsonID(soundID)+`]}}`, c)
+	if lay := s.lib.Layout("favorites"); lay.Sort != "" || len(lay.Orders["list"]) != 1 {
+		t.Fatalf("back to the custom order: %+v", lay)
+	}
+	rec = do(t, h, "GET", "/api/library", "", c)
+	if !strings.Contains(rec.Body.String(), `"sort":""`) {
+		t.Fatalf("the library doesn't send the sorting: %s", rec.Body)
+	}
+
 	// A phone from an earlier version sends its path-keyed settings.
 	pathJSON, _ := json.Marshal(snd.Path)
 	body := `{"sounds":[{"path":` + string(pathJSON) + `,"color":"green","emoji":"🎺"}],` +

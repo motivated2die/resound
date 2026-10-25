@@ -36,7 +36,7 @@ type overlayState struct {
 
 // overlayFavorites returns the favorites in the order of the phone's
 // Favorites tab (its custom order for its current layout, the rest after
-// it), as overlay items.
+// it, or by name when the phone sorts it so), as overlay items.
 func (a *App) overlayFavorites() ([]uint64, []ui.OverlayItem) {
 	favs := a.lib.Favorites()
 	lay := a.lib.Layout(library.FavoritesKey)
@@ -63,6 +63,12 @@ func (a *App) overlayFavorites() ([]uint64, []ui.OverlayItem) {
 		}
 		return 0
 	})
+	switch lay.Sort {
+	case library.SortNameAsc:
+		slices.SortStableFunc(favs, func(x, y library.Sound) int { return library.CompareNames(x.Name, y.Name) })
+	case library.SortNameDesc:
+		slices.SortStableFunc(favs, func(x, y library.Sound) int { return library.CompareNames(y.Name, x.Name) })
+	}
 	ids := make([]uint64, len(favs))
 	items := make([]ui.OverlayItem, len(favs))
 	for i, s := range favs {

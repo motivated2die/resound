@@ -248,7 +248,7 @@ function startSounduxTutorial() {
              // Step 7: Top Bar Overview (Edit Mode Active)
              {
                  element: '.top-bar',
-                 popover: { title: 'Edit mode controls', description: 'When in edit mode, toggle through layout options, rearrange soundboard buttons via drag & drop, long-press a tab to drag it to another place, or tap on any sound to edit it. (pro tip: even when not in edit mode, you can long-press buttons to edit them)', side: "bottom", align: 'center' },
+                 popover: { title: 'Edit mode controls', description: 'When in edit mode, toggle through layout options, sort a tab by name or keep your own order, rearrange soundboard buttons via drag & drop, long-press a tab to drag it to another place, or tap on any sound to edit it. (pro tip: even when not in edit mode, you can long-press buttons to edit them)', side: "bottom", align: 'center' },
                  userData: { enteredEditMode: false },
                  onHighlightStarted: (element, step, { config, state }) => {
                      // console.log("Step 7: Entering edit mode for highlight...");

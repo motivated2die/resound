@@ -33,12 +33,15 @@ Long-press a button, or enter edit mode and tap it, to open its settings:
 
 The settings open as a sheet from the bottom, or, on a PC, a tablet or a phone turned sideways, from the right. The button floats beside them and shows how it looks, as a list row when the tab is a list; tap it to preview. Drag the sheet down (or to the right), tap outside it or press <kbd>Esc</kbd> to close it.
 
-## Layouts
+## Layouts and sorting
 
 In edit mode:
 
 - the layout button at the top switches this tab between 3 columns, 2 columns and a list (one line per sound, in its color, with the emoji before the name);
-- drag buttons to put them in your own order.
+- the sort button, left of it, switches this tab between your **custom order**, **A–Z** and **Z–A** by name;
+- in the custom order, drag buttons to put them where you want them. New sounds are added at the end.
+
+The top bar briefly shows what you switched to. Each tab keeps its own layout and sorting, on all your devices. Sorting by name never changes your custom order: switch back to it, and your buttons are where you left them. A tab sorted by name can't be rearranged by dragging.
 
 Tap ✅ to leave edit mode.
 
