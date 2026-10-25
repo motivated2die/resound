@@ -133,6 +133,9 @@ type AppKeybinds struct {
 	PushToTalk *KeyOverride `json:"pushToTalk,omitempty"`
 	Pause      *KeyOverride `json:"pause,omitempty"`
 	Stop       *KeyOverride `json:"stop,omitempty"`
+	// Overlay replaces OverlayKeys (one combination) or, Off, turns the
+	// overlay off in the program.
+	Overlay *KeyOverride `json:"overlay,omitempty"`
 }
 
 // KeyOverride replaces a global keybind in one program: with key

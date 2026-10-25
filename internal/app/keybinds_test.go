@@ -11,6 +11,7 @@ import (
 const (
 	vkPause, vkScroll, vkG, vkV, vkX = 0x13, 0x91, 0x47, 0x56, 0x58
 	vkMouse4                         = input.VKXButton1
+	vkF8, vkF9, vkF10                = 0x77, 0x78, 0x79
 )
 
 // keybindsApp has global keys (push-to-talk Pause, pause G, stop X) and two
@@ -156,5 +157,74 @@ func TestRunningKeysStatus(t *testing.T) {
 	}
 	if s := overrideSummary(&a.cfg.AppKeybinds[0]); s != "Push-to-talk, pause" {
 		t.Errorf("summary %q", s)
+	}
+}
+
+// An app can have an overlay key of its own or none; without its own
+// setting it keeps the global key. The panel's preview plays with the
+// global key whatever app was in front. (Through config: addKeys and the
+// like start the keyboard hook.)
+func TestAppOverlayKey(t *testing.T) {
+	a := keybindsApp()
+	a.cfg.OverlayKeys = []uint16{vkF8}
+	plain, game := keyTarget{"plain.exe", fnOverlay}, keyTarget{"game.exe", fnOverlay}
+	overlay := func(app string) string { k := a.keymap(); return k.For(app).Overlay.String() }
+
+	if got := overlay("game.exe"); got != "F8" {
+		t.Errorf("game keeps the global key: %q", got)
+	}
+	a.appKeybinds("plain.exe").Overlay = &config.KeyOverride{Keys: [][]uint16{{vkF10}}}
+	if got := overlay("plain.exe"); got != "F10" {
+		t.Errorf("watcher in plain: %q", got)
+	}
+	if got := overlay("other.exe"); got != "F8" {
+		t.Errorf("elsewhere: %q", got)
+	}
+	a.appKeybinds("game.exe").Overlay = &config.KeyOverride{Off: true}
+	if got := overlay("game.exe"); got != "" || !a.keybind(game).off {
+		t.Errorf("game turned it off: %q", got)
+	}
+	if got := overrideSummary(a.appKeybinds("game.exe")); !strings.Contains(got, "overlay") {
+		t.Errorf("game's summary: %q", got)
+	}
+	a.overlay.preview = true
+	if got := overlay("plain.exe"); got != "F8" {
+		t.Errorf("preview in plain: %q, want the global key", got)
+	}
+	a.overlay.preview = false
+
+	if got := a.keyConflict(plain, input.Combo{vkX}); !strings.Contains(got, "a stop key in Plain already") {
+		t.Errorf("stop key as plain's overlay key: %q", got)
+	}
+	if got := a.keyConflict(keyTarget{"plain.exe", fnPause}, input.Combo{vkF10}); !strings.Contains(got, "the overlay key in Plain already") {
+		t.Errorf("plain's overlay key as its pause key: %q", got)
+	}
+	if got := a.keyConflict(keyTarget{"", fnStop}, input.Combo{vkF10}); !strings.Contains(got, "the overlay key in Plain already") {
+		t.Errorf("plain's overlay key as a global stop key: %q", got)
+	}
+	if got := a.keyConflict(plain, input.Combo{vkF9}); got != "" {
+		t.Errorf("another key for plain (replaces its own): %q", got)
+	}
+	if got := a.keyConflict(game, input.Combo{vkF8}); got != "" {
+		t.Errorf("the global key for game: %q", got)
+	}
+}
+
+// The overlay closes when the app in front has no key for it, e.g. one
+// that turned it off came to the front.
+func TestOverlayClosesWithoutKey(t *testing.T) {
+	t.Setenv("LOCALAPPDATA", t.TempDir()) // closing remembers the highlight
+	a := keybindsApp()
+	a.cfg.OverlayKeys = []uint16{vkF8}
+	a.cfg.AppKeybinds[0].Overlay = &config.KeyOverride{Off: true} // game.exe
+	a.overlay.open = true
+	a.closeOverlayWithoutKey()
+	if !a.overlay.open {
+		t.Fatal("closed with a key in front")
+	}
+	a.fgApp = "game.exe"
+	a.closeOverlayWithoutKey()
+	if a.overlay.open {
+		t.Error("open in an app that turned it off")
 	}
 }

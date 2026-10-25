@@ -415,6 +415,72 @@ func (p paragraphRow) paint(c *canvas, r rect, _ rowState) {
 	c.textWrapped(p.text, rect{in.Left, r.Top + c.px(3), in.Right, r.Bottom}, fontBody, p.tone.color())
 }
 
+// --- Paragraph with a link ---------------------------------------------------
+
+type paragraphLinkRow struct {
+	text, link, tipText string
+	onClick             func()
+}
+
+// ParagraphLink is a muted Paragraph with an accent link on its own line
+// below it, e.g. a shortcut to the page where more can be set. tip is the
+// link's tooltip.
+func ParagraphLink(text, link, tip string, onClick func()) Row {
+	return paragraphLinkRow{text, link, tip, onClick}
+}
+
+const paragraphLinkH = 22 // the link's line
+
+func (paragraphLinkRow) height() int { return 22 + paragraphLinkH }
+func (p paragraphLinkRow) measure(c *canvas, width int32) int32 {
+	return paragraphRow{p.text, ToneMuted}.measure(c, width) + c.px(paragraphLinkH)
+}
+
+func (p paragraphLinkRow) linkBox(c *canvas, r rect) rect {
+	in := inset(c, r)
+	w := c.textWidth(p.link, fontBody) + c.px(4)
+	return rect{in.Left, r.Bottom - c.px(paragraphLinkH), in.Left + w, r.Bottom - c.px(2)}
+}
+
+func (p paragraphLinkRow) segments(c *canvas, r rect) []rect {
+	if p.onClick == nil {
+		return nil
+	}
+	return []rect{p.linkBox(c, r)}
+}
+
+func (p paragraphLinkRow) tip(_ *canvas, _ rect, seg int) string {
+	if seg == 0 {
+		return p.tipText
+	}
+	return ""
+}
+
+func (p paragraphLinkRow) click(int) {
+	if p.onClick != nil {
+		p.onClick()
+	}
+}
+func (paragraphLinkRow) keepsOpen() bool { return true }
+
+func (p paragraphLinkRow) paint(c *canvas, r rect, st rowState) {
+	link := p.linkBox(c, r)
+	paragraphRow{p.text, ToneMuted}.paint(c, rect{r.Left, r.Top, r.Right, link.Top}, st)
+	col := colAccent
+	switch {
+	case st.press == 0:
+		col = shade(colAccent, -30)
+	case st.hover == 0:
+		col = shade(colAccent, 30)
+	}
+	c.text(p.link, link, fontBody, col, dtLeft)
+	if st.hover == 0 { // underline while hovered, like a link
+		w := c.textWidth(p.link, fontBody)
+		y := link.Top + link.h()/2 + c.px(8)
+		c.fill(rect{link.Left, y, link.Left + w, y + max(1, c.px(1))}, col)
+	}
+}
+
 // --- Guided-setup header -----------------------------------------------------
 
 type wizardHeaderRow struct {

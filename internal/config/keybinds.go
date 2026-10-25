@@ -6,7 +6,7 @@ import "strings"
 // the shapes it writes itself: empty combinations go; further push-to-talk
 // combinations move up when the first one is empty; programs without a
 // file name or listed twice go; an override with neither keys nor Off is
-// no override.
+// no override; an overlay override keeps one combination.
 func (c *Config) cleanKeybinds() {
 	clean := func(list [][]uint16) [][]uint16 {
 		var out [][]uint16
@@ -33,7 +33,7 @@ func (c *Config) cleanKeybinds() {
 			continue
 		}
 		seen[a.Exe] = true
-		for _, o := range []**KeyOverride{&a.PushToTalk, &a.Pause, &a.Stop} {
+		for _, o := range []**KeyOverride{&a.PushToTalk, &a.Pause, &a.Stop, &a.Overlay} {
 			if *o == nil {
 				continue
 			}
@@ -42,6 +42,9 @@ func (c *Config) cleanKeybinds() {
 			} else if len((*o).Keys) == 0 {
 				*o = nil
 			}
+		}
+		if a.Overlay != nil && len(a.Overlay.Keys) > 1 {
+			a.Overlay.Keys = a.Overlay.Keys[:1]
 		}
 		apps = append(apps, a)
 	}

@@ -416,3 +416,27 @@ func TestBadgeHitArea(t *testing.T) {
 		t.Errorf("you badge segment is %d px wide, the label isn't in it", seg.w())
 	}
 }
+
+// The link of a ParagraphLink sits below the wrapped text, inside the row.
+func TestParagraphLinkRender(t *testing.T) {
+	p := ParagraphLink("Own setting in Valorant (F9), Counter-Strike 2 (off): it replaces this key while that app is in front.",
+		"Set it in App keybinds", "tip", func() {})
+	rows := []Row{Section("Key"), p, Section("Screen edge")}
+	for _, scale := range []float64{1, 1.5} {
+		name := "paragraphlink"
+		if scale == 1.5 {
+			name += "@1.5x"
+		}
+		savePNG(t, renderRowsMeasured(t, rows, scale), name)
+		renderCanvas(t, 10, 10, scale, func(c *canvas) {
+			pr := p.(paragraphLinkRow)
+			h := pr.measure(c, c.px(popupWidthL))
+			r := rect{0, 0, c.px(popupWidthL), h}
+			link := pr.linkBox(c, r)
+			text := paragraphRow{pr.text, ToneMuted}.measure(c, r.w())
+			if link.Top < text || link.Bottom > r.Bottom || link.w() <= 0 {
+				t.Errorf("@%vx: link %+v outside the row below the text (text %d, row %d)", scale, link, text, h)
+			}
+		})
+	}
+}

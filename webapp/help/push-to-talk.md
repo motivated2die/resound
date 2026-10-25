@@ -54,7 +54,7 @@ You can add up to 8 pause keys and 8 stop keys. Pause and stop keys work in any 
 Games bind different keys: one game's push-to-talk may be <kbd>V</kbd>, another's Mouse 4. An app can have keys of its own, which work while it is in front.
 
 1. On the Keybinds page, open **Add a running app** and choose the game. Start the game first, so it's in the list.
-2. Its page shows the same three cards. Each one shows the **global** keys, greyed, until you give it keys of its own with **+**.
+2. Its page shows the same three cards, and a fourth for the [overlay](overlay.md) key. Each one shows the **global** keys, greyed, until you give it keys of its own with **+**.
 
 For each function, the app either:
 

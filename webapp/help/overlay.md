@@ -29,3 +29,7 @@ Your game keeps the focus all along. While the bar shows, only your key, <kbd>Es
 - The overlay shows on the main screen, over games in windowed, borderless and most fullscreen modes. A game in true “exclusive” fullscreen covers it: switch the game to borderless or windowed.
 - Games running as administrator don't let Resound see your keys. See [Keys don't work in a game](keys-in-games.md).
 - To turn the overlay off, remove its key with **✕** on its page.
+
+## A different key in one game
+
+A game can have an overlay key of its own, or no overlay at all, like any other [keybind for one app](push-to-talk.md#keybinds-for-one-app). Click **Set it in App keybinds** below the key on the overlay's page, open the game (or add it), and use the **Overlay** card there: **+** gives it its own key, **⊘** turns the overlay off in that game, **↺** brings back the global key. Without a setting of its own, a game uses the global key. If you switch to an app without an overlay key while the bar shows, it closes.
