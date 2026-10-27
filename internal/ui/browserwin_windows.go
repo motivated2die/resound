@@ -8,12 +8,12 @@ import (
 	"golang.org/x/sys/windows"
 )
 
-// Closing the editor's browser window for its page. A page may only close
-// a window that a script opened, or one whose history has a single entry;
-// the edit page has two once the editor inside it has loaded (it moves on
-// to its editing page), so Edge refuses its window.close(). Resound opened
-// the window, so it closes it instead, found by a title the page sets just
-// before (editbridge). Only a Chromium window whose title is exactly that
+// Closing the editor's browser window for its page, when the browser
+// refuses the page's own window.close(). A page may only close a window
+// that a script opened, or one whose history has a single entry; the edit
+// page normally keeps one and closes itself, but should its history grow,
+// Resound, which opened the window, closes it instead, found by a title the
+// page sets just before (editbridge). Only a Chromium window whose title is exactly that
 // one qualifies: an app window (Edge --app) shows the page's title alone,
 // while a normal browser window adds the profile and browser name, so a
 // window with other tabs never matches.

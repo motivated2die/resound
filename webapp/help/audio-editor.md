@@ -30,7 +30,7 @@ Right after you accept, your browser may ask whether `getresound.app` may **acce
 3. A browser window opens with the file loaded. In the panel, the folder reads **Editing in your browser…**.
 4. Select the part you want (drag across the waveform) and press **Add to Resound**. The clip is saved into the folder, and the usual card opens in the panel to name it, preview it or discard it.
 5. Select the next part and press **Add to Resound** again for another clip. Each clip you add shows as a chip in the window's top bar; the newest is highlighted.
-6. When you're done, press **Done** at the top of the window. The window closes, and the clips you added stay in the folder. **Stop editing** under the folder in the panel does the same.
+6. When you're done, press **Done**, next to **Add to Resound**. The window closes, and the clips you added stay in the folder. **Stop editing** under the folder in the panel does the same. If a clip didn't reach Resound, Done says so first and the window stays open: add the clip again, or press Done again to close anyway.
 
 Up to three files open at once from one drop, each in its own window.
 
@@ -53,7 +53,7 @@ The edited sound overwrites the file. To keep the original, copy it in Explorer 
 - the **selection**, if you selected a part;
 - otherwise the selected fragment, or the **whole file**.
 
-New clips are saved as **FLAC**: lossless, so cutting doesn't cost quality, and playable at any sample rate. A sound you trim keeps its own format.
+New clips are saved as **FLAC** at 48 kHz: lossless, so cutting doesn't cost quality, and at the rate Resound plays at. A sound you trim keeps its own format and sample rate.
 
 The editor's own **Download file** button works too. Drag the downloaded file from your browser's download list onto a folder to add it.
 
@@ -74,8 +74,8 @@ The editor reads files with FFmpeg, in your browser. A file without an audio tra
 - **One audio track.** The editor uses a video's first audio track. To cut from another one (a second language, a commentary), save that track as a file of its own first, for example with a video converter.
 - **Esc stays in the editor.** While a file is open in the editor, <kbd>Esc</kbd> leaves the panel on the Sound library page, so you can use it freely in the editor. Close the panel with its close button; it opens on the same page again.
 - **Show editor** under the folder brings the editor window back if you closed or lost it.
-- **Colors and theme.** The window tints the editor in Resound's colors. The editor follows your Windows light or dark setting; its sun and moon button switches it, and it remembers your choice.
-- **A small window** scrolls with the scrollbar on the right. The editor needs about 500 pixels of height.
+- **Colors and theme.** The editor opens dark, in Resound's colors, whatever your Windows setting. On audiocutter.online itself, it keeps the theme you chose there.
+- **A small window** scrolls with the scrollbar on the right. The editor needs about 480 pixels of height.
 - **It needs the internet.** The editor loads from audiocutter.online each time.
 
 ## When something goes wrong

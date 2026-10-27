@@ -65,7 +65,8 @@ func (a *App) editBridge() *editbridge.Bridge {
 			OnResult: a.saveClip,
 			OnClose:  func(token string) { a.tray.Post(func() { a.editorClosed(token) }) },
 			// A page that finished (Done, a saved sound, Stop editing here)
-			// can't close its own window; Resound opened it and closes it.
+			// and couldn't close its own window: Resound opened it and
+			// closes it.
 			CloseWindow: func(title string) {
 				go func() { // it waits for the browser to show the title
 					if !ui.CloseBrowserWindow(title, 2*time.Second) {

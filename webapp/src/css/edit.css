@@ -2,9 +2,9 @@
 
 :root {
     --accent: #50dea8;
-    --on-accent: #10261d;
+    --on-accent: #102a20;
     --background: #1c1d22;
-    --surface: #25272d;
+    --surface: #2a2c33; /* as the editor's banner below it */
     --border: #34363e;
     --text: #ececf0;
     --text-secondary: #9a9ca6;
@@ -13,6 +13,9 @@
 }
 
 * { box-sizing: border-box; }
+
+/* Hidden wins over the display of .btn and the like. */
+[hidden] { display: none !important; }
 
 html, body { margin: 0; }
 
@@ -40,7 +43,7 @@ body {
 
 .logo { width: 32px; height: 32px; flex: none; }
 
-/* While editing, the editor's banner shows the logo, title and button:
+/* While editing, the editor's banner shows the logo, title and buttons:
    this bar shrinks to a status line with the clips added so far. */
 .editing .bar { min-height: 0; padding: 4px 16px; }
 .editing .bar .logo,
@@ -99,13 +102,8 @@ h1 { margin: 0; font-size: 15px; font-weight: 600; }
 
 .stage { position: relative; flex: 1 0 auto; display: flex; flex-direction: column; }
 
-/* The editor's page is always taller than its frame: its session banner
-   sits above an area that is itself as tall as the frame (empty below the
-   controls). So the frame doesn't scroll (scrolling="no", edit.js) and is
-   at least as tall as the editor's controls need; in a shorter window this
-   page scrolls instead, with the site's scrollbar, under the sticky bar.
-   The wheel over the frame stays with the editor (its page stops scroll
-   chaining); over the bar, and the scrollbar, scroll this page. */
+/* The editor fills the window; its controls need about 480 px, so in a
+   shorter window this page scrolls instead, under the sticky bar. */
 .stage iframe { flex: 1 0 auto; display: block; width: 100%; min-height: 480px; border: 0; background: var(--background); }
 
 .notice {
@@ -144,7 +142,7 @@ h1 { margin: 0; font-size: 15px; font-weight: 600; }
 .btn-secondary { background: var(--border); color: var(--text); }
 .btn-secondary:hover { background: color-mix(in srgb, var(--border) 80%, white); }
 .btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-/* Done and Keep editing fit the slim bar while editing. */
+/* Keep editing fits the slim bar while editing. */
 .btn-bar { flex: none; min-height: 28px; padding: 0 14px; border-radius: 8px; font-size: 13px; }
 
 progress { width: 100%; accent-color: var(--accent); }
