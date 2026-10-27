@@ -1,7 +1,7 @@
 /* The edit page (edit.html): a slim bar above the embedded editor. */
 
 :root {
-    --accent: #50dea8;
+    --accent: #40b286; /* the editor's primary (edit.js) */
     --on-accent: #102a20;
     --background: #1c1d22;
     --surface: #2a2c33; /* as the editor's banner below it */

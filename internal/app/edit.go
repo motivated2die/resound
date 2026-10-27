@@ -64,7 +64,7 @@ func (a *App) editBridge() *editbridge.Bridge {
 			OnOpen:   func(token string) { a.tray.Post(func() { a.editorOpened(token) }) },
 			OnResult: a.saveClip,
 			OnClose:  func(token string) { a.tray.Post(func() { a.editorClosed(token) }) },
-			// A page that finished (Done, a saved sound, Stop editing here)
+			// A page that finished (Close, a saved sound, Stop editing here)
 			// and couldn't close its own window: Resound opened it and
 			// closes it.
 			CloseWindow: func(title string) {
@@ -286,7 +286,7 @@ func (a *App) editRows(job *soundImport) []ui.Row {
 	case job.opened && job.replace != "":
 		text = "“" + job.src + "” is open in the editor in your browser. Trim it and press “Save to Resound”: it replaces the sound, and the editor closes."
 	case job.opened:
-		text = "“" + job.src + "” is open in the editor in your browser. Cut the part you want and press “Add to Resound”: each clip is saved here. Press “Done” there when you're finished."
+		text = "“" + job.src + "” is open in the editor in your browser. Cut the part you want and press “Add to Resound”: each clip is saved here. Press “Close” there when you're finished."
 	}
 	return []ui.Row{
 		ui.Paragraph(text, ui.ToneMuted),

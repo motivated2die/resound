@@ -2,7 +2,7 @@
 // play (a video, or audio in another format), dropped onto a library folder.
 // It reads the file from Resound on this PC, embeds the editor
 // (audiocutter.online) with the file loaded, and sends every clip the user
-// adds back to Resound, which saves it into the folder. Done (in the
+// adds back to Resound, which saves it into the folder. Close (in the
 // editor's banner), a saved sound of the library, or Stop editing in the
 // panel end it and close the window.
 //
@@ -18,14 +18,15 @@
     const EDITOR = 'https://audiocutter.online';
     // Resound's colours for the editor, which its session takes for its
     // design tokens (session.ui.colors), in its dark theme: the panel's
-    // greys, and its accent with the accent's dark text on buttons and
-    // selections. Keys the editor doesn't know are dropped.
+    // greys, and its accent, a step darker than the panel's (#50dea8 scaled
+    // to 80%), with the accent's dark text on buttons and selections
+    // (5.8:1). Keys the editor doesn't know are dropped.
     const COLORS = {
         background: '#1c1d22',
         foreground: '#ececf0',
         card: '#2a2c33',
         popover: '#25272d',
-        primary: '#50dea8',
+        primary: '#40b286',
         primaryForeground: '#102a20',
         secondary: '#3a3d46',
         muted: '#2a2c33', // its banner, under this page's bar
@@ -133,7 +134,7 @@
         editor.referrerPolicy = 'no-referrer';
         editor.src = EDITOR + '/import/';
         notice.replaceWith(editor);
-        document.body.classList.add('editing'); // the editor's banner carries the logo, title and Done now
+        document.body.classList.add('editing'); // the editor's banner carries the logo, title and Close now
 
         // The import page waits 30 s for the file after saying it's ready;
         // the file is loaded already, so it goes at once.
@@ -170,8 +171,9 @@
 
     // manifest is the editor's project: the one file, whole, with the
     // clips posted back to this window. The editor is dark, in Resound's
-    // colours, whatever theme it shows on its own site, and has a Done
-    // button in its banner.
+    // colours, whatever theme it shows on its own site, and has a Close
+    // button in its banner (its done button: it ends editing, it saves
+    // nothing).
     function manifest(file) {
         return {
             version: 2,
@@ -187,10 +189,10 @@
                         submitLabel: 'Save to Resound',
                     } : {
                         title: 'Cut a sound for Resound',
-                        instruction: 'Select the part you want, then press “Add to Resound”. Add as many clips as you like, then press Done.',
+                        instruction: 'Select the part you want, then press “Add to Resound”: only what you add is saved. Add as many clips as you like.',
                         submitLabel: 'Add to Resound',
                     }),
-                    doneLabel: 'Done',
+                    doneLabel: 'Close',
                     theme: 'dark',
                     colors: COLORS,
                     logoUrl: logoData(),
@@ -250,7 +252,7 @@
                 if (info.replace) {
                     closeSoon(name);
                 } else {
-                    setStatus(`Added “${name}” to “${info.folder}”. Name it in the Resound panel, or cut another clip; press Done when you're finished.`);
+                    setStatus(`Added “${name}” to “${info.folder}”. Name it in the Resound panel, or cut another clip; press Close when you're finished.`);
                 }
             } catch (e) {
                 setStatus(e instanceof ResoundError ? e.message : 'The clip could not be sent to Resound.', true);
@@ -274,7 +276,7 @@
 
     // --- finishing ------------------------------------------------------------------
 
-    // Done in the editor's banner ends editing: Resound stops serving the
+    // Close in the editor's banner ends editing: Resound stops serving the
     // file at once and the window closes. A sound of the library is done
     // once it's saved: the window closes a moment later unless the user
     // wants to keep editing. Stop editing in the panel ends it too; the
@@ -300,7 +302,7 @@
         $('keep').addEventListener('click', () => {
             clearTimeout(closing);
             $('keep').hidden = true;
-            setStatus(`Saved in “${info.folder}”. Save again when you've changed it, or press Done.`);
+            setStatus(`Saved in “${info.folder}”. Save again when you've changed it, or press Close.`);
         });
         checking = setInterval(async () => {
             try {
@@ -310,16 +312,16 @@
         }, 1000);
     }
 
-    // done is the editor's Done, once the clips sent so far have arrived.
+    // done is the editor's Close, once the clips sent so far have arrived.
     // A clip the editor rendered that Resound didn't save had its error in
-    // the bar, easily missed: the first Done says so and keeps the window;
+    // the bar, easily missed: the first Close says so and keeps the window;
     // a second one finishes all the same.
     let warned = false;
     function done(submitted) {
         const lost = Math.max(rendered, submitted) - saved;
         if (lost > 0 && !warned) {
             warned = true;
-            setStatus(`${lost === 1 ? 'A clip' : `${lost} clips`} didn't reach Resound. Add ${lost === 1 ? 'it' : 'them'} again, or press Done again to close anyway.`, true);
+            setStatus(`${lost === 1 ? 'A clip' : `${lost} clips`} didn't reach Resound. Add ${lost === 1 ? 'it' : 'them'} again, or press Close again to close anyway.`, true);
             return;
         }
         finish('done');
@@ -375,7 +377,7 @@
     // can be closed.
     function closable(why) {
         const text = {
-            done: info.replace ? 'Done.' : `Done. The clips you added are in “${info.folder}”.`,
+            done: info.replace ? 'Editing ended.' : `Editing ended. The clips you added are in “${info.folder}”.`,
             saved: `Saved “${info.name}” in “${info.folder}”.`,
             stopped: 'Editing was stopped in the Resound panel.',
         }[why] + ' You can close this page now.';

@@ -30,7 +30,7 @@ Right after you accept, your browser may ask whether `getresound.app` may **acce
 3. A browser window opens with the file loaded. In the panel, the folder reads **Editing in your browser…**.
 4. Select the part you want (drag across the waveform) and press **Add to Resound**. The clip is saved into the folder, and the usual card opens in the panel to name it, preview it or discard it.
 5. Select the next part and press **Add to Resound** again for another clip. Each clip you add shows as a chip in the window's top bar; the newest is highlighted.
-6. When you're done, press **Done**, next to **Add to Resound**. The window closes, and the clips you added stay in the folder. **Stop editing** under the folder in the panel does the same. If a clip didn't reach Resound, Done says so first and the window stays open: add the clip again, or press Done again to close anyway.
+6. When you're finished, press **Close**, next to **Add to Resound**. The window closes, and the clips you added stay in the folder; a selection you didn't add isn't saved. **Stop editing** under the folder in the panel does the same. If a clip didn't reach Resound, Close says so first and the window stays open: add the clip again, or press Close again to close anyway.
 
 Up to three files open at once from one drop, each in its own window.
 
