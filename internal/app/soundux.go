@@ -110,9 +110,10 @@ func (a *App) sounduxOffer() []ui.Row {
 		found = what[0]
 	}
 	return []ui.Row{
-		ui.Section("Coming from Soundux?"),
-		ui.Paragraph("Soundux is set up on this PC with "+found+". Carry them over, then check them in the steps.", ui.ToneMuted),
-		ui.Button("Import from Soundux…", ui.ButtonNormal, false, a.openSoundux),
+		ui.Spacer(6),
+		ui.Offer(ui.IconImport, "Coming from Soundux?",
+			"Soundux is set up on this PC with "+found+". Carry them over, then check them in the steps.",
+			"Import from Soundux…", a.openSoundux),
 	}
 }
 

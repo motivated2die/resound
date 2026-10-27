@@ -4,7 +4,7 @@ Resound does what Soundux did on Windows: it plays your sounds into games and vo
 
 ## Import your settings
 
-1. On the setup's welcome page, under **Coming from Soundux?**, click **Import from Soundux…**.
+1. On the setup's welcome page, the **Coming from Soundux?** card appears above the setup's buttons. Click **Import from Soundux…** in it.
 2. Each kind of setting found in Soundux has a switch. Turn off what you'd rather set up fresh.
 3. Click **Import and continue**. The setup goes on with its usual steps, already filled in, so you can check everything: your folders in the first step, your microphone setting in the second, your push-to-talk key in the third.
 

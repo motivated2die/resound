@@ -49,6 +49,7 @@ const (
 	IconGrip         Icon = "grip-horizontal"
 	IconHandGrab     Icon = "hand-grab"
 	IconHelp         Icon = "help-circle"
+	IconImport       Icon = "transfer-in"
 	IconInfo         Icon = "info-circle"
 	IconKeyboard     Icon = "keyboard"
 	IconLayoutDash   Icon = "layout-dashboard-filled"
