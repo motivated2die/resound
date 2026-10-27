@@ -22,7 +22,7 @@ Only to open the app the first time, to install it, and for updates. After that 
 
 ## I used Soundux or Soundpad. Do I have to set everything up again?
 
-No. If Soundux or Soundpad is set up on your PC, the guided setup's welcome page offers to carry your sounds and keys over: [Switch from Soundux](soundux.md), [Switch from Soundpad](soundpad.md).
+No. If Soundux or Soundpad is set up on your PC, the guided setup's welcome page offers to carry your sounds and settings over: [Switch from Soundux](soundux.md), [Switch from Soundpad](soundpad.md).
 
 ## Can several sounds play at once?
 

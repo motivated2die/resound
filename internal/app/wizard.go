@@ -113,9 +113,21 @@ func (a *App) wizardWelcome() []ui.Row {
 			"You hear them on your speakers; the others hear them through your microphone.", ui.ToneNormal),
 		ui.Paragraph("Four short steps: add your sounds, set up your audio and voice chat, set your push-to-talk key and pair your phone.", ui.ToneMuted),
 	}
-	rows = append(rows, a.sounduxOffer()...)
-	return append(append(rows, a.soundpadOffer()...),
-		ui.Flex(),
+	// The import cards sit just above the buttons, as far apart from them
+	// as from each other: 6 between them plus the cards' margins of 4, and
+	// 7 plus the button's 3 below the last.
+	rows = append(rows, ui.Flex())
+	offers := 0
+	for _, o := range []ui.Row{a.sounduxOffer(), a.soundpadOffer()} {
+		if o != nil {
+			rows = append(rows, ui.Spacer(6), o)
+			offers++
+		}
+	}
+	if offers > 0 {
+		rows = append(rows, ui.Spacer(7))
+	}
+	return append(rows,
 		ui.Button("Start setup", ui.ButtonPrimary, false, func() { a.wizardGo(1) }),
 		ui.Button("Skip, I'll set it up myself", ui.ButtonNormal, false, a.finishWizard),
 		ui.Button("Restore from a backup…", ui.ButtonNormal, false, func() { a.openPage(pageBackup) }),

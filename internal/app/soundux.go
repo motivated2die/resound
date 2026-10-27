@@ -92,7 +92,7 @@ func (a *App) readSoundux() {
 
 // sounduxOffer is the welcome page's offer to carry Soundux's settings
 // over, nil while there is nothing to offer.
-func (a *App) sounduxOffer() []ui.Row {
+func (a *App) sounduxOffer() ui.Row {
 	a.readSoundux()
 	p := a.soundux.plan
 	if p == nil {
@@ -110,12 +110,9 @@ func (a *App) sounduxOffer() []ui.Row {
 	if len(what) == 1 {
 		found = what[0]
 	}
-	return []ui.Row{
-		ui.Spacer(6),
-		ui.Offer(ui.IconImport, "Coming from Soundux?",
-			"Soundux is set up on this PC with "+found+". Carry them over, then check them in the steps.",
-			"Import from Soundux…", a.openSoundux),
-	}
+	return ui.Offer(ui.IconImport, "Coming from Soundux?",
+		"Found "+found+" to carry over. You check them in the steps.",
+		"Import from Soundux…", a.openSoundux)
 }
 
 func (a *App) openSoundux() {

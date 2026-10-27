@@ -25,11 +25,14 @@ func TestOfferRender(t *testing.T) {
 		}
 		f.destroy()
 	}
+	// As the welcome page lays them out (app.wizardWelcome).
 	rows := []Row{
 		Paragraph("Four short steps: add your sounds, set up your audio and voice chat, set your push-to-talk key and pair your phone.", ToneMuted),
 		Spacer(6),
-		long,
-		Spacer(16),
+		Offer(IconImport, "Coming from Soundux?", "Found 4 sound folders, keys and settings to carry over. You check them in the steps.", "Import from Soundux…", nop),
+		Spacer(6),
+		Offer(IconImport, "Coming from Soundpad?", "Found 3 sound lists and settings. Carry your sounds over by category or by folder.", "Import from Soundpad…", nop),
+		Spacer(7),
 		Button("Start setup", ButtonPrimary, false, nop),
 		Button("Skip, I'll set it up myself", ButtonNormal, false, nop),
 	}

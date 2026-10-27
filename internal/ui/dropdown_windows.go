@@ -175,6 +175,54 @@ func (d dropdownRow) tip(c *canvas, r rect, _ int) string {
 	return fieldTip(c, d.segments(c, r)[0], d.dropdownField)
 }
 
+// dropdownToolRow is a compact select field with an icon-only button on its
+// left, such as the Soundpad import's list with "Choose another list…".
+type dropdownToolRow struct {
+	dropdownField
+	icon   Icon
+	info   string // the button's tooltip
+	onTool func()
+}
+
+// DropdownTool is a select field without caption and, left of it, a square
+// button with icon whose tooltip is tip. The button closes the panel before
+// onTool runs, as it opens a dialog. id and selected work as in Dropdown.
+func DropdownTool(id string, icon Icon, tip string, onTool func(), options []Option, selected int, onSelect func(int)) Row {
+	return dropdownToolRow{dropdownField{id: id, options: options, selected: selected, placeholder: "Choose…", onSelect: onSelect}, icon, tip, onTool}
+}
+
+func (dropdownToolRow) height() int { return 44 }
+
+// Segments: the field, then the button.
+func (d dropdownToolRow) segments(c *canvas, r rect) []rect {
+	in := inset(c, r)
+	top, size := r.Top+c.px(5), c.px(34)
+	btn := rect{in.Left, top, in.Left + size, top + size}
+	return []rect{{btn.Right + c.px(8), top, in.Right, top + size}, btn}
+}
+
+func (d dropdownToolRow) click(seg int) {
+	if seg == 1 && d.onTool != nil {
+		d.onTool()
+	}
+}
+func (dropdownToolRow) keepsOpen() bool                       { return true }
+func (dropdownToolRow) keepsOpenAt(seg int) bool              { return seg != 1 }
+func (d dropdownToolRow) field(seg int) (dropdownField, bool) { return d.dropdownField, seg == 0 }
+
+func (d dropdownToolRow) tip(c *canvas, r rect, seg int) string {
+	if seg == 1 {
+		return d.info
+	}
+	return fieldTip(c, d.segments(c, r)[0], d.dropdownField)
+}
+
+func (d dropdownToolRow) paint(c *canvas, r rect, st rowState) {
+	segs := d.segments(c, r)
+	paintField(c, segs[0], d.dropdownField, st.open == 0, st.hover == 0, st.press == 0)
+	paintButton(c, segs[1], "", d.icon, ButtonNormal, false, st.hover == 1, st.press == 1)
+}
+
 // openDropdown opens the list of the field at segment seg of row.
 func (p *Popup) openDropdown(row, seg int, f dropdownField) {
 	p.dd = &dropdownState{id: f.id, row: row, seg: seg, hover: f.selected, press: -1}

@@ -675,6 +675,32 @@ func (t toggleRow) paint(c *canvas, r rect, st rowState) {
 	c.text(t.label, rect{in.Left, r.Top, track.Left - c.px(8), r.Bottom}, fontBody, colText, dtLeft)
 }
 
+type toggleDetailRow struct {
+	toggleRow
+	detail, info string
+}
+
+// ToggleDetail is a Toggle with a short grey detail right after its label,
+// such as a count, and a longer text shown as a tooltip while the row is
+// hovered.
+func ToggleDetail(label, detail, tip string, on bool, onClick func()) Row {
+	return toggleDetailRow{toggleRow{label, on, onClick}, detail, tip}
+}
+
+func (t toggleDetailRow) tip(*canvas, rect, int) string { return t.info }
+
+func (t toggleDetailRow) paint(c *canvas, r rect, st rowState) {
+	label := t.label
+	t.label = "" // the label and detail are drawn here, sharing the room
+	t.toggleRow.paint(c, r, st)
+	in := inset(c, r)
+	right := in.Right - c.px(36) - c.px(8) // left of the switch
+	dw := min(c.textWidth(t.detail, fontBody)+c.px(2), (right-in.Left)/2)
+	lw := min(c.textWidth(label, fontBody)+c.px(2), right-in.Left-dw-c.px(8))
+	c.text(label, rect{in.Left, r.Top, in.Left + lw, r.Bottom}, fontBody, colText, dtLeft)
+	c.text(t.detail, rect{in.Left + lw + c.px(8), r.Top, right, r.Bottom}, fontBody, colMuted, dtLeft)
+}
+
 // --- QR code -----------------------------------------------------------------
 
 type qrRow struct {
