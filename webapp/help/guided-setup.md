@@ -13,8 +13,11 @@ Each step has its own article: [sound folders](sound-library.md), [voice chat](v
 
 ## Before you start
 
-The welcome page also offers:
+If Soundux or Soundpad is set up on your PC, the welcome page shows a card for each, above the setup's buttons. Its import carries your sounds and settings over; you choose what, and the steps then show it for you to check. See [Switch from Soundux](soundux.md) and [Switch from Soundpad](soundpad.md).
 
+Below the cards:
+
+- **Start setup**: the four steps.
 - **Skip, I'll set it up myself**: goes straight to the home page.
 - **Restore from a backup…**: brings back settings from an earlier installation, see [Backup and restore](backup.md).
 

@@ -6,6 +6,8 @@
 ## Getting started
 - [Install Resound](install.md)
 - [The guided setup](guided-setup.md)
+- [Switch from Soundux](soundux.md)
+- [Switch from Soundpad](soundpad.md)
 - [Set up voice chat](voice-chat.md)
 - [Use Voicemeeter or another mixer](voicemeeter.md)
 - [Use Resound in Discord and games](apps.md)

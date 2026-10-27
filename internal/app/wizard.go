@@ -11,6 +11,9 @@ import (
 // from Settings. A welcome page is followed by four steps, each a plain
 // page of rows shared with the settings pages; every step can be skipped
 // and redone later: sounds, audio and voice chat, push-to-talk, phone.
+// When Soundux's or Soundpad's settings are found, the welcome page offers
+// to carry them over first (soundux.go, soundpad.go); the steps then show
+// them for review.
 
 const wizardSteps = 4
 
@@ -78,6 +81,12 @@ func (a *App) wizardPage() []ui.Row {
 	case 4:
 		return a.wizardPhone()
 	}
+	if a.soundux.open && a.soundux.plan != nil {
+		return a.sounduxPage()
+	}
+	if a.soundpad.open {
+		return a.soundpadPage()
+	}
 	return a.wizardWelcome()
 }
 
@@ -98,17 +107,32 @@ func (a *App) wizardNext(done bool) ui.Row {
 }
 
 func (a *App) wizardWelcome() []ui.Row {
-	return []ui.Row{
+	rows := []ui.Row{
 		ui.Brand(a.logo, "RESOUND", "", "Guided setup · about 2 minutes", nil, nil),
 		ui.Paragraph("Welcome! Play sounds into games and voice chat, controlled from your phone. "+
 			"You hear them on your speakers; the others hear them through your microphone.", ui.ToneNormal),
 		ui.Paragraph("Four short steps: add your sounds, set up your audio and voice chat, set your push-to-talk key and pair your phone.", ui.ToneMuted),
-		ui.Flex(),
+	}
+	// The import cards sit just above the buttons, as far apart from them
+	// as from each other: 6 between them plus the cards' margins of 4, and
+	// 7 plus the button's 3 below the last.
+	rows = append(rows, ui.Flex())
+	offers := 0
+	for _, o := range []ui.Row{a.sounduxOffer(), a.soundpadOffer()} {
+		if o != nil {
+			rows = append(rows, ui.Spacer(6), o)
+			offers++
+		}
+	}
+	if offers > 0 {
+		rows = append(rows, ui.Spacer(7))
+	}
+	return append(rows,
 		ui.Button("Start setup", ui.ButtonPrimary, false, func() { a.wizardGo(1) }),
 		ui.Button("Skip, I'll set it up myself", ui.ButtonNormal, false, a.finishWizard),
 		ui.Button("Restore from a backup…", ui.ButtonNormal, false, func() { a.openPage(pageBackup) }),
 		ui.Spacer(4),
-	}
+	)
 }
 
 func (a *App) wizardSounds() []ui.Row {
