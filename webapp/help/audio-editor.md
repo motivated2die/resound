@@ -30,7 +30,9 @@ Right after you accept, your browser may ask whether `getresound.app` may **acce
 3. A browser window opens with the file loaded. In the panel, the folder reads **Editing in your browser…**.
 4. Select the part you want (drag across the waveform) and press **Add to Resound**. The clip is saved into the folder, and the usual card opens in the panel to name it, preview it or discard it.
 5. Select the next part and press **Add to Resound** again for another clip. Each clip you add shows as a chip in the window's top bar; the newest is highlighted.
-6. When you're finished, press **Close**, next to **Add to Resound**. The window closes, and the clips you added stay in the folder; a selection you didn't add isn't saved. **Stop editing** under the folder in the panel does the same. If a clip didn't reach Resound, Close says so first and the window stays open: add the clip again, or press Close again to close anyway.
+6. When you're finished, press **Close**, next to **Add to Resound**. The window closes and the clips you added stay in the folder. Close doesn't save anything itself: a part you selected but didn't add is not kept. **Stop editing** under the folder in the panel does the same as Close.
+
+If a clip couldn't be saved, the bar at the top of the window says so, and **Close** reminds you once before closing, so you can add it again.
 
 Up to three files open at once from one drop, each in its own window.
 
@@ -38,7 +40,9 @@ Up to three files open at once from one drop, each in its own window.
 
 1. On the Sound library page, click a folder to list its sounds.
 2. Click the **scissors** next to a sound. The editor opens with it; the sound's line reads **Editing…**.
-3. Select the part to keep and press **Save to Resound**. The trimmed sound replaces the file.
+3. Select the part to keep and press **Save to Resound**. The trimmed sound replaces the file, and the window closes a moment later; press **Keep editing** in the bar at the top to stay.
+
+To leave without changing the sound, press **Close** instead.
 
 The sound keeps its name, its format (an MP3 stays an MP3) and its settings: favorite, volume, color and emoji. Resound measures its length and loudness again. You can keep editing and save again; each save replaces the sound once more.
 
