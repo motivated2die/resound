@@ -30,6 +30,7 @@ internal/vbcable/  automatic VB-Cable install (download, signature check, silent
 internal/input/    push-to-talk via SendInput, key presets, pause/stop hotkeys (keyboard hook)
 internal/library/  sound folders → tabs/sounds with stable IDs
 internal/importer/ sounds from dropped links (Myinstants pages, sound files): find, download, check, name
+internal/soundux/  Soundux's config.json, read and checked for the setup's import
 internal/editbridge/ files Resound can't play, handed to the browser editor and its clips taken back (127.0.0.1)
 internal/server/   phone API over WebRTC, pairing
 internal/install/  install/update/uninstall, autostart, firewall
@@ -66,7 +67,7 @@ Helper roles run before the single-instance mutex (`Local\Resound.SingleInstance
 
 | Package | Responsibility |
 |---|---|
-| `app` | Wiring and all app state. Panel pages (`pages.go`, `wizard.go`, `diagnostics.go`, `system.go`), the audio flow and its meters (`flow.go`), playback holds (`playback.go`), push-to-talk (`ptt.go`), devices and routing actions (`devices.go`), server bridge (`remote.go`) |
+| `app` | Wiring and all app state. Panel pages (`pages.go`, `wizard.go`, `diagnostics.go`, `system.go`), the import from Soundux (`soundux.go`), the audio flow and its meters (`flow.go`), playback holds (`playback.go`), push-to-talk (`ptt.go`), devices and routing actions (`devices.go`), server bridge (`remote.go`) |
 | `audio` | WASAPI outputs (`output_windows.go`), mixer (`mixer.go`), streaming sources and ring buffer (`source.go`), streaming decoder (`decode.go`), header-only length probe (`probe.go`), loudness measurement (`loudness.go`), engine API (`engine_windows.go`), mix-format parsing (`format_windows.go`), level meters (`levels.go`, `meter_windows.go`) |
 | `wincom` | Core Audio COM plumbing: COM threads, endpoint enumeration/lookup, and fixes for go-wca bugs |
 | `routing` | VB-Cable detection, mic mute, the undocumented "Listen" properties, the elevated apply command |
@@ -74,6 +75,7 @@ Helper roles run before the single-instance mutex (`Local\Resound.SingleInstance
 | `input` | `SendInput` key and mouse presses with scan codes (a combination in one call), key names, quick-pick presets; hotkeys: the portable `Matcher`, the overlay's `Filter` and the per-app `Keymap` (tested) and the `Watcher` keyboard and mouse hooks with the push-to-talk hand-over and foreground tracking (`hook_windows.go`); which program owns a window, which programs run (`apps_windows.go`) |
 | `library` | Sound index (`library.json`): folders → tabs → sounds with stable IDs, rename/move matching (`reconcile.go`), per-sound settings and phone layouts, background indexer (`indexer.go`) |
 | `importer` | A dropped link to a sound: the page's one sound (`og:audio`, else exactly one `<audio>`/`<source>`/`data-url`/sound link), the download (public addresses only, size limits), the decode check, a safe unique file name. Portable and unit-tested |
+| `soundux` | Soundux's settings (`%APPDATA%\Soundux\config.json`, its 0.2.7 format): read field by field (`Parse`), then checked against the disk and converted for Resound (`Plan`). Portable and unit-tested |
 | `editbridge` | A file being cut in the editor: a loopback HTTP server, running only while files are open, that serves each file under a random token to the app's edit page and takes the clips back; origin, Host and token checks. Portable and unit-tested |
 | `server` | The app's WebRTC connection (`rtc.go`), the API it carries (Soundux Remote compatible), pairing and devices, LAN addresses |
 | `install` | Drop-in install/update, Installed-apps entry, Start Menu shortcut, autostart, uninstall, firewall helper |
@@ -84,7 +86,7 @@ Helper roles run before the single-instance mutex (`Local\Resound.SingleInstance
 | `backup` | Backup zips of `config.json`, `library.json` and `remote.json` with a manifest; validation, clean restore, backup index. Zips of the sound folders (`sounds.go`, never restored) |
 | `config`, `logx` | `config.json`; log file plus crash output |
 
-Platform-specific files use the `_windows.go` suffix. `mixer.go`, `source.go`, `decode.go`, `probe.go`, `loudness.go`, `library` and `server` are portable and unit-tested on any OS. `cmd/devremote` serves the phone remote with the real library and indexer but no audio output (plays are only timed, so progress, previews and their ends show as with the PC), for front-end work on any OS (`go run ./cmd/devremote -folder <sounds>`). Enter in its console refreshes the library like the panel's Refresh, including the `library` event.
+Platform-specific files use the `_windows.go` suffix. `mixer.go`, `source.go`, `decode.go`, `probe.go`, `loudness.go`, `library`, `soundux` and `server` are portable and unit-tested on any OS. `cmd/devremote` serves the phone remote with the real library and indexer but no audio output (plays are only timed, so progress, previews and their ends show as with the PC), for front-end work on any OS (`go run ./cmd/devremote -folder <sounds>`). Enter in its console refreshes the library like the panel's Refresh, including the `library` event.
 
 ## Threading model
 
@@ -220,6 +222,23 @@ Pause, talk-through and a held pause key pause the active voices and release the
 Failures (no network, declined UAC, bad signature) leave the manual "Install manually" path, which works as before. Every start logs its arguments, so `debug.log` shows how the app was started. The guided setup's step is saved in `config.json` (`setupStep`), so any restart continues where the user left it.
 
 **Licensing.** VB-Cable is donationware. VB-Audio's licensing page allows installing the unmodified package from another application, silently, as long as end users can see that it is VB-Audio's product and can donate (mentioning www.vb-cable.com and that it is donationware). Settings → Audio & voice chat therefore shows a credit with links to vb-cable.com and the donation page; the setup's audio step names VB-Audio as VB-Cable's maker and its install button says that installing accepts VB-Audio's license. The pack is downloaded from VB-Audio, never bundled or modified. Professional deployments where users can't donate need purchased licenses, and VB-Cable A+B/C+D may never be bundled. The pack's own readme asks for the author's agreement before integrating it into another installer; see Known issues.
+
+## Carrying settings over from Soundux
+
+`internal/soundux`, `app/soundux.go`. When Soundux's config is found, the setup's welcome page offers to carry it over ("Coming from Soundux?", `sounduxOffer`): a page of switches, one per part that has something (sound folders with their tabs' sorting, favorites, sound volumes, push-to-talk and stop keys, default volumes, playback options), then the setup's usual steps, which show what was carried over for review. Nothing marks imported settings as such. Soundux's file is only read.
+
+- **The format** (Soundux 0.2.7, its last release; checked against its source): `{"data": {"tabs": [{name, path, sortMode, sounds: [{path, isFavorite, hotkeys, localVolume, remoteVolume, …}]}]}, "settings": {pushToTalkKeys, stopHotkey, localVolume, remoteVolume, allowOverlapping, muteDuringPlayback, outputs, …}}`. A tab is one folder. Keys are arrays of Windows virtual-key codes, the codes Resound saves. Volumes are linear gains in percent, and a sound's own volume replaces the default, as in Resound, so `audio.FromLinear` converts both (the developer's 8% and 18% became 45% and 63%, close to the 55% and 65% set by hand in Resound). `sortMode` 0–3 is date ascending, date descending (the default, Resound's order), name ascending, name descending.
+- **Reading** (`soundux.Parse`). At most 16 MB, 500 tabs and 50,000 sounds. Every field is decoded on its own: a missing field or one of the wrong type is left out (as Soundux's own reader does) and an unreadable tab or sound is skipped and counted, never failing the rest. Paths must be absolute and are cleaned (Soundux writes forward slashes). A key combination is taken whole or not at all: up to 6 codes in 1–254 (a `{key, type}` object, from builds after 0.2.7, only as a keyboard key).
+- **Checking** (`File.Plan`, off the UI thread when the welcome page first shows, as cloud and network drives can be slow; once per run). Folders must exist (missing ones are listed and skipped) and are taken once each, case-insensitively, in tab order; one inside another is marked as covered. Sound settings are kept only for files that exist and play (an `.m4a` Soundux listed doesn't); per-sound hotkeys and settings of missing files are only counted, for the page to say they don't carry over. Combinations with the left or right mouse button are dropped, as is a stop key that is also the push-to-talk key.
+- **Not carried over**: the output devices (`outputs`). The audio step sets up VB-Cable and the devices, which fits most users better than a mixer input Soundux may have played into; Soundux saved no microphone (it used the default recording device, or the one listening to CABLE Output, as Resound's automatic choice does). Per-sound hotkeys have no equivalent; the overlay of favorites plays sounds by key, but sounds with hotkeys are not made favorites. Also the theme, view mode, window size, tray and trash options, and Linux's audio backend.
+- **Applying** (`importSoundux`, `applySoundux`):
+  - A Resound set up before (the setup run again, or folders already) is backed up first (`backup.Create`, `…-before-soundux.zip`); if that fails, nothing is carried over.
+  - On a first start, `SetupStep` becomes 1 in the same save as the folders: a start with folders on the welcome page (step 0) would count as configured before the guided setup existed and skip it.
+  - Folders go through `addFolders`, which checks them again, skips ones already in the library or inside a library folder, and says what it added; then the sounds are in the index.
+  - Settings only fill what Resound doesn't have, so importing twice changes nothing: a favorite is added (found with `FindPath`, set with `Update`), a sound's own volumes only when it has none, a tab's sorting only when the phone neither sorted nor arranged it (its layout by tab ID). Keys go through `keyConflict`, as recorded ones do, and are added to the global keys (a key that does something else is left out, with a note); an imported push-to-talk key turns on holding it while sounds play. The default volumes and the overlap option are set; Soundux's mute during playback turns on muting the mic with "Always" (`muteMicMinSeconds` 0), as Soundux muted it for every sound.
+  - Then everything is saved and applied (volumes, mic, hotkeys), phones are told, the result is the library note on the setup's first step, and the offer goes for the rest of the run. The log gets the counts, never paths.
+- **Soundux running** (`soundux.exe` in `input.RunningApps`, checked when the page opens) shows a warning: both apps would press push-to-talk and hook the keys.
+- Tested with a fixture of what a real config lacks (hotkeys, favorites, nested and missing folders, damaged entries, the newer key format) and, opt-in (`RESOUND_LIVE=1`, `TestLiveSoundux`), against this PC's real config and a copy of the real `library.json`. `app/soundux_test.go` checks the filling, the key conflicts and that parts switched off change nothing.
 
 ## Importing sounds by drag and drop
 
@@ -449,6 +468,8 @@ The phone remote is a web app on an HTTPS host (`webapp/`, built by `cmd/webapp`
 | `backups\` | Backup zips (`Resound-backup-<date>_<time>.zip`) and `index.json`, which also lists backups saved elsewhere |
 | `debug.log` | Log and crash output; over 2 MB at start it moves to `debug.old.log`. Every line leaves out the user's name in paths (`C:\Users\<user>\…`), the computer's name, OneDrive organisations and email addresses (`logx.Scrub`); Diagnostics → Copy log scrubs the whole file again, crash output and older lines included. Sound, folder and device names stay |
 | `running.json` | Version, pid and start time of the running instance; left behind means the run ended without a clean exit, which the next start logs |
+
+Outside it, Resound only reads Soundux's `%APPDATA%\Soundux\config.json`, for the setup's import (see Carrying settings over from Soundux), and never writes it.
 
 ## Key technical choices
 

@@ -106,6 +106,7 @@ type App struct {
 	keepNote    bool         // reopening after a dialog: keep libNote and backupNote
 	imports     importsState // sounds dropped onto folders (import.go)
 	lists       soundLists   // the library page's opened folders (sounds.go)
+	soundux     sounduxState // Soundux's settings to carry over (soundux.go)
 	muteEdit    bool         // the mute threshold's field is open (mutemic.go)
 	muteEditErr string       // why the typed threshold wasn't taken
 

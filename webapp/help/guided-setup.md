@@ -17,6 +17,7 @@ The welcome page also offers:
 
 - **Skip, I'll set it up myself**: goes straight to the home page.
 - **Restore from a backup…**: brings back settings from an earlier installation, see [Backup and restore](backup.md).
+- **Import from Soundux…**, when Soundux is set up on your PC: carries over its sound folders, favorites, sound volumes, keys and playback settings. You choose which; the steps then show them for you to check. See [Switch from Soundux](soundux.md).
 
 ## Interrupted?
 

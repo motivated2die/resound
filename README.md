@@ -29,6 +29,7 @@ Resound plays sounds to your own speakers and into a virtual audio cable at the 
 - **Cut sounds from videos.** Drop a video (or audio in another format) onto a folder: it opens in [audiocutter.online](https://audiocutter.online)'s editor in your browser, and every clip you cut is saved into that folder. Sounds in your library can be trimmed there too.
 - **Mic mute and push-to-talk.** While a sound plays, Resound can mute your real microphone and hold your game's push-to-talk key. "Talk through" lets you speak over a sound. Optional pause and stop keys work from inside your game: hold a pause key to pause the sounds and release push-to-talk (for example to talk on another channel), or press a stop key to end them at once.
 - **Guided setup.** A short first-run setup covers sounds, speakers, voice chat, push-to-talk and the phone. It can install VB-Cable for you (downloaded from VB-Audio, signature checked).
+- **Coming from Soundux?** The setup finds its settings and carries over the ones you choose: sound folders, favorites, sound volumes, push-to-talk and stop keys, playback options.
 - **Backup and restore** of all settings in one click.
 - **One-click updates.** Resound shows a dot next to its name when a new release is out, and updates itself without touching your settings.
 

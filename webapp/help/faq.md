@@ -20,6 +20,10 @@ No. The app also runs on the PC itself, in a window of its own: the button in th
 
 Only to open the app the first time, to install it, and for updates. After that it needs only your PC, on the same network. It can't reach the PC over mobile data or from another network.
 
+## I used Soundux. Do I have to set everything up again?
+
+No. If Soundux is set up on your PC, the guided setup's welcome page offers to carry over your sound folders, favorites, sound volumes, push-to-talk and stop keys: [Switch from Soundux](soundux.md).
+
 ## Can several sounds play at once?
 
 Yes, sounds overlap. **STOP** ends all of them, and a [stop key](push-to-talk.md#stop-keys) does the same from inside a game.
