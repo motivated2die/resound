@@ -35,12 +35,13 @@ const (
 	// MaxSourceBytes limits the file handed to the editor, which reads it
 	// into the browser's memory whole.
 	MaxSourceBytes = 1 << 30
-	// Format is the format new clips come back in. The editor renders at the
-	// sample rate it guesses from the file's first bytes, which for videos
-	// can be any MP3 rate down to 8 kHz; Resound's MP3 decoder reads only
-	// MPEG-1 (32 kHz and up), FLAC every rate. FLAC is lossless too, so a
-	// clip isn't encoded lossily a second time.
+	// Format is the format new clips come back in: lossless, so a clip isn't
+	// encoded lossily a second time, and readable at every sample rate.
 	Format = "flac"
+	// SampleRate is the rate new clips are rendered at: Resound's mixer
+	// runs at it, so they play without resampling, whatever rate the editor
+	// would read from the source. A sound of the library keeps its own.
+	SampleRate = 48000
 	// closeGrace is how long a page that went away (closed, or reloading)
 	// has to come back before its file counts as closed.
 	closeGrace = 10 * time.Second
@@ -49,9 +50,9 @@ const (
 	stopGrace = 5 * time.Second
 )
 
-// windowTitle is the title a finishing page gives its window, so Resound
-// can close exactly that window (Options.CloseWindow): a fixed text and 16
-// random hex digits.
+// windowTitle is the title a finishing page that couldn't close its own
+// window gives it, so Resound can close exactly that window
+// (Options.CloseWindow): a fixed text and 16 random hex digits.
 var windowTitle = regexp.MustCompile(`^Resound · Closing [0-9a-f]{16}$`)
 
 // ErrTooLarge means a file is larger than MaxSourceBytes.
@@ -72,8 +73,9 @@ type Options struct {
 	// file is no longer served.
 	OnClose func(token string)
 	// CloseWindow closes the browser window titled title, if Resound can:
-	// a page that finished asks for it, as pages may not close their own
-	// window. title matches windowTitle. It runs before OnClose.
+	// a page that finished asks for it when the browser refused to let it
+	// close its own window. title matches windowTitle. It runs before
+	// OnClose.
 	CloseWindow func(title string)
 }
 
@@ -219,7 +221,7 @@ func (b *Bridge) start() error {
 // handler serves /v1/<token> (the file's details), /v1/<token>/source (the
 // file), /v1/<token>/result (POST: a clip), /v1/<token>/state (whether
 // editing was stopped in the panel), /v1/<token>/done (POST: the user
-// finished; the window should close) and /v1/<token>/close (POST: the page
+// finished; with a window title, the window should close) and /v1/<token>/close (POST: the page
 // is going away) for a server on port.
 func (b *Bridge) handler(port int) http.Handler {
 	host := "127.0.0.1:" + strconv.Itoa(port)
@@ -266,10 +268,17 @@ func (b *Bridge) handler(port int) http.Handler {
 		case action == "state" && r.Method == http.MethodGet:
 			writeJSON(w, http.StatusOK, map[string]bool{"stopped": j.stopped})
 		case action == "done" && r.Method == http.MethodPost:
+			// Without a body: the page closed its own window.
 			var req struct {
 				Window string `json:"window"`
 			}
-			if err := json.NewDecoder(io.LimitReader(r.Body, 1<<10)).Decode(&req); err != nil || !windowTitle.MatchString(req.Window) {
+			body, err := io.ReadAll(io.LimitReader(r.Body, 1<<10))
+			if err == nil && len(body) > 0 {
+				if err = json.Unmarshal(body, &req); err == nil && !windowTitle.MatchString(req.Window) {
+					err = errors.New("bad window title")
+				}
+			}
+			if err != nil {
 				writeJSON(w, http.StatusBadRequest, map[string]string{"error": "bad request"})
 				return
 			}
@@ -284,6 +293,7 @@ func (b *Bridge) handler(port int) http.Handler {
 				"size":     j.size,
 				"type":     contentType(j.Path),
 				"format":   j.Format,
+				"rate":     j.rate(),
 				"replace":  j.Replace,
 			})
 		case action == "source" && r.Method == http.MethodGet:
@@ -311,8 +321,18 @@ func (b *Bridge) handler(port int) http.Handler {
 	})
 }
 
+// rate is the sample rate the editor renders the job's saves at; 0 leaves
+// it to the editor, which keeps the source's (a sound of the library).
+func (j Job) rate() int {
+	if j.Replace {
+		return 0
+	}
+	return SampleRate
+}
+
 // finish ends a file whose page is done: it is removed at once (no grace,
-// as for a page that went away), and its window is closed.
+// as for a page that went away), and its window is closed if the page
+// names it (window; "" when the page closed it itself).
 func (b *Bridge) finish(token, window string) {
 	b.mu.Lock()
 	j := b.jobs[token]
@@ -324,7 +344,7 @@ func (b *Bridge) finish(token, window string) {
 	if j == nil {
 		return
 	}
-	if b.opts.CloseWindow != nil {
+	if window != "" && b.opts.CloseWindow != nil {
 		b.opts.CloseWindow(window)
 	}
 	if !stopped && b.opts.OnClose != nil { // a stop came from the panel, which knows

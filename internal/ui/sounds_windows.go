@@ -18,8 +18,8 @@ type SoundSpec struct {
 	// Depth indents the row like a subfolder of that depth: the folder's
 	// own depth + 1.
 	Depth int
-	// Note, in the accent colour, takes the place of the tools, e.g.
-	// "Editing in your browser…".
+	// Note, in the accent colour, sits between the name and the tools, e.g.
+	// "Editing…" (with a tool to show the editor).
 	Note string
 	// Muted draws the name as a placeholder ("No sounds in this folder").
 	Muted bool
@@ -42,7 +42,7 @@ func (soundItemRow) keepsOpen() bool { return true }
 func (s soundItemRow) geometry(c *canvas, r rect) (band rect, tools []rect) {
 	in := inset(c, r)
 	band = rect{in.Left + c.px(folderIndentL*min(s.s.Depth, folderMaxIndent)), r.Top + c.px(2), in.Right, r.Bottom - c.px(2)}
-	if s.s.Note != "" || s.s.Muted {
+	if s.s.Muted {
 		return band, nil
 	}
 	size := min(c.px(soundToolL), band.h())
@@ -106,8 +106,8 @@ func (s soundItemRow) paint(c *canvas, r rect, st rowState) {
 	}
 	if s.s.Note != "" {
 		w := min(c.textWidth(s.s.Note, fontCaption)+c.px(2), band.w()/2)
-		c.text(s.s.Note, rect{band.Right - pad - w, band.Top, band.Right - pad, band.Bottom}, fontCaption, colAccent, dtRight)
-		nameRight = band.Right - pad - w - c.px(8)
+		c.text(s.s.Note, rect{nameRight - w, band.Top, nameRight, band.Bottom}, fontCaption, colAccent, dtRight)
+		nameRight -= w + c.px(8)
 	}
 	c.text(s.s.Name, rect{iconBox.Right + c.px(8), band.Top, nameRight, band.Bottom}, fontBody, nameCol, dtLeft)
 

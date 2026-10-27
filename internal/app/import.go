@@ -65,6 +65,7 @@ type soundImport struct {
 	dup   string // naming: the same sound is already in the library
 
 	src            string // editing: the file's name
+	source         string // editing: the file's path
 	token, editURL string // editing: the file's token and the edit page's address
 	opened         bool   // editing: the page has loaded the file
 	replace        string // editing: the library sound the editor's saves replace ("" = new clips)
@@ -538,7 +539,9 @@ func (a *App) folderImport(dir string) (note string, active bool) {
 }
 
 // importRows show, under folder dir's field, the card of a sound waiting
-// for its name and the reasons imports failed.
+// for its name and the reasons imports failed. Files open in the editor
+// are listed in the page's dock (editDock); their folder's field only says
+// so.
 func (a *App) importRows(dir string) []ui.Row {
 	var rows []ui.Row
 	for _, job := range a.imports.jobs {
@@ -548,8 +551,6 @@ func (a *App) importRows(dir string) []ui.Row {
 		switch job.state {
 		case importFailed:
 			rows = append(rows, ui.Paragraph(job.err, ui.ToneBad))
-		case importEditing:
-			rows = append(rows, a.editRows(job)...)
 		case importNaming:
 			j := job
 			fieldID := fmt.Sprintf("import-name-%d", j.id)

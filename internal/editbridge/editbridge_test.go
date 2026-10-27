@@ -215,7 +215,7 @@ func TestServerLifetime(t *testing.T) {
 }
 
 // A sound of the library is replaced by what the editor saves, in its own
-// format; new clips come back as FLAC.
+// format and at its own rate; new clips come back as FLAC at the mixer's.
 func TestReplaceFormat(t *testing.T) {
 	b := New(Options{Origins: []string{testOrigin}})
 	t.Cleanup(b.Close)
@@ -224,20 +224,28 @@ func TestReplaceFormat(t *testing.T) {
 	if err := os.WriteFile(src, []byte("mp3"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	token, port, err := b.Add(src, dir, true)
-	if err != nil {
-		t.Fatal(err)
-	}
-	rec := do(b, port, "GET", "/v1/"+token, testOrigin, "")
-	var info struct {
+	type details struct {
 		Name, Format string
+		Rate         int
 		Replace      bool
 	}
-	if err := json.Unmarshal(rec.Body.Bytes(), &info); err != nil {
-		t.Fatal(err)
+	get := func(replace bool) details {
+		t.Helper()
+		token, port, err := b.Add(src, dir, replace)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var info details
+		if err := json.Unmarshal(do(b, port, "GET", "/v1/"+token, testOrigin, "").Body.Bytes(), &info); err != nil {
+			t.Fatal(err)
+		}
+		return info
 	}
-	if info.Name != "Horn" || info.Format != "mp3" || !info.Replace {
-		t.Errorf("info = %+v", info)
+	if info := get(true); info.Name != "Horn" || info.Format != "mp3" || info.Rate != 0 || !info.Replace {
+		t.Errorf("replace: info = %+v", info)
+	}
+	if info := get(false); info.Format != Format || info.Rate != SampleRate || info.Replace {
+		t.Errorf("new clips: info = %+v", info)
 	}
 }
 
@@ -265,7 +273,7 @@ func TestDone(t *testing.T) {
 		OnClose:     func(tk string) { closed = append(closed, tk) },
 		CloseWindow: func(title string) { windows = append(windows, title) },
 	})
-	for _, bad := range []string{``, `{}`, `{"window": "Inbox - Outlook"}`, `{"window": "Resound · Closing 0123"}`} {
+	for _, bad := range []string{`{}`, `{"window": ""}`, `x`, `{"window": "Inbox - Outlook"}`, `{"window": "Resound · Closing 0123"}`} {
 		if rec := do(b, port, "POST", "/v1/"+token+"/done", testOrigin, bad); rec.Code != http.StatusBadRequest {
 			t.Errorf("done with %s: %d, want 400", bad, rec.Code)
 		}
@@ -278,6 +286,25 @@ func TestDone(t *testing.T) {
 		t.Fatalf("done: %d", rec.Code)
 	}
 	if len(closed) != 1 || closed[0] != token || len(windows) != 1 || windows[0] != title {
+		t.Errorf("OnClose %v, CloseWindow %v", closed, windows)
+	}
+	if rec := do(b, port, "GET", "/v1/"+token, testOrigin, ""); rec.Code != http.StatusNotFound {
+		t.Errorf("finished file still served: %d", rec.Code)
+	}
+}
+
+// A page that closed its own window finishes without a title: its file
+// ends at once, and no window is looked for.
+func TestDoneClosedItself(t *testing.T) {
+	var closed, windows []string
+	b, token, port := newTestBridge(t, Options{
+		OnClose:     func(tk string) { closed = append(closed, tk) },
+		CloseWindow: func(title string) { windows = append(windows, title) },
+	})
+	if rec := do(b, port, "POST", "/v1/"+token+"/done", testOrigin, ""); rec.Code != http.StatusNoContent {
+		t.Fatalf("done: %d", rec.Code)
+	}
+	if len(closed) != 1 || closed[0] != token || len(windows) != 0 {
 		t.Errorf("OnClose %v, CloseWindow %v", closed, windows)
 	}
 	if rec := do(b, port, "GET", "/v1/"+token, testOrigin, ""); rec.Code != http.StatusNotFound {

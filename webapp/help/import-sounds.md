@@ -30,7 +30,7 @@ Drop a video (MP4, MKV, WEBM, MOV and others) or audio Resound can't play as it 
 
 1. A browser window opens with the file loaded in [the audio editor](audio-editor.md).
 2. Select the part you want and press **Add to Resound**. The clip is saved into the folder, and the usual card opens in the panel to name it.
-3. Cut as many clips as you like; each **Add to Resound** saves one more. Press **Done** at the top of the window when you're finished: it closes.
+3. Cut as many clips as you like; each **Add to Resound** saves one more. Press **Close** when you're finished: the window closes, and the clips you added stay in the folder.
 
 [The audio editor](audio-editor.md) explains it all: the first-time notice, supported formats, trimming sounds already in your library, privacy and what to do when something goes wrong.
 

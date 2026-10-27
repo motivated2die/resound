@@ -27,18 +27,22 @@ Right after you accept, your browser may ask whether `getresound.app` may **acce
 
 1. On the PC, open Settings → **Sound library** (or click **Folders** on the home page).
 2. Drag a video or audio file from Explorer onto a folder. While it's over the folder, the folder reads **Drop to cut in the editor**.
-3. A browser window opens with the file loaded. In the panel, the folder reads **Editing in your browser…**.
+3. A browser window opens with the file loaded. In the panel, the folder reads **Editing in your browser…**, and the file is listed under **Currently open in the editor** at the bottom of the panel.
 4. Select the part you want (drag across the waveform) and press **Add to Resound**. The clip is saved into the folder, and the usual card opens in the panel to name it, preview it or discard it.
 5. Select the next part and press **Add to Resound** again for another clip. Each clip you add shows as a chip in the window's top bar; the newest is highlighted.
-6. When you're done, press **Done** at the top of the window. The window closes, and the clips you added stay in the folder. **Stop editing** under the folder in the panel does the same.
+6. When you're finished, press **Close**, next to **Add to Resound**. The window closes and the clips you added stay in the folder. Close doesn't save anything itself: a part you selected but didn't add is not kept. Its **✕** under **Currently open in the editor** in the panel does the same as Close.
+
+If a clip couldn't be saved, the bar at the top of the window says so, and **Close** reminds you once before closing, so you can add it again.
 
 Up to three files open at once from one drop, each in its own window.
 
 ## Trim a sound in your library
 
 1. On the Sound library page, click a folder to list its sounds.
-2. Click the **scissors** next to a sound. The editor opens with it; the sound's line reads **Editing…**.
-3. Select the part to keep and press **Save to Resound**. The trimmed sound replaces the file.
+2. Click the **scissors** next to a sound. The editor opens with it; the sound's line reads **Editing…**, with a button that brings the editor window back.
+3. Select the part to keep and press **Save to Resound**. The trimmed sound replaces the file, and the window closes a moment later; press **Keep editing** in the bar at the top to stay.
+
+To leave without changing the sound, press **Close** instead.
 
 The sound keeps its name, its format (an MP3 stays an MP3) and its settings: favorite, volume, color and emoji. Resound measures its length and loudness again. You can keep editing and save again; each save replaces the sound once more.
 
@@ -53,7 +57,7 @@ The edited sound overwrites the file. To keep the original, copy it in Explorer 
 - the **selection**, if you selected a part;
 - otherwise the selected fragment, or the **whole file**.
 
-New clips are saved as **FLAC**: lossless, so cutting doesn't cost quality, and playable at any sample rate. A sound you trim keeps its own format.
+New clips are saved as **FLAC** at 48 kHz: lossless, so cutting doesn't cost quality, and at the rate Resound plays at. A sound you trim keeps its own format and sample rate.
 
 The editor's own **Download file** button works too. Drag the downloaded file from your browser's download list onto a folder to add it.
 
@@ -73,9 +77,9 @@ The editor reads files with FFmpeg, in your browser. A file without an audio tra
 
 - **One audio track.** The editor uses a video's first audio track. To cut from another one (a second language, a commentary), save that track as a file of its own first, for example with a video converter.
 - **Esc stays in the editor.** While a file is open in the editor, <kbd>Esc</kbd> leaves the panel on the Sound library page, so you can use it freely in the editor. Close the panel with its close button; it opens on the same page again.
-- **Show editor** under the folder brings the editor window back if you closed or lost it.
-- **Colors and theme.** The window tints the editor in Resound's colors. The editor follows your Windows light or dark setting; its sun and moon button switches it, and it remembers your choice.
-- **A small window** scrolls with the scrollbar on the right. The editor needs about 500 pixels of height.
+- **Currently open in the editor**, at the bottom of the Sound library page, lists every file open in the editor and stays in view while you scroll. For each file, the first button brings the editor window back if you closed or lost it, and **✕** stops editing it (the clips you added stay). **Close all editors** stops them all.
+- **Colors and theme.** The editor opens dark, in Resound's colors, whatever your Windows setting. On audiocutter.online itself, it keeps the theme you chose there.
+- **A small window** scrolls with the scrollbar on the right. The editor needs about 480 pixels of height.
 - **It needs the internet.** The editor loads from audiocutter.online each time.
 
 ## When something goes wrong

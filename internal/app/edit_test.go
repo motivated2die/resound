@@ -114,3 +114,32 @@ func TestWriteChecked(t *testing.T) {
 		t.Errorf("left behind: %v", left)
 	}
 }
+
+// The library page's dock lists the files open in the editor, at most
+// maxDockedEdits one by one, with one button that closes them all; other
+// imports stay. Without files in the editor, there is no dock.
+func TestEditDock(t *testing.T) {
+	a := &App{}
+	if rows := a.editDock(); rows != nil {
+		t.Fatalf("dock without files in the editor: %d rows", len(rows))
+	}
+	sound := a.imports.add(&soundImport{state: importEditing, dir: `D:\Sounds`, src: "Horn.mp3", replace: `D:\Sounds\Horn.mp3`})
+	a.imports.add(&soundImport{state: importEditing, dir: `D:\Clips`, src: "a.mp4"})
+	if rows := a.editDock(); len(rows) != 4 { // caption, two files, stop all
+		t.Errorf("two files: %d rows, want 4", len(rows))
+	}
+	if j := a.soundEditor(`d:\sounds\horn.MP3`); j != sound {
+		t.Errorf("soundEditor found %v", j)
+	}
+	for range maxDockedEdits {
+		a.imports.add(&soundImport{state: importEditing, dir: `D:\Clips`, src: "b.mp4"})
+	}
+	if rows := a.editDock(); len(rows) != 1+maxDockedEdits-1+1+1 { // caption, files, "and … more", stop all
+		t.Errorf("%d files: %d rows", len(a.editingJobs()), len(rows))
+	}
+	naming := a.imports.add(&soundImport{state: importNaming, dir: `D:\Sounds`})
+	a.stopAllEditing()
+	if len(a.editingJobs()) != 0 || a.editDock() != nil || len(a.imports.jobs) != 1 || a.imports.jobs[0] != naming {
+		t.Errorf("after stopping all: %d jobs, %d editing", len(a.imports.jobs), len(a.editingJobs()))
+	}
+}

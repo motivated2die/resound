@@ -512,7 +512,11 @@ func (a *App) libraryPage() []ui.Row {
 		ui.Toggle("Even out the loudness of sounds", !a.cfg.NoNormalize, a.toggleNormalize),
 		ui.Paragraph("Loud sounds are turned down and quiet ones up, so every sound plays about equally loud. Volumes you set for a sound apply on top.", ui.ToneMuted),
 	)
-	return append(rows, ui.Spacer(4))
+	rows = append(rows, ui.Spacer(4))
+	if dock := a.editDock(); dock != nil {
+		rows = append(rows, ui.Docked(dock...)) // the files open in the editor, in view while the page scrolls
+	}
+	return rows
 }
 
 // folderRows lists the sound folders and all their subfolders (empty ones

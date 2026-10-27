@@ -40,9 +40,14 @@ type Popup struct {
 	height   int32
 	contentH int32
 	scroll   int32
-	anchor   point // the tray icon it docks at
-	work     rect  // work area of the screen it shows on
-	pos      point // its top left corner, screen pixels
+	// dockN is how many slots, at the end of slots, hold the Docked rows,
+	// pinned at the bottom; dockH is the height of their area (0 without).
+	// The other rows scroll above it.
+	dockN  int
+	dockH  int32
+	anchor point // the tray icon it docks at
+	work   rect  // work area of the screen it shows on
+	pos    point // its top left corner, screen pixels
 	// custom is where the user moved it by its tab; nil = docked at the
 	// taskbar. It is shown on its screen, kept inside the work area.
 	custom *point
@@ -272,33 +277,12 @@ func (p *Popup) layoutAndPlace() {
 	dc, _, _ := procGetDC.Call(p.hwnd)
 	c := p.canvas(dc)
 	p.width = c.px(popupWidthL)
-
-	p.slots = p.slots[:0]
-	var y int32
-	for _, r := range p.rows {
-		h := c.px(r.height())
-		if m, ok := r.(measurer); ok && dc != 0 {
-			h = m.measure(c, p.width)
-		}
-		p.slots = append(p.slots, slot{row: r, y: y, h: h})
-		y += h
-	}
+	maxH := min(c.px(popupMaxL), work.h()-2*c.px(popupGapL)-p.tab.visibleH(c))
+	p.layout(c, dc != 0, maxH)
 	if dc != 0 {
 		procReleaseDC.Call(p.hwnd, dc)
 	}
-	c = p.canvas(0)
-	gap := c.px(popupGapL)
-	tabRoom := p.tab.visibleH(c)
-	maxH := min(c.px(popupMaxL), work.h()-2*gap-tabRoom)
-	if minH := min(c.px(popupMinL), maxH) - 2*c.px(popupPadL); y < minH {
-		p.grow(minH - y)
-		y = minH
-	}
-	p.contentH = y
 	defer p.syncDropdown() // keep an open list attached to its row
-
-	p.height = min(p.contentH+2*c.px(popupPadL), maxH)
-	p.scroll = max(0, min(p.scroll, p.maxScroll()))
 
 	p.pos = p.target(docked)
 	r := rect{p.pos.X, p.pos.Y, p.pos.X + p.width, p.pos.Y + p.height}
@@ -308,6 +292,64 @@ func (p *Popup) layoutAndPlace() {
 	p.syncField()
 	procInvalidateRect.Call(p.hwnd, 0, 0)
 }
+
+// layout places the rows in a panel p.width wide and at most maxH tall:
+// the page's rows one below the other (measured with measure), the rows of
+// its Docked row at the bottom, and sets the panel's height, keeping the
+// scroll position valid. A page shorter than the panel's minimum height
+// gives the room to its Flex row; the dock stays at the bottom.
+func (p *Popup) layout(c *canvas, measure bool, maxH int32) {
+	height := func(r Row) int32 {
+		if m, ok := r.(measurer); ok && measure {
+			return m.measure(c, p.width)
+		}
+		return c.px(r.height())
+	}
+	p.slots = p.slots[:0]
+	var dock []Row
+	var y int32
+	for _, r := range p.rows {
+		if d, ok := r.(dockRow); ok {
+			dock = append(dock, d.rows...)
+			continue
+		}
+		h := height(r)
+		p.slots = append(p.slots, slot{row: r, y: y, h: h})
+		y += h
+	}
+	// Docked rows are placed from the dock's top edge (rowRect), on the card
+	// below the fade.
+	p.dockN, p.dockH = len(dock), 0
+	if len(dock) > 0 {
+		dy := c.px(dockFadeL)
+		for _, r := range dock {
+			h := height(r)
+			p.slots = append(p.slots, slot{row: r, y: dy, h: h})
+			dy += h
+		}
+		p.dockH = dy + c.px(dockEndL+dockMarginL)
+	}
+	pad := c.px(popupPadL)
+	if minH := min(c.px(popupMinL), maxH) - 2*pad - p.dockH; y < minH {
+		p.grow(minH - y)
+		y = minH
+	}
+	p.contentH = y
+	p.height = min(p.contentH+2*pad+p.dockH, maxH)
+	p.scroll = max(0, min(p.scroll, p.maxScroll()))
+}
+
+// dockStart is the index of the first docked slot (len(slots) without).
+func (p *Popup) dockStart() int { return len(p.slots) - p.dockN }
+
+// viewBottom is the window y where the scrolling rows end: the dock's top
+// edge, or the panel's bottom without a dock.
+func (p *Popup) viewBottom() int32 { return p.height - p.dockH }
+
+// reaches reports whether slot i can be at window y: the docked rows only
+// below the dock's edge, the others only above it (one scrolled under the
+// dock is covered there).
+func (p *Popup) reaches(i int, y int32) bool { return (i >= p.dockStart()) == (y >= p.viewBottom()) }
 
 // target is where the laid-out popup goes on p.work: docked at the tray
 // icon, under the mouse while it is dragged, or where the user put it. The
@@ -330,7 +372,7 @@ func (p *Popup) target(docked bool) point {
 
 func (p *Popup) maxScroll() int32 {
 	c := p.canvas(0)
-	return max(0, p.contentH+2*c.px(popupPadL)-p.height)
+	return max(0, p.contentH+2*c.px(popupPadL)+p.dockH-p.height)
 }
 
 // canvas returns a canvas on dc, or, for dc 0, on the popup's measuring DC:
@@ -343,9 +385,13 @@ func (p *Popup) canvas(dc uintptr) *canvas {
 	return &canvas{dc: dc, scale: p.scale, fonts: p.fonts}
 }
 
-// rowRect returns slot i's rectangle in window coordinates.
+// rowRect returns slot i's rectangle in window coordinates; docked rows
+// don't scroll.
 func (p *Popup) rowRect(i int) rect {
 	top := p.slots[i].y - p.scroll + p.canvas(0).px(popupPadL)
+	if i >= p.dockStart() {
+		top = p.viewBottom() + p.slots[i].y
+	}
 	return rect{0, top, p.width, top + p.slots[i].h}
 }
 
@@ -354,7 +400,7 @@ func (p *Popup) hitTest(x, y int32) (int, int) {
 	c := p.canvas(0)
 	for i, s := range p.slots {
 		r := p.rowRect(i)
-		if y < r.Top || y >= r.Bottom {
+		if y < r.Top || y >= r.Bottom || !p.reaches(i, y) {
 			continue
 		}
 		for seg, sr := range s.row.segments(c, r) {
@@ -572,43 +618,61 @@ func (p *Popup) paint() {
 		procDeleteDC.Call(mem)
 	}()
 
-	c := p.canvas(mem)
+	p.paintTo(p.canvas(mem))
+	procBitBlt.Call(hdc, 0, 0, uintptr(p.width), uintptr(p.height), mem, 0, 0, 0x00CC0020 /* SRCCOPY */)
+}
+
+// paintTo draws the whole panel on c: the scrolling rows with their
+// scroll indicator, then the dock over them, the open dropdown list and
+// the tooltip.
+func (p *Popup) paintTo(c *canvas) {
 	c.fill(rect{0, 0, p.width, p.height}, colBackground)
 	c.glows()
-	paintGroups(c, len(p.slots), func(i int) Row { return p.slots[i].row }, p.rowRect)
-	for i, s := range p.slots {
-		r := p.rowRect(i)
-		if r.Bottom < 0 || r.Top > p.height {
-			continue
+	n, view := p.dockStart(), p.viewBottom()
+	paintGroups(c, n, func(i int) Row { return p.slots[i].row }, p.rowRect)
+	for i := range n {
+		if r := p.rowRect(i); r.Bottom >= 0 && r.Top <= view {
+			p.paintSlot(c, i)
 		}
-		st := rowState{hover: -1, press: -1, open: -1}
-		if i == p.hoverRow {
-			st.hover = p.hoverSeg
-		}
-		if i == p.pressRow {
-			st.press = p.pressSeg
-		}
-		if p.dd != nil && p.dd.row == i {
-			st.open = p.dd.seg
-		}
-		if st.drop = i == p.dropRow; st.drop {
-			st.dragged = &p.dragData
-		}
-		s.row.paint(c, r, st)
 	}
-	// Scroll indicator.
+	// Scroll indicator, beside the scrolling rows.
 	if ms := p.maxScroll(); ms > 0 {
-		track := p.height - 2*c.px(popupPadL)
-		thumb := max(c.px(24), track*p.height/(p.contentH+2*c.px(popupPadL)))
-		top := c.px(popupPadL) + (track-thumb)*p.scroll/ms
+		pad := c.px(popupPadL)
+		track := view - 2*pad
+		thumb := max(c.px(24), track*view/(p.contentH+2*pad))
+		top := pad + (track-thumb)*p.scroll/ms
 		c.roundRect(rect{p.width - c.px(5), top, p.width - c.px(2), top + thumb}, c.px(3), colControl)
+	}
+	if p.dockN > 0 {
+		paintDock(c, rect{0, view, p.width, p.height})
+		for i := n; i < len(p.slots); i++ {
+			p.paintSlot(c, i)
+		}
 	}
 	p.paintDropdown(c)
 	p.paintTip(c)
 	if p.rounded {
 		c.glowBorder(p.width, p.height)
 	}
-	procBitBlt.Call(hdc, 0, 0, uintptr(p.width), uintptr(p.height), mem, 0, 0, 0x00CC0020 /* SRCCOPY */)
+}
+
+// paintSlot paints slot i's row with its hover, press, dropdown and drop
+// state.
+func (p *Popup) paintSlot(c *canvas, i int) {
+	st := rowState{hover: -1, press: -1, open: -1}
+	if i == p.hoverRow {
+		st.hover = p.hoverSeg
+	}
+	if i == p.pressRow {
+		st.press = p.pressSeg
+	}
+	if p.dd != nil && p.dd.row == i {
+		st.open = p.dd.seg
+	}
+	if st.drop = i == p.dropRow; st.drop {
+		st.dragged = &p.dragData
+	}
+	p.slots[i].row.paint(c, p.rowRect(i), st)
 }
 
 // rowTipKey identifies a hovered row segment that can show a tooltip.
@@ -706,14 +770,16 @@ func (p *Popup) endDrag() {
 }
 
 // grow gives extra height to the first Flex row, moving the rows after it
-// down; without one, the space stays empty at the bottom.
+// down; without one, the space stays empty at the bottom. Docked rows stay
+// where they are.
 func (p *Popup) grow(extra int32) {
-	for i := range p.slots {
+	n := p.dockStart()
+	for i := range n {
 		if _, ok := p.slots[i].row.(flexRow); !ok {
 			continue
 		}
 		p.slots[i].h += extra
-		for j := i + 1; j < len(p.slots); j++ {
+		for j := i + 1; j < n; j++ {
 			p.slots[j].y += extra
 		}
 		return

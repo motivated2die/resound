@@ -161,13 +161,17 @@ func (p *Popup) syncField() {
 		procSendMessageW.Call(f.hwnd, emSetMargins, ecLeftRight, 0)
 	}
 	// The text sits inside the painted box, vertically centred; hidden while
-	// its row is scrolled out of the panel.
+	// its row is scrolled out of the panel or under the dock.
 	box := row.box(c, p.rowRect(slot))
 	textH := c.px(20)
 	x, y := box.Left+c.px(10), box.Top+(box.h()-textH)/2
 	w := box.w() - 2*c.px(10)
 	pad := c.px(popupPadL)
-	if box.Top < pad || box.Bottom > p.height-pad {
+	bottom := p.viewBottom() - pad
+	if slot >= p.dockStart() {
+		bottom = p.height
+	}
+	if box.Top < pad || box.Bottom > bottom {
 		procShowWindow.Call(f.hwnd, swHide)
 		return
 	}

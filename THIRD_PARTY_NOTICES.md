@@ -40,7 +40,7 @@ The full license texts are in each module's source (`go mod download`, then the 
 | [Tabler Icons](https://tabler.io/icons) (outline) SVG icons by Paweł Kuna, copies of the panel's | MIT | `webapp/src/assets/panel-icons/` |
 | [Font Awesome Free](https://fontawesome.com) 6.7.2 Discord icon by Fonticons, Inc. (license comment kept in the file) | CC BY 4.0 | `webapp/src/assets/icons/discord.svg` |
 
-Each folder contains the component's license file(s) and a README naming the exact source. The app loads nothing from other hosts.
+Each folder contains the component's license file(s) and a README naming the exact source. The app loads nothing from other hosts, except the edit page, which embeds the audio editor (see below).
 
 ## Icons
 
@@ -50,6 +50,10 @@ Each folder contains the component's license file(s) and a README naming the exa
 ## Not included: VB-Cable
 
 [VB-Audio Virtual Cable](https://vb-cable.com) is proprietary donationware by VB-Audio Software and is **not** part of Resound. When the user chooses to install it, Resound downloads the unmodified package from VB-Audio's server, verifies VB-Audio's digital signature, and runs VB-Audio's own setup. Resound credits VB-Audio and links to its donation page wherever the cable is set up, as VB-Audio's licensing terms ask.
+
+## Not included: audiocutter.online
+
+[audiocutter.online](https://audiocutter.online) is a browser audio editor by its own developers, independent of Resound, and is **not** part of Resound. To cut and trim sounds, the app's edit page (`webapp/src/edit.html`) embeds the editor from audiocutter.online in a frame and hands it the user's file through its documented [postMessage API](https://audiocutter.online/docs/post-message-api/); none of its code is copied, bundled or modified. The editor runs in the user's browser and loads its own components, among them FFmpeg from `unpkg.com`, under its own terms. Resound names the editor, and asks for the user's consent, before loading it, and credits it in the [help center](https://getresound.app/help/audio-editor).
 
 ## Prior work
 

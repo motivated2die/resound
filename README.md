@@ -26,7 +26,7 @@ Resound plays sounds to your own speakers and into a virtual audio cable at the 
 - **Phone app.** Scan a QR code and the Resound app opens on your phone; install it from the browser, no app store needed. It connects straight to your PC over your network, keeps the screen on and runs fullscreen. Tabs, favorites, colors and emoji per sound, custom layouts, play progress, stop and pause.
 - **Your folders are your library.** Add folders by drag and drop, empty ones too; each folder and subfolder (at any depth) becomes a tab. MP3, WAV, FLAC and OGG. Renaming or moving files keeps their settings.
 - **Import from Myinstants.** Drag a sound from [Myinstants](https://www.myinstants.com/) or [Sound Buttons World](https://soundbuttonsworld.com/) (or any link to a sound file) onto one of your folders: Resound downloads it there and lets you name it. No account needed.
-- **Cut sounds from videos.** Drop a video (or audio in another format) onto a folder: it opens in an audio editor in your browser, and every clip you cut is saved into that folder.
+- **Cut sounds from videos.** Drop a video (or audio in another format) onto a folder: it opens in [audiocutter.online](https://audiocutter.online)'s editor in your browser, and every clip you cut is saved into that folder. Sounds in your library can be trimmed there too.
 - **Mic mute and push-to-talk.** While a sound plays, Resound can mute your real microphone and hold your game's push-to-talk key. "Talk through" lets you speak over a sound. Optional pause and stop keys work from inside your game: hold a pause key to pause the sounds and release push-to-talk (for example to talk on another channel), or press a stop key to end them at once.
 - **Guided setup.** A short first-run setup covers sounds, speakers, voice chat, push-to-talk and the phone. It can install VB-Cable for you (downloaded from VB-Audio, signature checked).
 - **Backup and restore** of all settings in one click.
@@ -51,6 +51,10 @@ Resound plays sounds to your own speakers and into a virtual audio cable at the 
 ## Voice chat and VB-Cable
 
 Games and voice chat apps hear Resound through a virtual microphone, "CABLE Output", provided by [VB-Audio Virtual Cable](https://vb-cable.com) by VB-Audio Software. VB-Cable is **donationware**: if you use it, please consider [supporting VB-Audio](https://vb-audio.com/Services/licensing.htm). Resound never bundles or modifies VB-Cable: when you choose "Install VB-Cable", it downloads the original package from VB-Audio, checks its digital signature and runs VB-Audio's own setup, which asks for your permission (UAC).
+
+## Cutting sounds and audiocutter.online
+
+Cutting and trimming sounds uses [audiocutter.online](https://audiocutter.online), an audio editor that runs in your browser, made by its own developers and independent of Resound. Resound doesn't bundle or modify it: a browser window embeds the editor from audiocutter.online and hands it your file through its public API, and the clips you cut come back to Resound on your PC. Your file is processed in your browser, not uploaded. Many thanks to audiocutter.online's developers for building the editor, opening it to other apps, and improving its API for Resound. See [The audio editor](https://getresound.app/help/audio-editor) in the help center.
 
 ## Privacy
 
