@@ -317,16 +317,17 @@ func (p *Popup) layout(c *canvas, measure bool, maxH int32) {
 		p.slots = append(p.slots, slot{row: r, y: y, h: h})
 		y += h
 	}
-	// Docked rows are placed from the dock's top edge (rowRect).
+	// Docked rows are placed from the dock's top edge (rowRect), on the card
+	// below the fade.
 	p.dockN, p.dockH = len(dock), 0
 	if len(dock) > 0 {
-		dy := c.px(dockPadL)
+		dy := c.px(dockFadeL)
 		for _, r := range dock {
 			h := height(r)
 			p.slots = append(p.slots, slot{row: r, y: dy, h: h})
 			dy += h
 		}
-		p.dockH = dy + c.px(dockPadL)
+		p.dockH = dy + c.px(dockEndL+dockMarginL)
 	}
 	pad := c.px(popupPadL)
 	if minH := min(c.px(popupMinL), maxH) - 2*pad - p.dockH; y < minH {

@@ -116,7 +116,7 @@ func TestWriteChecked(t *testing.T) {
 }
 
 // The library page's dock lists the files open in the editor, at most
-// maxDockedEdits one by one, with one button that stops them all; other
+// maxDockedEdits one by one, with one button that closes them all; other
 // imports stay. Without files in the editor, there is no dock.
 func TestEditDock(t *testing.T) {
 	a := &App{}

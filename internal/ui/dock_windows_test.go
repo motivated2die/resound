@@ -32,11 +32,11 @@ func TestDockLayout(t *testing.T) {
 	for range 30 {
 		rows = append(rows, Button("Row", ButtonNormal, false, nil))
 	}
-	rows = append(rows, Docked(Section("Open in the editor"), testTask("a.mp4", &clicked), testTask("b.mkv", &clicked),
-		Button("Stop editing all 2", ButtonNormal, false, nil)))
+	rows = append(rows, Docked(Section("Currently open in the editor"), testTask("a.mp4", &clicked), testTask("b.mkv", &clicked),
+		Button("Close all editors", ButtonNormal, false, nil)))
 	p := layoutPopup(rows)
 
-	const pad, dockH = popupPadL, dockPadL + 28 + 46 + 46 + 38 + dockPadL
+	const pad, dockH = popupPadL, dockFadeL + 28 + 46 + 46 + 38 + dockEndL + dockMarginL
 	if p.height != popupMaxL || p.dockN != 4 || p.dockH != dockH {
 		t.Fatalf("height %d, %d docked rows, dock %d px; want %d, 4, %d", p.height, p.dockN, p.dockH, popupMaxL, dockH)
 	}
@@ -50,11 +50,11 @@ func TestDockLayout(t *testing.T) {
 	}
 	for _, scroll := range []int32{0, 200, p.maxScroll()} {
 		p.scroll = scroll
-		if r := p.rowRect(n); r.Top != view+dockPadL {
-			t.Errorf("scroll %d: first docked row at %d, want %d", scroll, r.Top, view+dockPadL)
+		if r := p.rowRect(n); r.Top != view+dockFadeL {
+			t.Errorf("scroll %d: first docked row at %d, want %d", scroll, r.Top, view+dockFadeL)
 		}
-		if r := p.rowRect(len(p.slots) - 1); r.Bottom != p.height-dockPadL {
-			t.Errorf("scroll %d: last docked row ends at %d, want %d", scroll, r.Bottom, p.height-dockPadL)
+		if r := p.rowRect(len(p.slots) - 1); r.Bottom != p.height-(dockEndL+dockMarginL) {
+			t.Errorf("scroll %d: last docked row ends at %d, want %d", scroll, r.Bottom, p.height-(dockEndL+dockMarginL))
 		}
 	}
 	// Scrolled to the end, the page's last row ends above the dock.
@@ -65,7 +65,7 @@ func TestDockLayout(t *testing.T) {
 
 	// At the top, page rows lie under the dock; the dock gets the point.
 	p.scroll = 0
-	y := view + dockPadL + 28 + 46 + 20 // in b.mkv's row
+	y := view + dockFadeL + 28 + 46 + 20 // in b.mkv's row
 	if row, seg := p.hitTest(100, y); row != n+2 || seg != 0 {
 		t.Errorf("hitTest over the dock = (%d, %d), want (%d, 0)", row, seg, n+2)
 	}
@@ -97,8 +97,8 @@ func TestDockShortPage(t *testing.T) {
 	if r := p.rowRect(1); r.Bottom != p.viewBottom()-popupPadL {
 		t.Errorf("last page row ends at %d, want %d", r.Bottom, p.viewBottom()-popupPadL)
 	}
-	if r := p.rowRect(2); r.Bottom != p.height-dockPadL {
-		t.Errorf("docked row ends at %d, want %d", r.Bottom, p.height-dockPadL)
+	if r := p.rowRect(2); r.Bottom != p.height-(dockEndL+dockMarginL) {
+		t.Errorf("docked row ends at %d, want %d", r.Bottom, p.height-(dockEndL+dockMarginL))
 	}
 
 	// Without a dock, nothing changes: the page runs to the bottom.
@@ -153,12 +153,12 @@ func TestDockRender(t *testing.T) {
 			Tools: []Tool{{Icon: IconExternalLink, Tip: "Show the editor"}}}),
 		Section("Loudness"),
 		Toggle("Even out the loudness of sounds", true, nil),
-		Docked(Section("Open in the editor"), testTask("Funny moment.mp4", &clicked),
+		Docked(Section("Currently open in the editor"), testTask("Funny moment.mp4", &clicked),
 			TaskItem(TaskSpec{Icon: IconScissors, Name: "Vine boom.mp3", Detail: "Opening the editor…", Tools: []Tool{{Icon: IconExternalLink}, {Icon: IconClose}}}),
-			Button("Stop editing all 2", ButtonNormal, false, nil)),
+			Button("Close all editors", ButtonNormal, false, nil)),
 	)
 	for _, scale := range []float64{1, 1.5} {
-		for _, end := range []bool{false, true} {
+		for _, at := range []string{"", "-mid", "-end"} {
 			m := &canvas{scale: scale}
 			w, h := m.px(popupWidthL), m.px(popupMaxL)
 			img := renderCanvas(t, w, h, scale, func(c *canvas) {
@@ -167,16 +167,16 @@ func TestDockRender(t *testing.T) {
 				if p.height != h {
 					t.Fatalf("height %d, want %d", p.height, h)
 				}
-				if end {
+				switch at {
+				case "-mid": // folders fading out above the card
+					p.scroll = p.maxScroll() / 2
+				case "-end":
 					p.scroll = p.maxScroll()
 					p.hoverRow, p.hoverSeg = p.dockStart()+1, 2
 				}
 				p.paintTo(c)
 			})
-			name := "library-dock"
-			if end {
-				name += "-end"
-			}
+			name := "library-dock" + at
 			if scale != 1 {
 				name += "@1.5x"
 			}

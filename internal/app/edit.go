@@ -315,7 +315,7 @@ func clipMessage(err error) string {
 
 // editDock is the library page's dock while files are open in the editor:
 // each file with buttons to bring its editor back and to stop editing it,
-// and below them one button that stops them all. It stays in view while
+// and below them one button that closes them all (Close all editors). It stays in view while
 // the page scrolls; the folders the files go into are highlighted too
 // (folderImport). Nil while no file is open.
 func (a *App) editDock() []ui.Row {
@@ -327,7 +327,7 @@ func (a *App) editDock() []ui.Row {
 	if len(shown) > maxDockedEdits {
 		shown = shown[:maxDockedEdits-1] // the last line says how many more
 	}
-	rows := []ui.Row{ui.Section("Open in the editor")}
+	rows := []ui.Row{ui.Section("Currently open in the editor")}
 	for _, j := range shown {
 		detail := "Opening the editor…"
 		switch {
@@ -347,9 +347,5 @@ func (a *App) editDock() []ui.Row {
 	if more := len(jobs) - len(shown); more > 0 {
 		rows = append(rows, ui.Paragraph(fmt.Sprintf("and %s more in the editor", plural(more, "file")), ui.ToneMuted))
 	}
-	label := "Stop editing"
-	if len(jobs) > 1 {
-		label = fmt.Sprintf("Stop editing all %d", len(jobs))
-	}
-	return append(rows, ui.Button(label, ui.ButtonNormal, false, a.stopAllEditing))
+	return append(rows, ui.Button("Close all editors", ui.ButtonNormal, false, a.stopAllEditing))
 }
