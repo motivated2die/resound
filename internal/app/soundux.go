@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io/fs"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -333,23 +334,10 @@ func (a *App) importSoundux() {
 	if p == nil {
 		return
 	}
-	// Resound was set up already (the setup runs again): keep a way back.
-	if a.cfg.SetupComplete || len(a.cfg.Folders) > 0 {
-		a.flushState()
-		now := time.Now()
-		e, err := backup.Create(config.Dir(), filepath.Join(backup.Dir(config.Dir()), backup.DefaultName(now, "before-soundux")), Version, now)
-		if err != nil {
-			logx.Printf("soundux: backup before the import: %v", err)
-			a.soundux.err = "Nothing was carried over: the backup of your current settings failed (" + err.Error() + ")."
-			a.render()
-			return
-		}
-		logx.Printf("soundux: saved %s before the import", filepath.Base(e.Path))
-	}
-	if !a.cfg.SetupComplete {
-		// Saved with the folders: a start with folders on the welcome page
-		// would count as set up before the guided setup existed (Run).
-		a.cfg.SetupStep = 1
+	if err := a.beginCarryOver("soundux"); err != "" {
+		a.soundux.err = err
+		a.render()
+		return
 	}
 
 	var note []string
@@ -360,20 +348,12 @@ func (a *App) importSoundux() {
 				paths = append(paths, f.Path)
 			}
 		}
-		a.addFolders(paths) // checks them again, says what it added
-		if a.libNote != "" {
-			note = append(note, a.libNote)
-		}
+		note = append(note, a.carryOverFolders(paths)...)
 	}
 	r := a.applySoundux(p)
 	if r.favorites+r.volumes > 0 {
 		note = append(note, fmt.Sprintf("From Soundux: %s, %s.", plural(r.favorites, "favorite"), plural(r.volumes, "sound volume")))
 	}
-	a.save()
-	a.libraryChanged()
-	a.applyVolumes()
-	a.syncMic()
-	a.keybindsChanged()
 	logx.Printf("soundux: imported: folders %v, %d favorite(s), %d sound volume(s), %d sorted tab(s), %d key(s), %s",
 		a.sxOn(sxFolders), r.favorites, r.volumes, r.sorted, r.keys, strings.Join(r.settings, ", "))
 	for _, n := range r.notes {
@@ -381,8 +361,78 @@ func (a *App) importSoundux() {
 	}
 
 	a.soundux.plan, a.soundux.open = nil, false // carried over: not offered again
-	a.setLibNote(strings.Join(append(note, r.notes...), " "), false)
+	a.finishCarryOver(append(note, r.notes...))
+}
+
+// beginCarryOver prepares carrying another soundboard's settings over (from
+// is its name in the backup's file name and the log). A Resound set up
+// before (the setup runs again, or folders already) is backed up first; it
+// returns why the import can't run when that fails.
+func (a *App) beginCarryOver(from string) string {
+	if a.cfg.SetupComplete || len(a.cfg.Folders) > 0 {
+		a.flushState()
+		now := time.Now()
+		e, err := backup.Create(config.Dir(), filepath.Join(backup.Dir(config.Dir()), backup.DefaultName(now, "before-"+from)), Version, now)
+		if err != nil {
+			logx.Printf("%s: backup before the import: %v", from, err)
+			return "Nothing was carried over: the backup of your current settings failed (" + err.Error() + ")."
+		}
+		logx.Printf("%s: saved %s before the import", from, filepath.Base(e.Path))
+	}
+	if !a.cfg.SetupComplete {
+		// Saved with the folders: a start with folders on the welcome page
+		// would count as set up before the guided setup existed (Run).
+		a.cfg.SetupStep = 1
+	}
+	return ""
+}
+
+// carryOverFolders adds an import's folders the way the panel adds folders
+// (addFolders checks them again and skips ones in the library) and
+// returns what it said.
+func (a *App) carryOverFolders(paths []string) []string {
+	if len(paths) == 0 {
+		return nil
+	}
+	a.addFolders(paths)
+	if a.libNote == "" {
+		return nil
+	}
+	return []string{a.libNote}
+}
+
+// finishCarryOver saves and applies everything an import changed, shows its
+// note on the setup's first step and goes there.
+func (a *App) finishCarryOver(note []string) {
+	a.save()
+	a.libraryChanged()
+	a.applyVolumes()
+	a.syncMic()
+	a.keybindsChanged()
+	a.setLibNote(strings.Join(slices.DeleteFunc(note, func(n string) bool { return n == "" }), " "), false)
 	a.wizardGo(1)
+}
+
+// carryOverKeys adds another soundboard's combinations to fn's global keys,
+// each through the checks a recorded key gets (keyConflict). It returns how
+// many it added and why the others weren't; a combination Resound has
+// there already is skipped silently.
+func (a *App) carryOverKeys(from string, fn keyFunc, keys [][]uint16) (added int, notes []string) {
+	for _, k := range keys {
+		c := input.Combo(k)
+		if msg := a.keyConflict(keyTarget{fn: fn}, c); msg != "" {
+			if !strings.Contains(msg, "in this list already") {
+				notes = append(notes, from+"'s "+strings.ToLower(fn.title())+" key "+c.String()+" wasn't added: "+msg)
+			}
+			continue
+		}
+		a.setGlobalKeys(fn, append(a.globalKeys(fn), slices.Clone(k)))
+		added++
+		if fn == fnPTT {
+			a.cfg.PushToTalkWhilePlaying = true // the other soundboard held it while sounds played
+		}
+	}
+	return added, notes
 }
 
 // sxResult is what applySoundux carried over.
@@ -438,20 +488,10 @@ func (a *App) applySoundux(p *soundux.Plan) sxResult {
 			fn   keyFunc
 			keys []uint16
 		}{{fnPTT, p.PushToTalk}, {fnStop, p.Stop}} {
-			if k.keys == nil {
-				continue
-			}
-			c := input.Combo(k.keys)
-			if msg := a.keyConflict(keyTarget{fn: k.fn}, c); msg != "" {
-				if !strings.Contains(msg, "in this list already") {
-					r.notes = append(r.notes, "Soundux's "+strings.ToLower(k.fn.title())+" key wasn't added: "+msg)
-				}
-				continue
-			}
-			a.setGlobalKeys(k.fn, append(a.globalKeys(k.fn), k.keys))
-			r.keys++
-			if k.fn == fnPTT {
-				a.cfg.PushToTalkWhilePlaying = true // Soundux held it while sounds played
+			if k.keys != nil {
+				n, notes := a.carryOverKeys("Soundux", k.fn, [][]uint16{k.keys})
+				r.keys += n
+				r.notes = append(r.notes, notes...)
 			}
 		}
 	}

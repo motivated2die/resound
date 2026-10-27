@@ -31,6 +31,7 @@ internal/input/    push-to-talk via SendInput, key presets, pause/stop hotkeys (
 internal/library/  sound folders → tabs/sounds with stable IDs
 internal/importer/ sounds from dropped links (Myinstants pages, sound files): find, download, check, name
 internal/soundux/  Soundux's config.json, read and checked for the setup's import
+internal/soundpad/ Soundpad's sound lists and keys, read and grouped by folder for the setup's import
 internal/editbridge/ files Resound can't play, handed to the browser editor and its clips taken back (127.0.0.1)
 internal/server/   phone API over WebRTC, pairing
 internal/install/  install/update/uninstall, autostart, firewall
@@ -67,7 +68,7 @@ Helper roles run before the single-instance mutex (`Local\Resound.SingleInstance
 
 | Package | Responsibility |
 |---|---|
-| `app` | Wiring and all app state. Panel pages (`pages.go`, `wizard.go`, `diagnostics.go`, `system.go`), the import from Soundux (`soundux.go`), the audio flow and its meters (`flow.go`), playback holds (`playback.go`), push-to-talk (`ptt.go`), devices and routing actions (`devices.go`), server bridge (`remote.go`) |
+| `app` | Wiring and all app state. Panel pages (`pages.go`, `wizard.go`, `diagnostics.go`, `system.go`), the imports from Soundux and Soundpad (`soundux.go`, `soundpad.go`), the audio flow and its meters (`flow.go`), playback holds (`playback.go`), push-to-talk (`ptt.go`), devices and routing actions (`devices.go`), server bridge (`remote.go`) |
 | `audio` | WASAPI outputs (`output_windows.go`), mixer (`mixer.go`), streaming sources and ring buffer (`source.go`), streaming decoder (`decode.go`), header-only length probe (`probe.go`), loudness measurement (`loudness.go`), engine API (`engine_windows.go`), mix-format parsing (`format_windows.go`), level meters (`levels.go`, `meter_windows.go`) |
 | `wincom` | Core Audio COM plumbing: COM threads, endpoint enumeration/lookup, and fixes for go-wca bugs |
 | `routing` | VB-Cable detection, mic mute, the undocumented "Listen" properties, the elevated apply command |
@@ -76,6 +77,7 @@ Helper roles run before the single-instance mutex (`Local\Resound.SingleInstance
 | `library` | Sound index (`library.json`): folders → tabs → sounds with stable IDs, rename/move matching (`reconcile.go`), per-sound settings and phone layouts, background indexer (`indexer.go`) |
 | `importer` | A dropped link to a sound: the page's one sound (`og:audio`, else exactly one `<audio>`/`<source>`/`data-url`/sound link), the download (public addresses only, size limits), the decode check, a safe unique file name. Portable and unit-tested |
 | `soundux` | Soundux's settings (`%APPDATA%\Soundux\config.json`, its 0.2.7 format): read field by field (`Parse`), then checked against the disk and converted for Resound (`Plan`). Portable and unit-tested |
+| `soundpad` | Soundpad's sound lists (`.spl`, XML: `Parse`, `Discover`) grouped by the folders their sounds are in (`PlanLists`), and its keys from the registry (`ReadSettings`, read only; parsing portable in `settings.go`). Unit-tested |
 | `editbridge` | A file being cut in the editor: a loopback HTTP server, running only while files are open, that serves each file under a random token to the app's edit page and takes the clips back; origin, Host and token checks. Portable and unit-tested |
 | `server` | The app's WebRTC connection (`rtc.go`), the API it carries (Soundux Remote compatible), pairing and devices, LAN addresses |
 | `install` | Drop-in install/update, Installed-apps entry, Start Menu shortcut, autostart, uninstall, firewall helper |
@@ -86,7 +88,7 @@ Helper roles run before the single-instance mutex (`Local\Resound.SingleInstance
 | `backup` | Backup zips of `config.json`, `library.json` and `remote.json` with a manifest; validation, clean restore, backup index. Zips of the sound folders (`sounds.go`, never restored) |
 | `config`, `logx` | `config.json`; log file plus crash output |
 
-Platform-specific files use the `_windows.go` suffix. `mixer.go`, `source.go`, `decode.go`, `probe.go`, `loudness.go`, `library`, `soundux` and `server` are portable and unit-tested on any OS. `cmd/devremote` serves the phone remote with the real library and indexer but no audio output (plays are only timed, so progress, previews and their ends show as with the PC), for front-end work on any OS (`go run ./cmd/devremote -folder <sounds>`). Enter in its console refreshes the library like the panel's Refresh, including the `library` event.
+Platform-specific files use the `_windows.go` suffix. `mixer.go`, `source.go`, `decode.go`, `probe.go`, `loudness.go`, `library`, `soundux`, `soundpad` (but for reading the registry) and `server` are portable and unit-tested on any OS. `cmd/devremote` serves the phone remote with the real library and indexer but no audio output (plays are only timed, so progress, previews and their ends show as with the PC), for front-end work on any OS (`go run ./cmd/devremote -folder <sounds>`). Enter in its console refreshes the library like the panel's Refresh, including the `library` event.
 
 ## Threading model
 
@@ -239,6 +241,20 @@ Failures (no network, declined UAC, bad signature) leave the manual "Install man
   - Then everything is saved and applied (volumes, mic, hotkeys), phones are told, the result is the library note on the setup's first step, and the offer goes for the rest of the run. The log gets the counts, never paths.
 - **Soundux running** (`soundux.exe` in `input.RunningApps`, checked when the page opens) shows a warning: both apps would press push-to-talk and hook the keys.
 - Tested with a fixture of what a real config lacks (hotkeys, favorites, nested and missing folders, damaged entries, the newer key format) and, opt-in (`RESOUND_LIVE=1`, `TestLiveSoundux`), against this PC's real config and a copy of the real `library.json`. `app/soundux_test.go` checks the filling, the key conflicts and that parts switched off change nothing.
+
+- **Shared with the Soundpad import:** `beginCarryOver` (the backup and the setup step), `carryOverFolders` (`addFolders`), `carryOverKeys` (`keyConflict`, added to the global keys; push-to-talk turns on holding it) and `finishCarryOver` (save, apply, the note, step 1). "Carry over" keeps them apart from importing sounds by drag and drop (`import.go`).
+
+## Carrying sounds and keys over from Soundpad
+
+`internal/soundpad`, `app/soundpad.go`. Offered on the welcome page like Soundux's, in a card of its own below it ("Coming from Soundpad?"). Soundpad keeps sounds from anywhere in sound lists and groups them into categories at will; Resound's tabs are folders. So the page chooses lists, shows the folders their sounds are in, and adds the chosen folders.
+
+- **Sound lists** (Soundpad 4, checked with 4.0.35). `.spl` files, XML: `<Soundlist url=…>` with `<Sound url title color [key keyModifiers]>`, then `<Categories>` (`<Category name>` with `<Sound id>`; `type="1"` is the built-in "all sounds") and `<Hotbar>` (`<HotbarPage>` with `<HotbarItem soundId>`), both referring to sounds by their 0-based position. `%APPDATA%\Leppsoft\soundlist.spl` is the list Soundpad shows (its `url` is the file it was last saved as); `Discover` offers it first, then lists from Soundpad's recent lists and its folder that exist (not `stats.spl`, its play counts, nor `^…` files), at most 20. "Choose another list…" adds any `.spl`. The current list is chosen at first.
+- **Parsing** (`Parse`): at most 16 MB and 50,000 sounds per list. Go's XML decoder doesn't resolve DTDs or external entities. Sounds without an absolute path (streams, damaged entries) are skipped and counted; a hotbar `soundId` that isn't a number is ignored. A color (`RRGGBB`) becomes the phone's nearest card color by hue (`PhoneColor`: grey below 15% saturation).
+- **Settings** (`ReadSettings`): `HKCU\Software\Leppsoft\Soundpad\MainFrame`, opened with `QUERY_VALUE` only: no admin rights, nothing written (Soundpad's "Export preferences" writes the same values as a `.reg` file). A key is a virtual-key code (`stopKey`, `pauseResumeKey`; 0 = none) and a modifier field (`…KeyModifiers`) whose bits aren't documented, so only keys without modifiers are taken; others are named as left out. Push-to-talk is Soundpad's auto keys (`MainFrame\AutoKeys`, numbered `key0`, `keyModifiers0`, `enabled0`, `type0`…; `0xFFFFFFFF` = no key): enabled ones of type 0, Soundpad's default "press and hold" while the sound plays, at most 4. Type 1 (pressing before and after) is left out. Soundpad's pause/resume key toggles, Resound's pause key holds; the page says so.
+- **Grouping** (`PlanLists`): the chosen lists' sounds once each (case-insensitive path), only files that exist and play (Soundpad plays M4A, WMA and more: counted as not carried over, as are missing files, categories by name and per-sound hotkeys). Each sound's folder is a candidate; a folder inside another comes with it. Each folder's playable files are counted (`CountSounds`, at most 5000, skipping `.`/`$` folders as the library does), and a folder whose sounds are mostly not in the lists (listed < half) starts off (`Folder.Suggested`), so a Downloads folder with one used sound doesn't bring hundreds. Folders already in the library show as such. Planning runs off the UI thread at start and whenever the chosen lists change (a generation counter drops outdated results).
+- **Applying** (`importSoundpad`, `applySoundpad`): the shared steps above; the chosen folders not in the library are added; hotbar sounds become favorites and colors fill sounds without one (fill-only, so importing twice changes nothing); push-to-talk, stop and pause keys go through `carryOverKeys`.
+- **Soundpad running** (`soundpad.exe`) shows the same warning as Soundux.
+- Tested with a fixture (a stream, a relative path, a per-sound hotkey, an M4A, a missing file, a subfolder, a duplicate), the developer's real registry values (stop H, pause `\`, an auto key without a key) and invented ones (modifiers, type 1, mouse buttons), `Discover` on a temporary folder, and opt-in (`RESOUND_LIVE=1`, `TestLiveSoundpad`) against this PC's registry and lists. `app/soundpad_test.go` checks filling, key conflicts, parts switched off and the folder suggestions.
 
 ## Importing sounds by drag and drop
 
@@ -469,7 +485,7 @@ The phone remote is a web app on an HTTPS host (`webapp/`, built by `cmd/webapp`
 | `debug.log` | Log and crash output; over 2 MB at start it moves to `debug.old.log`. Every line leaves out the user's name in paths (`C:\Users\<user>\…`), the computer's name, OneDrive organisations and email addresses (`logx.Scrub`); Diagnostics → Copy log scrubs the whole file again, crash output and older lines included. Sound, folder and device names stay |
 | `running.json` | Version, pid and start time of the running instance; left behind means the run ended without a clean exit, which the next start logs |
 
-Outside it, Resound only reads Soundux's `%APPDATA%\Soundux\config.json`, for the setup's import (see Carrying settings over from Soundux), and never writes it.
+Outside it, Resound only reads Soundux's `%APPDATA%\Soundux\config.json` and Soundpad's sound lists (`%APPDATA%\Leppsoft\*.spl`, or one the user picks) and registry key (`HKCU\Software\Leppsoft\Soundpad`), for the setup's imports, and never writes them.
 
 ## Key technical choices
 

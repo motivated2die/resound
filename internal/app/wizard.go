@@ -11,8 +11,9 @@ import (
 // from Settings. A welcome page is followed by four steps, each a plain
 // page of rows shared with the settings pages; every step can be skipped
 // and redone later: sounds, audio and voice chat, push-to-talk, phone.
-// When Soundux's settings are found, the welcome page offers to carry them
-// over first (soundux.go); the steps then show them for review.
+// When Soundux's or Soundpad's settings are found, the welcome page offers
+// to carry them over first (soundux.go, soundpad.go); the steps then show
+// them for review.
 
 const wizardSteps = 4
 
@@ -83,6 +84,9 @@ func (a *App) wizardPage() []ui.Row {
 	if a.soundux.open && a.soundux.plan != nil {
 		return a.sounduxPage()
 	}
+	if a.soundpad.open {
+		return a.soundpadPage()
+	}
 	return a.wizardWelcome()
 }
 
@@ -109,7 +113,8 @@ func (a *App) wizardWelcome() []ui.Row {
 			"You hear them on your speakers; the others hear them through your microphone.", ui.ToneNormal),
 		ui.Paragraph("Four short steps: add your sounds, set up your audio and voice chat, set your push-to-talk key and pair your phone.", ui.ToneMuted),
 	}
-	return append(append(rows, a.sounduxOffer()...),
+	rows = append(rows, a.sounduxOffer()...)
+	return append(append(rows, a.soundpadOffer()...),
 		ui.Flex(),
 		ui.Button("Start setup", ui.ButtonPrimary, false, func() { a.wizardGo(1) }),
 		ui.Button("Skip, I'll set it up myself", ui.ButtonNormal, false, a.finishWizard),
