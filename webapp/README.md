@@ -14,7 +14,7 @@ Nothing here is embedded into `Resound.exe`.
 
 | File | Purpose |
 |---|---|
-| `index.html`, `js/landing.js`, `css/landing.css` | The landing page at `/`: what Resound is, the download, getting started (with cards for switching from Soundux and Soundpad), features, the desktop panel (an animated picture, icons in `assets/panel-icons/`), how it works, news (the latest two entries open). The installed app skips it |
+| `index.html`, `js/landing.js`, `css/landing.css` | The landing page at `/`: what Resound is, the download, getting started (with cards for switching from Soundpad and Soundux), features, the desktop panel (an animated picture, icons in `assets/panel-icons/`), how it works, news (the latest two entries open). The installed app skips it |
 | `app.html`, `js/app.js`, `js/*.js`, `css/styles.css` | The remote (the soundboard): tabs, sound cards, layouts, settings. The installed app starts here |
 | `js/rtc.js` | The connection: pairing, reconnecting, `fetch()` for `/api/` over the data channel, and events from the PC (`onEvent`, e.g. `library`: `app.js` reloads tabs and sounds). The first script on every page |
 | `connect.html`, `js/connect.js`, `css/connect.css` | Pairing (link, in-app QR scanner, pasted link) and the list of paired PCs |
