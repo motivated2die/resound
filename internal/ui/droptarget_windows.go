@@ -225,10 +225,11 @@ func (p *Popup) clientPoint(pt point) point {
 	return pt
 }
 
-// rowAt returns the slot at window y, or -1.
+// rowAt returns the slot at window y, or -1; a row scrolled under the dock
+// isn't there.
 func (p *Popup) rowAt(y int32) int {
 	for i := range p.slots {
-		if r := p.rowRect(i); y >= r.Top && y < r.Bottom {
+		if r := p.rowRect(i); y >= r.Top && y < r.Bottom && p.reaches(i, y) {
 			return i
 		}
 	}

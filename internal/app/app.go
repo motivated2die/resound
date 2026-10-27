@@ -325,8 +325,8 @@ func (a *App) onEscape() bool {
 		a.cancelCapture()
 	case a.page == pageLibrary && a.imports.editing():
 		// Esc pressed in the editor's browser window reaches the panel too
-		// (escape_windows.go): the library page stays, with its editing
-		// card, until the user leaves it on purpose.
+		// (escape_windows.go): the library page stays, with the files in
+		// its dock, until the user leaves it on purpose.
 	case a.page == pageHome || a.page == pageWizard:
 		return false
 	case a.page == pageSettings:

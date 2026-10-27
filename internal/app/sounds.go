@@ -56,8 +56,8 @@ func (a *App) soundsByFolder() map[string][]library.Sound {
 
 // soundRows list the sounds directly in folder dir, by name, indented to
 // depth: a placeholder when there are none, the name field for the one
-// being renamed, and for one open in the editor a note in place of its
-// tools.
+// being renamed, and for one open in the editor a note and a button that
+// shows its editor in place of its tools.
 func (a *App) soundRows(sounds []library.Sound, depth int) []ui.Row {
 	if len(sounds) == 0 {
 		return []ui.Row{ui.SoundItem(ui.SoundSpec{Name: "No sounds in this folder", Depth: depth, Muted: true})}
@@ -73,8 +73,9 @@ func (a *App) soundRows(sounds []library.Sound, depth int) []ui.Row {
 			continue
 		}
 		spec := ui.SoundSpec{Name: s.Name, Tip: s.Path, Depth: depth}
-		if a.editingSound(s.Path) {
+		if j := a.soundEditor(s.Path); j != nil {
 			spec.Note = "Editing…"
+			spec.Tools = []ui.Tool{{Icon: ui.IconExternalLink, Tip: "Show the editor", OnClick: func() { a.showEditor(j) }}}
 		} else {
 			path, name, id := s.Path, s.Name, s.ID
 			spec.Tools = []ui.Tool{
@@ -86,13 +87,6 @@ func (a *App) soundRows(sounds []library.Sound, depth int) []ui.Row {
 		rows = append(rows, ui.SoundItem(spec))
 	}
 	return rows
-}
-
-// editingSound reports whether a sound is open in the editor.
-func (a *App) editingSound(path string) bool {
-	return slices.ContainsFunc(a.imports.jobs, func(j *soundImport) bool {
-		return j.state == importEditing && strings.EqualFold(j.replace, path)
-	})
 }
 
 // --- rename ---------------------------------------------------------------------

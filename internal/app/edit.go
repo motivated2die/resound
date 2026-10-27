@@ -34,6 +34,9 @@ const (
 	// maxClipBytes limits a clip coming back from the editor (FLAC: about
 	// 10 minutes of 24-bit stereo at 48 kHz).
 	maxClipBytes = 100 << 20
+	// maxDockedEdits is how many files open in the editor the dock lists
+	// one by one; beyond, a line says how many more (Stop all ends them).
+	maxDockedEdits = 5
 )
 
 // editable reports whether a dropped file is one to cut in the editor:
@@ -103,11 +106,9 @@ func (a *App) editFiles(dir string, files []string) {
 // editSound opens a sound of the library in the editor; what it saves
 // replaces the sound. A sound open already brings its editor back.
 func (a *App) editSound(path string) {
-	for _, j := range a.imports.jobs {
-		if j.state == importEditing && strings.EqualFold(j.replace, path) {
-			a.showEditor(j)
-			return
-		}
+	if j := a.soundEditor(path); j != nil {
+		a.showEditor(j)
+		return
 	}
 	a.openInEditor(filepath.Dir(path), path, true)
 }
@@ -115,7 +116,7 @@ func (a *App) editSound(path string) {
 // openInEditor opens path in the editor; new clips go into dir, or, with
 // replace, the editor's saves replace the file.
 func (a *App) openInEditor(dir, path string, replace bool) {
-	job := a.imports.add(&soundImport{dir: dir, host: "editor", state: importEditing, src: filepath.Base(path)})
+	job := a.imports.add(&soundImport{dir: dir, host: "editor", state: importEditing, src: filepath.Base(path), source: path})
 	if replace {
 		job.replace = path
 	}
@@ -151,11 +152,45 @@ func (a *App) showEditor(job *soundImport) {
 // stopEditing ends job: clips already added stay, the page can't add more
 // and finishes, which closes its window.
 func (a *App) stopEditing(job *soundImport) {
+	a.endEditing(job)
+	a.render()
+}
+
+// stopAllEditing ends every file open in the editor, as stopEditing.
+func (a *App) stopAllEditing() {
+	for _, j := range a.editingJobs() {
+		a.endEditing(j)
+	}
+	a.render()
+}
+
+func (a *App) endEditing(job *soundImport) {
 	if job.token != "" && a.imports.bridge != nil {
 		a.imports.bridge.Stop(job.token)
 	}
 	a.imports.remove(job)
-	a.render()
+}
+
+// editingJobs are the files open in the editor, in the order they opened.
+func (a *App) editingJobs() []*soundImport {
+	var out []*soundImport
+	for _, j := range a.imports.jobs {
+		if j.state == importEditing {
+			out = append(out, j)
+		}
+	}
+	return out
+}
+
+// soundEditor returns the job of a library sound open in the editor, or
+// nil.
+func (a *App) soundEditor(path string) *soundImport {
+	for _, j := range a.editingJobs() {
+		if strings.EqualFold(j.replace, path) {
+			return j
+		}
+	}
+	return nil
 }
 
 func (a *App) editingJob(token string) *soundImport {
@@ -278,21 +313,43 @@ func clipMessage(err error) string {
 	return "The clip could not be saved: " + err.Error()
 }
 
-// editRows show, under folder dir's field, that job's file is open in the
-// editor, with buttons to bring the editor back and to stop.
-func (a *App) editRows(job *soundImport) []ui.Row {
-	text := "Opening “" + job.src + "” in the editor in your browser…"
-	switch {
-	case job.opened && job.replace != "":
-		text = "“" + job.src + "” is open in the editor in your browser. Trim it and press “Save to Resound”: it replaces the sound, and the editor closes."
-	case job.opened:
-		text = "“" + job.src + "” is open in the editor in your browser. Cut the part you want and press “Add to Resound”: each clip is saved here. Press “Close” there when you're finished."
+// editDock is the library page's dock while files are open in the editor:
+// each file with buttons to bring its editor back and to stop editing it,
+// and below them one button that stops them all. It stays in view while
+// the page scrolls; the folders the files go into are highlighted too
+// (folderImport). Nil while no file is open.
+func (a *App) editDock() []ui.Row {
+	jobs := a.editingJobs()
+	if len(jobs) == 0 {
+		return nil
 	}
-	return []ui.Row{
-		ui.Paragraph(text, ui.ToneMuted),
-		ui.Buttons(
-			ui.Action{Label: "Show editor", Icon: ui.IconExternalLink, OnClick: func() { a.showEditor(job) }},
-			ui.Action{Label: "Stop editing", OnClick: func() { a.stopEditing(job) }},
-		),
+	shown := jobs
+	if len(shown) > maxDockedEdits {
+		shown = shown[:maxDockedEdits-1] // the last line says how many more
 	}
+	rows := []ui.Row{ui.Section("Open in the editor")}
+	for _, j := range shown {
+		detail := "Opening the editor…"
+		switch {
+		case j.opened && j.replace != "":
+			detail = "Trimming the sound in “" + filepath.Base(j.dir) + "”"
+		case j.opened:
+			detail = "Cutting clips into “" + filepath.Base(j.dir) + "”"
+		}
+		rows = append(rows, ui.TaskItem(ui.TaskSpec{
+			Icon: ui.IconScissors, Name: j.src, Detail: detail, Tip: j.source, Busy: j.opened,
+			Tools: []ui.Tool{
+				{Icon: ui.IconExternalLink, Tip: "Show the editor", OnClick: func() { a.showEditor(j) }},
+				{Icon: ui.IconClose, Tip: "Stop editing: the clips you added stay", OnClick: func() { a.stopEditing(j) }},
+			},
+		}))
+	}
+	if more := len(jobs) - len(shown); more > 0 {
+		rows = append(rows, ui.Paragraph(fmt.Sprintf("and %s more in the editor", plural(more, "file")), ui.ToneMuted))
+	}
+	label := "Stop editing"
+	if len(jobs) > 1 {
+		label = fmt.Sprintf("Stop editing all %d", len(jobs))
+	}
+	return append(rows, ui.Button(label, ui.ButtonNormal, false, a.stopAllEditing))
 }
