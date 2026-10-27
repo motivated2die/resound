@@ -67,6 +67,7 @@ code { font-family: Consolas, "Cascadia Mono", monospace; background: var(--rais
 .icon[data-icon="code"] { --icon: url("../assets/icons/code.svg"); }
 .icon[data-icon="computer"] { --icon: url("../assets/icons/computer.svg"); }
 .icon[data-icon="download"] { --icon: url("../assets/icons/download.svg"); }
+.icon[data-icon="expand_more"] { --icon: url("../assets/icons/expand_more.svg"); }
 .icon[data-icon="edit"] { --icon: url("../assets/icons/edit.svg"); }
 .icon[data-icon="favorite-fill"] { --icon: url("../assets/icons/favorite-fill.svg"); }
 .icon[data-icon="folder_open"] { --icon: url("../assets/icons/folder_open.svg"); }
@@ -506,6 +507,7 @@ h1 { font-size: clamp(32px, 5vw, 52px); line-height: 1.1; font-weight: 700; lett
 .picon[data-picon="refresh"] { --picon: url("../assets/panel-icons/refresh.svg"); }
 .picon[data-picon="scissors"] { --picon: url("../assets/panel-icons/scissors.svg"); }
 .picon[data-picon="settings"] { --picon: url("../assets/panel-icons/settings.svg"); }
+.picon[data-picon="transfer-in"] { --picon: url("../assets/panel-icons/transfer-in.svg"); }
 .picon[data-picon="x"] { --picon: url("../assets/panel-icons/x.svg"); }
 
 /* The panel's shadow and glow never widen the page on phones. */
@@ -1237,11 +1239,77 @@ h3 { font-size: 18px; line-height: 1.3; margin-bottom: 6px; }
 .flow-label { display: flex; align-items: center; gap: 6px; margin-top: 10px; font-size: 13px; color: var(--accent); text-align: center; }
 .flow-label .icon { font-size: 16px; }
 .how-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; }
+/* Switching from another soundboard: two cards below the steps, in the
+   accent like the header's Help button. A few dots drift from the old app
+   to Resound, slowly and faintly. */
+.switchers { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; margin-top: 16px; }
+.switcher {
+    display: grid;
+    gap: 8px;
+    padding: 18px 22px 20px;
+    border-radius: var(--radius);
+    border: 1px solid rgba(var(--accent-rgb), 0.45);
+    background: rgba(var(--accent-rgb), 0.07);
+    color: var(--muted);
+    font-size: 15px;
+    text-decoration: none;
+    transition: background 0.15s, border-color 0.15s;
+}
+.switcher:hover { background: rgba(var(--accent-rgb), 0.13); border-color: var(--accent); }
+.switcher-title { display: flex; align-items: center; gap: 8px; font-size: 17px; font-weight: 600; color: var(--accent); }
+.switcher:hover .switcher-title { color: var(--accent-light); }
+.switcher-title .picon { font-size: 20px; }
+.switcher-flow { display: flex; align-items: center; gap: 10px; margin-bottom: 4px; }
+.switcher-app {
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    color: var(--text);
+    background: var(--control);
+    padding: 3px 10px;
+    border-radius: 999px;
+}
+.switcher-flow img { border-radius: 6px; }
+.switcher-track { position: relative; flex: 1; max-width: 120px; height: 6px; border-radius: 3px; background: rgba(var(--accent-rgb), 0.12); }
+.switcher-track i {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--accent);
+    opacity: 0;
+}
+@media (prefers-reduced-motion: no-preference) {
+    .switcher-track i { animation: switcher-move 3.6s ease-in-out infinite; }
+    .switcher-track i:nth-child(2) { animation-delay: 1.2s; }
+    .switcher-track i:nth-child(3) { animation-delay: 2.4s; }
+    @keyframes switcher-move {
+        0% { left: 0; opacity: 0; }
+        20%, 70% { opacity: 0.8; }
+        100% { left: calc(100% - 6px); opacity: 0; }
+    }
+}
+@media (prefers-reduced-motion: reduce) {
+    .switcher-track i { opacity: 0.6; }
+    .switcher-track i:nth-child(2) { left: calc(50% - 3px); }
+    .switcher-track i:nth-child(3) { left: calc(100% - 6px); }
+}
+
 .how-links { display: flex; flex-wrap: wrap; gap: 8px 24px; margin-top: 20px; font-size: 15px; }
 
 /* News */
 .news { display: grid; gap: 16px; max-width: 760px; }
 .news-meta { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; color: var(--muted); }
+/* Entries are <details>: the latest two open, older ones closed by
+   landing.js (all open without it). */
+.news-item summary { display: block; list-style: none; cursor: pointer; }
+.news-item summary::-webkit-details-marker { display: none; }
+.news-item:not([open]) h3 { margin-bottom: 0; }
+.news-toggle { margin-left: auto; font-size: 22px; color: var(--caption); transition: transform 0.2s; }
+.news-item[open] .news-toggle { transform: rotate(180deg); }
+.news-item summary:hover .news-toggle { color: var(--text); }
 .news-version { font-size: 13px; color: var(--caption); }
 .badge { font-size: 12px; font-weight: 700; letter-spacing: 0.04em; color: var(--on-accent); background: var(--accent); padding: 2px 9px; border-radius: 999px; }
 
@@ -1319,7 +1387,7 @@ h3 { font-size: 18px; line-height: 1.3; margin-bottom: 6px; }
     .ed-visual { max-width: 380px; padding-bottom: 36px; }
     .edv-toast { right: 10px; }
     .ed-points { font-size: 14px; }
-    .steps, .features, .how-grid { grid-template-columns: 1fr; }
+    .steps, .features, .how-grid, .switchers { grid-template-columns: 1fr; }
     .section { padding: 44px 0; }
     .section.ed-section { padding-bottom: 70px; }
     .lead { font-size: 17px; }

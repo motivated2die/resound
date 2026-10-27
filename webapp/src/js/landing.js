@@ -33,6 +33,8 @@
     });
 
     document.addEventListener('DOMContentLoaded', () => {
+        // News: the latest two entries stay open, older ones start closed.
+        document.querySelectorAll('.news-item').forEach((d, i) => { if (i >= 2) d.open = false; });
         const target = pc ? '/app' : '/connect';
         document.querySelectorAll('[data-open-app]').forEach((a) => { a.href = target; });
         document.querySelectorAll('[data-open-app-label]').forEach((s) => {
