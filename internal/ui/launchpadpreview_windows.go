@@ -1,9 +1,10 @@
 package ui
 
 // LaunchpadPreview is a small, fixed picture of the launchpad for the panel,
-// beside paragraphs as in OverlayPreview: three of the phone's buttons
-// stacked in a narrow dark screen, emoji only like the overlay's picture, each with its key in
-// the launchpad's yellow in the corner, the middle one playing, as if its
+// beside paragraphs as in OverlayPreview: six of the phone's buttons in two
+// columns in a small dark screen, emoji only like the overlay's picture,
+// each with its key in the launchpad's yellow in the corner, numbered as on
+// the phone, row by row (1 2, 3 4, 5 6). The second one plays, as if its
 // key had just been pressed. Upright like the overlay's bar, it leaves the
 // text beside it most of the row.
 func LaunchpadPreview(underline string, paragraphs ...string) Row {
@@ -21,21 +22,24 @@ const (
 	lpvScreenR = 11 // the screen's corners
 	lpvKey     = 13 // a key's label
 	lpvKeyIn   = 3  // from the button's corner
+	lpvColumns = 2
 )
 
-// lpvItems are the example buttons; the second one plays.
+// lpvItems are the example buttons, row by row; the second one plays.
 var lpvItems = []OverlayItem{
 	{Name: "Airhorn", Emoji: "📯", Color: "red"},
 	{Name: "Bruh", Emoji: "😑", Color: "purple"},
 	{Name: "Applause", Emoji: "👏", Color: "green"},
+	{Name: "Drumroll", Emoji: "🥁", Color: "orange"},
+	{Name: "Sad trombone", Emoji: "🎺", Color: "blue"},
+	{Name: "Vine boom", Emoji: "💥", Color: "pink"},
 }
 
 var (
-	lpvScreenColor  = rgbaF(rgb(0x1C, 0x1D, 0x22), 1)    // the phone's background
-	lpvScreenBorder = rgbaF(LaunchpadYellow, 0.55)       // the screen glows while the key is held
-	lpvKeyText      = rgbaF(rgb(0x2A, 0x22, 0x08), 1)    // as on the phone (--on-launchpad)
-	lpvPlayEdge     = rgbaF(rgb(0xCE, 0x93, 0xD8), 1)    // the playing button's outline (the phone's purple)
-	lpvPlayFill     = rgbaF(rgb(0xFF, 0xFF, 0xFF), 0.10) // its progress
+	lpvScreenColor = rgbaF(rgb(0x1C, 0x1D, 0x22), 1)    // the phone's background
+	lpvKeyText     = rgbaF(rgb(0x2A, 0x22, 0x08), 1)    // as on the phone (--on-launchpad)
+	lpvPlayEdge    = rgbaF(rgb(0xCE, 0x93, 0xD8), 1)    // the playing button's outline (the phone's purple)
+	lpvPlayFill    = rgbaF(rgb(0xFF, 0xFF, 0xFF), 0.10) // its progress
 )
 
 var lpvCache struct {
@@ -63,9 +67,9 @@ func renderLaunchpadPreview(scale float64) (*surface, error) {
 	}
 	s := float32(scale)
 	px := func(v int) float32 { return float32(v) * s }
-	n := len(lpvItems)
-	screenW := px(2*lpvPad + lpvButton)
-	screenH := px(2*lpvPad + n*lpvButton + (n-1)*lpvGap)
+	rows := (len(lpvItems) + lpvColumns - 1) / lpvColumns
+	screenW := px(2*lpvPad + lpvColumns*lpvButton + (lpvColumns-1)*lpvGap)
+	screenH := px(2*lpvPad + rows*lpvButton + (rows-1)*lpvGap)
 	pad := ovShadowPanel.pad()
 	surf, err := newSurface(int32(screenW+px(2*pad)+0.5), int32(screenH+px(2*pad)+0.5))
 	if err != nil {
@@ -80,13 +84,11 @@ func renderLaunchpadPreview(scale float64) (*surface, error) {
 		surf.free()
 		return nil, err
 	}
-	// The screen, its border a ring around it.
-	border := px(1)
-	p.fillRound(screen, px(lpvScreenR), lpvScreenBorder)
-	p.fillRound(rectF{screen.L + border, screen.T + border, screen.R - border, screen.B - border}, px(lpvScreenR)-border, lpvScreenColor)
+	p.fillRound(screen, px(lpvScreenR), lpvScreenColor)
 	for i, it := range lpvItems {
-		y := screen.T + px(lpvPad+i*(lpvButton+lpvGap))
-		b := rectF{screen.L + px(lpvPad), y, screen.L + px(lpvPad+lpvButton), y + px(lpvButton)}
+		x := screen.L + px(lpvPad+i%lpvColumns*(lpvButton+lpvGap))
+		y := screen.T + px(lpvPad+i/lpvColumns*(lpvButton+lpvGap))
+		b := rectF{x, y, x + px(lpvButton), y + px(lpvButton)}
 		inner := b
 		if i == 1 { // playing: an outline, and the progress over the left part
 			p.fillRound(b, px(lpvRadius), lpvPlayEdge)
