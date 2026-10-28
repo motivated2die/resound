@@ -836,32 +836,54 @@ h1 { font-size: clamp(32px, 5vw, 52px); line-height: 1.1; font-weight: 700; lett
    on top of each other in one grid cell: both take the taller one's height,
    so switching never moves the page. The selected tab's line fills up while
    the demos switch by themselves. */
-.demo-tabs { display: flex; justify-content: center; gap: 6px; margin-bottom: 18px; }
+.demo-tabs .icon { font-size: 19px; }
+/* Tabs of one width (the wider one's), their lines as wide, on the cards'
+   left edge. */
+.demo-tabs {
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: 1fr;
+    width: max-content;
+    gap: 8px;
+    margin-bottom: 18px;
+}
 .demo-tab {
     --tab-rgb: var(--accent-rgb);
     position: relative;
+    isolation: isolate;
     display: inline-flex;
     align-items: center;
+    justify-content: center;
     gap: 8px;
-    padding: 9px 16px 13px;
+    padding: 9px 20px 17px;
     border: 0;
-    border-radius: 10px 10px 0 0;
     background: none;
     color: var(--muted);
     font: inherit;
     font-size: 15px;
     font-weight: 600;
+    white-space: nowrap;
     cursor: pointer;
-    transition: color 0.2s ease, background-color 0.2s ease;
+    transition: color 0.2s ease;
+}
+/* The hover background: a pill above the line. */
+.demo-tab::before {
+    content: "";
+    position: absolute;
+    inset: 0 0 8px;
+    border-radius: 999px;
+    background: transparent;
+    z-index: -1;
+    transition: background-color 0.2s ease;
 }
 .demo-tab.lp { --tab-rgb: var(--launchpad-rgb); }
-.demo-tab .icon { font-size: 19px; }
-.demo-tab:hover { color: var(--text); background: rgba(255, 255, 255, 0.03); }
+.demo-tab:hover { color: var(--text); }
+.demo-tab:hover::before { background: rgba(255, 255, 255, 0.05); }
 .demo-tab[aria-selected="true"] { color: rgb(var(--tab-rgb)); }
 .demo-tab-line {
     position: absolute;
-    left: 12px;
-    right: 12px;
+    left: 0;
+    right: 0;
     bottom: 0;
     height: 3px;
     border-radius: 2px;
@@ -917,13 +939,9 @@ h1 { font-size: clamp(32px, 5vw, 52px); line-height: 1.1; font-weight: 700; lett
 .lp-pads .tile {
     aspect-ratio: 1;
     font-size: 10px;
-    cursor: pointer;
     touch-action: manipulation;
-    transition: transform 0.12s ease, filter 0.12s ease;
 }
 .lp-pads .tile b { font-size: 28px; }
-.lp-pads .tile:active { transform: scale(0.93); }
-@media (hover: hover) { .lp-pads .tile:hover { filter: brightness(1.18); } }
 .lp-key {
     position: absolute;
     top: 4px;
@@ -954,11 +972,40 @@ h1 { font-size: clamp(32px, 5vw, 52px); line-height: 1.1; font-weight: 700; lett
 .lp-phone.held .lp-tab { color: var(--launchpad); }
 .lp-callout { border-color: rgba(var(--launchpad-rgb), 0.35); background: rgba(var(--launchpad-rgb), 0.07); }
 .lp-callout:hover, .lp-callout[aria-pressed="true"] { border-color: rgba(var(--launchpad-rgb), 0.6); background: rgba(var(--launchpad-rgb), 0.11); }
-.lp-callout .kbd-big { color: var(--launchpad); }
-.lp-status { color: var(--launchpad); }
+.lp-callout .kbd-big {
+    color: var(--launchpad);
+    box-shadow:
+        inset 0 -1px 0 rgba(0, 0, 0, 0.5),
+        0 3px 0 #141519,
+        0 10px 18px rgba(0, 0, 0, 0.5),
+        0 0 26px rgba(var(--launchpad-rgb), 0.12);
+}
+.lp-callout .kbd-big.down {
+    box-shadow:
+        inset 0 -1px 0 rgba(0, 0, 0, 0.5),
+        0 1px 0 #141519,
+        0 4px 10px rgba(0, 0, 0, 0.45),
+        0 0 30px rgba(var(--launchpad-rgb), 0.28);
+}
+/* A button clicked instead of played by its key: the key glows, twice
+   (launchpad-demo.js hint); without a keyboard, the box. */
+.lp-callout .kbd-big.hint { animation: lp-key-hint 0.5s ease-in-out 2; }
+@keyframes lp-key-hint {
+    50% {
+        box-shadow:
+            inset 0 -1px 0 rgba(0, 0, 0, 0.5),
+            0 3px 0 #141519,
+            0 10px 18px rgba(0, 0, 0, 0.5),
+            0 0 0 2px rgba(var(--launchpad-rgb), 0.85),
+            0 0 34px rgba(var(--launchpad-rgb), 0.65);
+    }
+}
+.lp-callout.hint { animation: lp-box-hint 0.5s ease-in-out 2; }
+@keyframes lp-box-hint { 50% { border-color: var(--launchpad); box-shadow: 0 0 26px rgba(var(--launchpad-rgb), 0.4); } }
 @media (prefers-reduced-motion: reduce) {
     .lp-key, .lp-phone { transition: none; }
     .lp-key.hit { animation: none; }
+    .lp-callout .kbd-big.hint, .lp-callout.hint { animation-duration: 0.01s; animation-iteration-count: 1; }
 }
 
 /* --- Audio editor (index.html #editor) ---
@@ -1482,8 +1529,10 @@ h3 { font-size: 18px; line-height: 1.3; margin-bottom: 6px; }
     .ovl-action { align-self: center; }
     .ovl-callout { width: 100%; flex-direction: column; align-items: flex-start; gap: 12px; padding: 14px; font-size: 14px; }
     .ovl-status { font-size: 14px; }
-    .demo-tabs { margin-bottom: 22px; }
-    .demo-tab { padding: 8px 12px 12px; font-size: 14px; }
+    .demo-tabs { width: 100%; margin-bottom: 22px; }
+    .demo-tab { padding: 8px 10px 16px; font-size: 14px; }
+    /* The picture and the box beside it, centred on each other. */
+    .lp-card .ovl-visual, .lp-card .ovl-action { align-self: center; }
     .lp-visual { width: 168px; }
     .lp-phone { padding: 6px 6px 3px; border-radius: 14px; }
     .lp-pads { gap: 4px; }

@@ -7,30 +7,30 @@
 // landing.js), and letting go of Alt takes the keys away. Alt is shared with
 // the overlay's demo: held for HOLD_MS, or with a digit, it is the
 // launchpad's (tookAlt); a short tap opens the overlay. Without a keyboard,
-// the box holds the key until it is tapped again; the buttons always play
-// when tapped.
+// the box holds the key until it is tapped again. The buttons only play by
+// their keys, the point of the launchpad: clicked, the Alt key glows
+// instead (without a keyboard, the box, unless it holds the key).
 //
 // The demos are two cards on top of each other, so they take the same
-// height. While nobody plays with them, hovers over the section or has it
-// out of view, the tabs above switch to the other one every CYCLE_MS, the
-// selected tab's line filling up meanwhile. Using a demo's key shows its
-// card.
+// height. While nobody plays with them, has the mouse over a card or the
+// section out of view, the tabs above switch to the other one every
+// CYCLE_MS, the selected tab's line filling up meanwhile. Using a demo's key
+// shows its card.
 (() => {
     'use strict';
 
     const HOLD_MS = 280;      // Alt held this long is the launchpad's, not a tap
-    const CYCLE_MS = 5000;    // each demo, while nobody plays with them
+    const CYCLE_MS = 6500;    // each demo, while nobody plays with them
     const PLAY_MS = 2600;     // a pad's progress bar (--play in css/landing.css)
-    const STATUS_MS = 2500;   // what played, below the box
 
     const touch = window.matchMedia('(pointer: coarse)').matches;
     const still = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    let section, tabs, cards, pads, tiles, box, status, label;
+    let section, tabs, cards, pads, tiles, box, key, label;
     let current = 'launchpad';
     let held = false;      // the keys show
     let altDown = false;
     let tookAlt = false;   // this Alt press was the launchpad's
-    let altTimer = 0, statusTimer = 0;
+    let altTimer = 0;
     const playTimers = new WeakMap();
 
     window.launchpadDemo = { tookAlt: () => tookAlt };
@@ -43,15 +43,20 @@
         tabs = [...section.querySelectorAll('[data-demo-tab]')];
         cards = [...section.querySelectorAll('[data-demo]')];
         tiles = [...pads.querySelectorAll('.tile')];
-        status = document.querySelector('[data-lp-status]');
         label = document.querySelector('[data-lp-label]');
+        key = document.querySelector('[data-lp-key]');
 
         if (touch) { // no Alt key to hold: the box holds it
-            document.querySelector('[data-lp-key]')?.remove();
+            key?.remove();
+            key = null;
             setLabel();
         }
-        box.addEventListener('click', () => setHeld(!held));
-        tiles.forEach((tile, i) => tile.addEventListener('click', () => { play(i); cycle.touched(); }));
+        box.addEventListener('click', () => (touch ? setHeld(!held) : hint()));
+        tiles.forEach((tile, i) => tile.addEventListener('click', () => {
+            if (touch && held) play(i);
+            else hint();
+            cycle.touched();
+        }));
         document.addEventListener('keydown', onKeyDown, true);
         document.addEventListener('keyup', onKeyUp, true);
         window.addEventListener('blur', letGo);
@@ -79,10 +84,7 @@
         held = on;
         pads.classList.toggle('held', on);
         box.setAttribute('aria-pressed', String(on));
-        if (on) {
-            select('launchpad');
-            say('');
-        }
+        if (on) select('launchpad');
         setLabel();
         cycle.sync();
     }
@@ -94,8 +96,8 @@
             : '<strong>Try it now:</strong> tap here to hold the launchpad key.';
     }
 
-    // play plays the i-th button as its key would: the pad's animation, its
-    // key flashing while the keys show, and its name below the box.
+    // play plays the i-th button as its key would: the pad's animation, and
+    // its key flashing while the keys show.
     function play(i) {
         const tile = tiles[i];
         if (!tile) return;
@@ -110,16 +112,15 @@
             void key.offsetWidth;
             key.classList.add('hit');
         }
-        const emoji = tile.querySelector('b')?.textContent || '';
-        const name = tile.querySelector('span')?.textContent || '';
-        say(held ? `${i + 1} played ${emoji} ${name}` : `${emoji} ${name}`);
     }
 
-    function say(text) {
-        if (!status) return;
-        clearTimeout(statusTimer);
-        status.textContent = text;
-        if (text) statusTimer = setTimeout(() => { status.textContent = ''; }, STATUS_MS);
+    // hint points at the key that plays the buttons, when one is clicked
+    // instead: the Alt key glows (without a keyboard, the box).
+    function hint() {
+        const el = key || box;
+        el.classList.remove('hint');
+        void el.offsetWidth; // again, even while it glows
+        el.classList.add('hint');
     }
 
     // digit is the button a key plays: 1 to 6, above the letters or on the
@@ -224,8 +225,11 @@
                     const next = tabs[(tabs.indexOf(tab) + 1) % tabs.length];
                     select(next.dataset.demoTab);
                 }));
-                section.addEventListener('pointerenter', (e) => { if (e.pointerType === 'mouse') { hovered = true; this.sync(); } });
-                section.addEventListener('pointerleave', () => { hovered = false; this.sync(); });
+                // The mouse over a card holds it, not over the tabs or beside the cards.
+                cards.forEach((card) => {
+                    card.addEventListener('pointerenter', (e) => { if (e.pointerType === 'mouse') { hovered = true; this.sync(); } });
+                    card.addEventListener('pointerleave', () => { hovered = false; this.sync(); });
+                });
                 // Keyboard focus only: a clicked tab keeps the focus, but not the line.
                 section.addEventListener('focusin', (e) => { focused = e.target.matches(':focus-visible'); this.sync(); });
                 section.addEventListener('focusout', (e) => {
