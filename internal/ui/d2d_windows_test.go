@@ -95,24 +95,65 @@ func TestRenderOverlay(t *testing.T) {
 		if a := s.bits[3]; a != 0 {
 			t.Errorf("%s: top left corner alpha %d, want 0", name, a)
 		}
-		if dir := os.Getenv("RESOUND_RENDER_DIR"); dir != "" {
-			img := image.NewNRGBA(image.Rect(0, 0, int(s.w), int(s.h)))
-			for i := 0; i < int(s.w*s.h); i++ {
-				b, g, r, a := s.bits[4*i], s.bits[4*i+1], s.bits[4*i+2], s.bits[4*i+3]
-				bg := uint32(0x2B) // a dark scene: premultiplied over it
-				img.Pix[4*i] = uint8(uint32(r) + bg*(255-uint32(a))/255)
-				img.Pix[4*i+1] = uint8(uint32(g) + (bg+0x0A)*(255-uint32(a))/255)
-				img.Pix[4*i+2] = uint8(uint32(b) + (bg-0x08)*(255-uint32(a))/255)
-				img.Pix[4*i+3] = 255
-			}
-			f, err := os.Create(filepath.Join(dir, "overlay-"+name+".png"))
-			if err != nil {
-				t.Fatal(err)
-			}
-			_ = png.Encode(f, img)
-			f.Close()
-		}
+		saveScene(t, s, "overlay-"+name)
 		s.free()
+	}
+}
+
+// saveScene saves a frame as a PNG over a dark background, for a look, when
+// RESOUND_RENDER_DIR is set.
+func saveScene(t *testing.T, s *surface, name string) {
+	dir := os.Getenv("RESOUND_RENDER_DIR")
+	if dir == "" {
+		return
+	}
+	img := image.NewNRGBA(image.Rect(0, 0, int(s.w), int(s.h)))
+	for i := 0; i < int(s.w*s.h); i++ {
+		b, g, r, a := s.bits[4*i], s.bits[4*i+1], s.bits[4*i+2], s.bits[4*i+3]
+		bg := uint32(0x2B) // a dark scene: premultiplied over it
+		img.Pix[4*i] = uint8(uint32(r) + bg*(255-uint32(a))/255)
+		img.Pix[4*i+1] = uint8(uint32(g) + (bg+0x0A)*(255-uint32(a))/255)
+		img.Pix[4*i+2] = uint8(uint32(b) + (bg-0x08)*(255-uint32(a))/255)
+		img.Pix[4*i+3] = 255
+	}
+	f, err := os.Create(filepath.Join(dir, name+".png"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = png.Encode(f, img)
+	f.Close()
+}
+
+// The launchpad's badge renders with transparency around it, wider with
+// text; with RESOUND_RENDER_DIR set, frames are saved as PNGs.
+func TestRenderLaunchpadBadge(t *testing.T) {
+	if _, err := getD2D(); err != nil {
+		t.Skipf("no Direct2D: %v", err)
+	}
+	scenes := map[string]badgeScene{
+		"button":    {scale: 1.5},
+		"tab":       {scale: 1.5, text: "Favorites"},
+		"right":     {scale: 1.5, right: true, text: "Anime › Naruto"},
+		"played":    {scale: 1.5, text: "Car horn", emoji: "🚗", flash: flashOK},
+		"failed":    {scale: 1.5, text: "Bruh", emoji: "😠", flash: flashBad},
+		"long name": {scale: 1.5, text: "A very long sound name that goes on and on and on"},
+	}
+	widths := map[string]int32{}
+	for name, sc := range scenes {
+		sc.shadow = ovShadowGame
+		s, err := renderBadge(sc)
+		if err != nil {
+			t.Fatalf("%s: %v", name, err)
+		}
+		if a := s.bits[3]; a != 0 {
+			t.Errorf("%s: top left corner alpha %d, want 0", name, a)
+		}
+		widths[name] = s.w
+		saveScene(t, s, "launchpad-"+name)
+		s.free()
+	}
+	if widths["button"] >= widths["tab"] || widths["tab"] >= widths["long name"] {
+		t.Errorf("widths %v: the button alone must be narrowest, a long name widest", widths)
 	}
 }
 

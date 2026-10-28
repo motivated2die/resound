@@ -54,6 +54,7 @@ const (
 	IconInfo         Icon = "info-circle"
 	IconKeyboard     Icon = "keyboard"
 	IconLayoutDash   Icon = "layout-dashboard-filled"
+	IconLaunchpad    Icon = "grid-dots"
 	IconMic          Icon = "microphone"
 	IconMicOff       Icon = "microphone-off"
 	IconPause        Icon = "player-pause"
