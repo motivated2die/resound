@@ -75,6 +75,11 @@ type Server struct {
 
 	// Name is this PC's name, shown in the app.
 	Name string
+	// OnView is told that the remote in use may show something else
+	// (views.go).
+	OnView func()
+
+	views views
 
 	handlerOnce sync.Once
 	handlerVal  http.Handler
@@ -268,4 +273,7 @@ func (s *Server) routes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/library/tab-order", s.handleTabOrder)
 	mux.HandleFunc("POST /api/sounds/{id}/appearance", s.handleAppearance)
 	mux.HandleFunc("POST /api/layouts/{key}", s.handleSetLayout)
+
+	// The launchpad (views.go): what each remote shows.
+	mux.HandleFunc("POST /api/remote/view", s.handleView)
 }

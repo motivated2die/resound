@@ -43,6 +43,7 @@ import (
 	"net/http"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 	"unicode/utf8"
 
@@ -65,13 +66,25 @@ const (
 // rtcProtocol is the app protocol version, sent in the welcome message.
 const rtcProtocol = 1
 
-type rtcDeviceKey struct{}
+type (
+	rtcDeviceKey struct{}
+	rtcConnKey   struct{}
+)
 
 // rtcDevice returns the app device a request came from, or "".
 func rtcDevice(r *http.Request) string {
 	id, _ := r.Context().Value(rtcDeviceKey{}).(string)
 	return id
 }
+
+// requestConn returns the connection a request came on (rtcSession.id), or 0.
+func requestConn(r *http.Request) uint64 {
+	id, _ := r.Context().Value(rtcConnKey{}).(uint64)
+	return id
+}
+
+// rtcConns numbers the connections.
+var rtcConns atomic.Uint64
 
 // RTC accepts the app's WebRTC connections on a UDP port.
 type RTC struct {
@@ -228,6 +241,7 @@ func (r *RTC) password(ufrag string) (pwd, deviceID string, ok bool) {
 // rtcSession is one app connection.
 type rtcSession struct {
 	r      *RTC
+	id     uint64 // numbers the connections, from 1 (View.Conn)
 	ufrag  string
 	pc     *webrtc.PeerConnection
 	dc     *webrtc.DataChannel
@@ -280,7 +294,7 @@ func (r *RTC) newSession(local, remote, pwd, deviceID string, addr net.Addr) err
 		return err
 	}
 	ctx, cancel := context.WithCancel(context.Background())
-	sess := &rtcSession{r: r, ufrag: local, pc: pc, dc: dc, addr: addr.String(),
+	sess := &rtcSession{r: r, id: rtcConns.Add(1), ufrag: local, pc: pc, dc: dc, addr: addr.String(),
 		pairOK: deviceID == "", expect: deviceID, ctx: ctx, cancel: cancel}
 
 	pc.OnConnectionStateChange(func(st webrtc.PeerConnectionState) {
@@ -368,6 +382,7 @@ func (s *rtcSession) close() {
 		delete(s.r.sessions, s.ufrag)
 	}
 	s.r.mu.Unlock()
+	s.r.s.dropView(s.id)
 	// Not on this goroutine: it may be a pion callback. A last message (such
 	// as "denied") is still queued; closing at once would drop it.
 	go func() {
@@ -539,7 +554,7 @@ func (s *rtcSession) serve(m rtcMessage, device string) {
 		s.send(reply)
 		return
 	}
-	ctx := context.WithValue(s.ctx, rtcDeviceKey{}, device)
+	ctx := context.WithValue(context.WithValue(s.ctx, rtcDeviceKey{}, device), rtcConnKey{}, s.id)
 	req, err := http.NewRequestWithContext(ctx, m.Method, m.Path, strings.NewReader(m.Body))
 	if err != nil {
 		reply["s"] = http.StatusBadRequest
