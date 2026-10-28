@@ -18,7 +18,7 @@ const launchpad = (() => {
     const YELLOW_RIPPLE = 'rgba(255, 201, 60, 0.35)';
     const KEYS_ANIM_MS = 200;  // the keys' coming and going (styles.css launchpad-key-in/-out)
 
-    let supported = true; // an older PC answers 404
+    let supported = true; // an older PC answers 404; asked again on each new connection
     let ready = false;    // the app has loaded its tabs
     let seq = 0;          // the newest launchpad message applied
     let active = false;
@@ -143,7 +143,10 @@ const launchpad = (() => {
         if (container) new MutationObserver(() => { if (active) decorate(); }).observe(container, { childList: true });
         window.resoundRTC?.onEvent((msg) => { if (msg.e === 'launchpad') onLaunchpad(msg); });
         window.resoundRTC?.onStatus((status) => {
-            if (status === 'up') report(false); // a new connection: the PC knows it by its report
+            if (status === 'up') { // a new connection: the PC knows it by its report
+                supported = true; // maybe an updated PC, after an older one said no
+                report(false);
+            }
             else if (status === 'down') { keys = new Map(); setActive(false); }
         });
     };
