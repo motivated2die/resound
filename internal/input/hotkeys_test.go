@@ -54,6 +54,50 @@ func TestMatcherStopOncePerPress(t *testing.T) {
 	}
 }
 
+// A toggle pause key reports each press, once, like a stop key, and
+// neither its repeats nor its release; it is never swallowed or handed
+// over (the game gets it as it is), unlike a pause key.
+func TestMatcherTogglePause(t *testing.T) {
+	b := &Bindings{TogglePause: []Combo{{vkLCtrl, vkF}}, Pause: []Combo{{vkG}}}
+	var f Filter
+	toggle := []HotkeyEvent{{Action: ActionTogglePause, Down: true}}
+	steps := []struct {
+		vk   uint16
+		down bool
+		want []HotkeyEvent
+	}{
+		{vkF, true, nil}, // F alone is not Ctrl+F
+		{vkF, false, nil},
+		{vkRCtrl, true, nil},
+		{vkF, true, toggle},
+		{vkF, true, nil}, // auto-repeat
+		{vkF, false, nil},
+		{vkF, true, toggle}, // again
+		{vkG, true, []HotkeyEvent{{Action: ActionPause, Down: true}}},
+		{vkG, false, []HotkeyEvent{{Action: ActionPause}}},
+		{vkF, false, nil},
+		{vkRCtrl, false, nil},
+	}
+	for i, s := range steps {
+		got, swallow := f.Key(b, s.vk, s.down)
+		if !reflect.DeepEqual(got, s.want) || swallow {
+			t.Fatalf("step %d (vk %#x down=%v): got %v swallow=%v, want %v", i, s.vk, s.down, got, swallow, s.want)
+		}
+		if handsOver(got) != (len(got) > 0 && got[0].Action == ActionPause && got[0].Down) {
+			t.Fatalf("step %d: handsOver %v for %v", i, handsOver(got), got)
+		}
+	}
+	if (Bindings{TogglePause: []Combo{{vkF}}}).Empty() {
+		t.Fatal("toggle pause keys alone are bindings")
+	}
+	if !(Bindings{TogglePause: []Combo{{0x05}}}).UsesMouse() {
+		t.Fatal("a toggle pause mouse button needs the mouse hook")
+	}
+	if (Keymap{Global: Bindings{TogglePause: []Combo{{vkF}}}}).Hotkeys() {
+		t.Fatal("toggle pause keys alone lend nothing: they don't hand over")
+	}
+}
+
 // A pause lasts while its keys are held, also when the bindings change
 // meanwhile (another app comes to the foreground, or the settings change):
 // it never ends early or bounces, and it ends with its keys' release.
@@ -229,6 +273,133 @@ func TestFilterOverlayCombo(t *testing.T) {
 	// F alone doesn't select.
 	if ev, sw := f.Key(b, vkF, true); sw || len(ev) != 0 {
 		t.Fatalf("F alone: %v %v", ev, sw)
+	}
+}
+
+// While the launchpad key is held, every new press is swallowed and becomes
+// a launchpad event; keys held before pass, releases with their presses.
+func TestFilterLaunchpad(t *testing.T) {
+	const vkCaps, vkW, vk3, vkNum7, vkF1 = 0x14, 0x57, 0x33, 0x67, 0x70
+	b := &Bindings{Launchpad: Combo{vkCaps}, Pause: []Combo{{vkG}}, Stop: []Combo{{vkX}}}
+	var f Filter
+	type ev = HotkeyEvent
+	steps := []struct {
+		name    string
+		vk      uint16
+		down    bool
+		want    []HotkeyEvent
+		swallow bool
+	}{
+		{"W held before", vkW, true, nil, false},
+		{"launchpad key starts it", vkCaps, true, []ev{{Action: ActionLaunchpad, Down: true}}, true},
+		{"its repeat is swallowed", vkCaps, true, nil, true},
+		{"W repeating passes", vkW, true, nil, false},
+		{"a digit plays", vk3, true, []ev{{Action: ActionLaunchpadKey, Down: true, Key: '3'}}, true},
+		{"its repeat does nothing", vk3, true, nil, true},
+		{"its release is swallowed", vk3, false, nil, true},
+		{"pressed again plays again", vk3, true, []ev{{Action: ActionLaunchpadKey, Down: true, Key: '3'}}, true},
+		{"release", vk3, false, nil, true},
+		{"a numpad digit is that digit", vkNum7, true, []ev{{Action: ActionLaunchpadKey, Down: true, Key: '7'}}, true},
+		{"release", vkNum7, false, nil, true},
+		{"a letter plays", vkF, true, []ev{{Action: ActionLaunchpadKey, Down: true, Key: 'F'}}, true},
+		{"release", vkF, false, nil, true},
+		{"the pause key is a letter here", vkG, true, []ev{{Action: ActionLaunchpadKey, Down: true, Key: 'G'}}, true},
+		{"and pauses nothing", vkG, false, nil, true},
+		{"so is the stop key", vkX, true, []ev{{Action: ActionLaunchpadKey, Down: true, Key: 'X'}}, true},
+		{"release", vkX, false, nil, true},
+		{"Space goes down", vkSpace, true, []ev{{Action: ActionLaunchpadSpace, Down: true}}, true},
+		{"its repeats are swallowed", vkSpace, true, nil, true},
+		{"and up", vkSpace, false, []ev{{Action: ActionLaunchpadSpace}}, true},
+		{"Left: the tab before", vkLeft, true, []ev{{Action: ActionLaunchpadTab, Down: true, Steps: -1}}, true},
+		{"release", vkLeft, false, nil, true},
+		{"Down: the next tab", vkDown, true, []ev{{Action: ActionLaunchpadTab, Down: true, Steps: 1}}, true},
+		{"release", vkDown, false, nil, true},
+		{"other keys are swallowed too", vkF1, true, nil, true},
+		{"W let go reaches the game", vkW, false, nil, false},
+		{"letting go ends it", vkCaps, false, []ev{{Action: ActionLaunchpad}}, true},
+		{"F1 let go after it ended stays swallowed", vkF1, false, nil, true},
+		{"keys pass again", vk3, true, nil, false},
+		{"release", vk3, false, nil, false},
+		{"the pause key pauses again", vkG, true, []ev{{Action: ActionPause, Down: true}}, false},
+		{"and resumes", vkG, false, []ev{{Action: ActionPause}}, false},
+	}
+	for i, s := range steps {
+		got, swallow := f.Key(b, s.vk, s.down)
+		if !reflect.DeepEqual(got, s.want) || swallow != s.swallow {
+			t.Fatalf("step %d %s: got %v swallow=%v, want %v swallow=%v", i, s.name, got, swallow, s.want, s.swallow)
+		}
+	}
+}
+
+// A combination holds the launchpad while all its keys are held: letting go
+// of the key that passed (Ctrl) ends it as well.
+func TestFilterLaunchpadCombo(t *testing.T) {
+	b := &Bindings{Launchpad: Combo{vkLCtrl, vkF}}
+	var f Filter
+	if _, sw := f.Key(b, vkLCtrl, true); sw {
+		t.Fatal("Ctrl swallowed")
+	}
+	if ev, sw := f.Key(b, vkF, true); !sw || !reflect.DeepEqual(ev, []HotkeyEvent{{Action: ActionLaunchpad, Down: true}}) {
+		t.Fatalf("Ctrl+F: %v %v", ev, sw)
+	}
+	if ev, sw := f.Key(b, vkLCtrl, false); sw || !reflect.DeepEqual(ev, []HotkeyEvent{{Action: ActionLaunchpad}}) {
+		t.Fatalf("Ctrl let go: %v %v, want the launchpad to end and Ctrl to pass", ev, sw)
+	}
+	if ev, sw := f.Key(b, vkF, false); !sw || ev != nil {
+		t.Fatalf("F let go: %v %v, want it swallowed like its press", ev, sw)
+	}
+}
+
+// The launchpad lasts while its keys are held, also when another app with
+// other bindings comes to the front meanwhile.
+func TestFilterLaunchpadAppSwitch(t *testing.T) {
+	const vkCaps = 0x14
+	game := &Bindings{Launchpad: Combo{vkCaps}}
+	other := &Bindings{}
+	var f Filter
+	f.Key(game, vkCaps, true)
+	if ev, sw := f.Key(other, vkF, true); !sw || len(ev) != 1 || ev[0].Key != 'F' {
+		t.Fatalf("F in the other app: %v %v", ev, sw)
+	}
+	f.Key(other, vkF, false)
+	if ev, _ := f.Key(other, vkCaps, false); !reflect.DeepEqual(ev, []HotkeyEvent{{Action: ActionLaunchpad}}) {
+		t.Fatalf("let go in the other app: %v", ev)
+	}
+}
+
+// Starting the launchpad closes the overlay; the wheel then switches tabs;
+// ending it at once (EndLaunchpad) lets keys pass again.
+func TestFilterLaunchpadOverlayAndWheel(t *testing.T) {
+	const vkCaps, vkF8 = 0x14, 0x77
+	b := &Bindings{Launchpad: Combo{vkCaps}, Overlay: Combo{vkF8}}
+	var f Filter
+	f.Key(b, vkF8, true)
+	f.Key(b, vkF8, false)
+	if !f.Open() {
+		t.Fatal("overlay didn't open")
+	}
+	want := []HotkeyEvent{{Action: ActionOverlayClose, Down: true}, {Action: ActionLaunchpad, Down: true}}
+	if ev, _ := f.Key(b, vkCaps, true); !reflect.DeepEqual(ev, want) || f.Open() {
+		t.Fatalf("launchpad over the open overlay: %v, open %v", ev, f.Open())
+	}
+	if ev, sw := f.Wheel(-240); !sw || !reflect.DeepEqual(ev, []HotkeyEvent{{Action: ActionLaunchpadTab, Down: true, Steps: 2}}) {
+		t.Fatalf("two notches towards the user: %v", ev)
+	}
+	if ev, sw := f.Key(b, vkF8, true); !sw || ev != nil {
+		t.Fatalf("overlay key while held: %v %v, want it swallowed and nothing else", ev, sw)
+	}
+	f.Key(b, vkF8, false)
+	if ev := f.EndLaunchpad(); !reflect.DeepEqual(ev, []HotkeyEvent{{Action: ActionLaunchpad}}) || f.Launchpad() {
+		t.Fatalf("EndLaunchpad: %v", ev)
+	}
+	if _, sw := f.Wheel(120); sw {
+		t.Fatal("wheel taken after the launchpad ended")
+	}
+	if _, sw := f.Key(b, vkCaps, false); !sw {
+		t.Fatal("the key's late release passed: its press was swallowed")
+	}
+	if ev, sw := f.Key(b, vkF, true); sw || ev != nil {
+		t.Fatalf("F after the end: %v %v", ev, sw)
 	}
 }
 

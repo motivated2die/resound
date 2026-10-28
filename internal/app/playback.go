@@ -46,6 +46,9 @@ type playbackState struct {
 	// holdResumeDelay, unless holdGen changed meanwhile.
 	holdResuming bool
 	holdGen      int
+	// ducked: the sounds play quieter while the user holds push-to-talk
+	// (duck.go).
+	ducked bool
 
 	vmu    sync.Mutex
 	voices map[uint64]voiceMeta
@@ -195,6 +198,19 @@ func (a *App) togglePause() bool {
 	a.resume(pb.paused)
 	pb.paused, pb.pausedActive = nil, false
 	return false
+}
+
+// tapPause is togglePause for a key the user taps (a toggle pause key,
+// Space on the launchpad): sounds pause, letting go of the mic and
+// push-to-talk, and the next tap resumes them, holding those again. With
+// nothing playing and nothing paused it does nothing (ok false): a pause
+// of nothing would only make the next tap seem to do nothing.
+func (a *App) tapPause() (paused, ok bool) {
+	pb := &a.playback
+	if !pb.pausedActive && !pb.holdResuming && len(pb.remaining) == 0 {
+		return false, false
+	}
+	return a.togglePause(), true
 }
 
 // setTalkThrough pauses playback, frees the mic and holds push-to-talk

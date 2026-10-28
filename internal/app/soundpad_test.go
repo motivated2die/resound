@@ -64,7 +64,7 @@ func TestApplySoundpad(t *testing.T) {
 	if stop := a.globalKeys(fnStop); len(stop) != 2 || fmt.Sprint(stop[1]) != "[164 72]" {
 		t.Errorf("stop: %v", stop)
 	}
-	if pause := a.globalKeys(fnPause); len(pause) != 1 || r.keys != 2 || len(r.notes) != 1 || !strings.Contains(r.notes[0], "Soundpad's pause key") {
+	if pause := a.globalKeys(fnTogglePause); len(pause) != 0 || len(a.globalKeys(fnPause)) != 1 || r.keys != 2 || len(r.notes) != 1 || !strings.Contains(r.notes[0], "Soundpad's toggle pause key") {
 		t.Errorf("pause %v, keys %d, notes %q", pause, r.keys, r.notes)
 	}
 

@@ -7,7 +7,8 @@ package ui
 // chips, each with a remove button. A card without keys is greyed out; an
 // app's card that uses the global keys shows them muted, without remove
 // buttons. While recording, a chip shows what was pressed so far, with a
-// short hint and a list of ready-made keys below it.
+// short hint and a list of ready-made keys below it. Push-to-talk's card
+// can end with the ducking slider (DuckSpec).
 
 // KeybindSpec describes a Keybind card.
 type KeybindSpec struct {
@@ -43,6 +44,8 @@ type KeybindSpec struct {
 	Tool    Icon   // a further tool left of the others, e.g. push-to-talk's "send to game"; "" for none
 	ToolTip string // its tooltip
 	OnTool  func() // nil shows it disabled
+
+	Duck *DuckSpec // the ducking slider below the keys (push-to-talk); nil for none, hidden while recording
 }
 
 type keybindRow struct{ s KeybindSpec }
@@ -59,6 +62,8 @@ const (
 	kbSegField
 	kbSegTool
 	kbSegOff
+	kbSegDuckInfo
+	kbSegDuck
 	kbSegChips
 )
 
@@ -97,6 +102,8 @@ type kbLayout struct {
 	add, off, reset, cancel, tool rect
 	chips                         []kbChip
 	hint, field, note             rect
+	duck                          duckLayout
+	hasDuck                       bool
 	height                        int32 // the row's
 }
 
@@ -215,6 +222,10 @@ func (k keybindRow) layout(c *canvas, r rect) kbLayout {
 			y = l.field.Bottom
 		}
 	}
+	if s.Duck != nil && !s.Recording && !collapsed {
+		l.duck, y = layoutDuck(c, *s.Duck, areaL, areaR, y+c.px(10))
+		l.hasDuck = true
+	}
 	if s.Note != "" {
 		h := c.wrapHeight(s.Note, areaR-areaL, fontBody)
 		if collapsed {
@@ -244,7 +255,7 @@ func (k keybindRow) segments(c *canvas, r rect) []rect {
 	if k.s.OnTool == nil {
 		tool = rect{}
 	}
-	segs := []rect{l.info, l.add, l.reset, l.cancel, l.field, tool, l.off}
+	segs := []rect{l.info, l.add, l.reset, l.cancel, l.field, tool, l.off, l.duck.info, l.duck.track}
 	for _, ch := range l.chips {
 		segs = append(segs, ch.del)
 	}
@@ -279,6 +290,26 @@ func (k keybindRow) click(seg int) {
 
 func (keybindRow) keepsOpen() bool { return true }
 
+// The ducking slider's knob drags; a press anywhere on the track takes it
+// there.
+func (k keybindRow) dragIDAt(seg int) string {
+	if seg != kbSegDuck || k.s.Duck == nil {
+		return ""
+	}
+	return "duck:" + k.s.ID
+}
+
+func (k keybindRow) dragTo(c *canvas, r rect, _ string, x int32, done bool) {
+	d := k.s.Duck
+	l := k.layout(c, r)
+	if d == nil || !l.hasDuck || d.OnChange == nil {
+		return
+	}
+	if v := duckValueAt(c, l.duck.track, x); v != d.Value || done {
+		d.OnChange(v, done)
+	}
+}
+
 // field is the list of ready-made keys while recording.
 func (k keybindRow) field(seg int) (dropdownField, bool) {
 	s := k.s
@@ -304,6 +335,10 @@ func (k keybindRow) tip(c *canvas, r rect, seg int) string {
 		return s.ToolTip
 	case kbSegOff:
 		return s.OffTip
+	case kbSegDuckInfo:
+		if s.Duck != nil {
+			return s.Duck.Info
+		}
 	}
 	if i := seg - kbSegChips; i >= 0 {
 		if chips := k.chips(); i < len(chips) {
@@ -419,6 +454,9 @@ func (k keybindRow) paint(c *canvas, r rect, st rowState) {
 	if l.field != (rect{}) {
 		f, _ := k.field(kbSegField)
 		paintField(c, l.field, f, st.open == kbSegField, st.hover == kbSegField, st.press == kbSegField)
+	}
+	if l.hasDuck {
+		paintDuck(c, l.duck, *s.Duck, bg, st.hover == kbSegDuckInfo, st.hover == kbSegDuck, st.press == kbSegDuck)
 	}
 	if l.note != (rect{}) {
 		c.textWrapped(s.Note, l.note, fontBody, s.NoteTone.color())

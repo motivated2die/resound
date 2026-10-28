@@ -52,6 +52,13 @@ type Mixer struct {
 	events chan<- Event
 
 	volume atomic.Uint32 // math.Float32bits of the master gain
+	// duck lowers the whole mix on top of every volume (SetDuck), e.g.
+	// while the user talks; duckNow is where the render thread's ramp
+	// towards it is.
+	duck     atomic.Uint32
+	duckNow  float32
+	duckWant float32 // the target duckStep was worked out for
+	duckStep float32 // the glide's change per frame
 
 	// Level meters: the voices before the master volume (the sounds
 	// themselves) and the final mix sent to the device.
@@ -63,8 +70,9 @@ type Mixer struct {
 
 // NewMixer creates a mixer whose events are tagged with role.
 func NewMixer(role string, events chan<- Event) *Mixer {
-	m := &Mixer{role: role, events: events}
+	m := &Mixer{role: role, events: events, duckNow: 1, duckWant: 1}
 	m.SetVolume(1)
+	m.SetDuck(1)
 	return m
 }
 
@@ -73,6 +81,15 @@ func (m *Mixer) SetVolume(v float32) { m.volume.Store(math.Float32bits(v)) }
 
 // Volume returns the master gain.
 func (m *Mixer) Volume() float32 { return math.Float32frombits(m.volume.Load()) }
+
+// SetDuck sets a gain (0..1) applied to the whole mix after every volume:
+// 1 leaves it alone. The mix glides there over duckRampFrames, however far
+// it goes, so the change is gentle and never clicks.
+func (m *Mixer) SetDuck(g float32) { m.duck.Store(math.Float32bits(max(0, min(1, g)))) }
+
+// duckRampFrames is how many frames a change of the duck gain takes (about
+// 400 ms at 48 kHz).
+const duckRampFrames = 19200
 
 // Add queues a new voice. With absolute, gain replaces the master volume
 // (per-sound custom volume); otherwise it scales it. The mixer owns src from
@@ -233,6 +250,7 @@ func (m *Mixer) Read(out []float32) {
 	m.voices = kept
 	m.mu.Unlock()
 
+	m.applyDuck(out)
 	var outPeak float32
 	for i, s := range out {
 		if s > clipKnee || s < -clipKnee {
@@ -242,6 +260,32 @@ func (m *Mixer) Read(out []float32) {
 	}
 	m.srcPeak.raise(srcPeak)
 	m.outPeak.raise(outPeak)
+}
+
+// applyDuck scales the mix by the duck gain, gliding from where it was.
+// Render thread.
+func (m *Mixer) applyDuck(out []float32) {
+	want := math.Float32frombits(m.duck.Load())
+	g := m.duckNow
+	if g == 1 && want == 1 {
+		return
+	}
+	if want != m.duckWant { // a new target: the whole way in duckRampFrames
+		m.duckWant = want
+		m.duckStep = max(abs32(want-g)/duckRampFrames, 1e-7)
+	}
+	step := m.duckStep
+	for i := 0; i+1 < len(out); i += 2 {
+		switch {
+		case g < want:
+			g = min(want, g+step)
+		case g > want:
+			g = max(want, g-step)
+		}
+		out[i] *= g
+		out[i+1] *= g
+	}
+	m.duckNow = g
 }
 
 // clipKnee is where the soft clipper starts: samples up to it pass

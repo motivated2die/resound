@@ -8,13 +8,19 @@ package ui
 // underline underlined (the key; "" = none), the others muted. left mirrors
 // the picture like the overlay at the left screen edge.
 func OverlayPreview(left bool, underline string, paragraphs ...string) Row {
-	return overlayPreviewRow{paragraphs, underline, left}
+	return previewRow{paragraphs, underline, func(c *canvas) (*surface, int32) {
+		// The bar's padding on the screen edge's side reaches into the panel's.
+		return overlayPreviewPicture(c, left), int32(float64(ovEdge) * previewScale * c.scale)
+	}}
 }
 
-type overlayPreviewRow struct {
+// previewRow is a small picture on the right (OverlayPreview,
+// LaunchpadPreview) with paragraphs beside it. picture returns it and how
+// far its transparent padding may reach into the panel's on the right.
+type previewRow struct {
 	paragraphs []string
 	underline  string
-	left       bool
+	picture    func(c *canvas) (pic *surface, reach int32)
 }
 
 const (
@@ -35,10 +41,10 @@ var previewItems = []OverlayItem{
 	{Name: "Vine boom", Emoji: "💥", Color: "pink"}, // one more below: the picture looks better uneven
 }
 
-func (overlayPreviewRow) height() int                   { return 150 }
-func (overlayPreviewRow) segments(*canvas, rect) []rect { return nil }
-func (overlayPreviewRow) click(int)                     {}
-func (overlayPreviewRow) keepsOpen() bool               { return true }
+func (previewRow) height() int                   { return 150 }
+func (previewRow) segments(*canvas, rect) []rect { return nil }
+func (previewRow) click(int)                     {}
+func (previewRow) keepsOpen() bool               { return true }
 
 // previewCache keeps the picture: rows are rebuilt on every render.
 var previewCache struct {
@@ -47,36 +53,35 @@ var previewCache struct {
 	surf  *surface
 }
 
-func (o overlayPreviewRow) picture(c *canvas) *surface {
-	if previewCache.surf != nil && previewCache.left == o.left && previewCache.scale == c.scale {
+func overlayPreviewPicture(c *canvas, left bool) *surface {
+	if previewCache.surf != nil && previewCache.left == left && previewCache.scale == c.scale {
 		return previewCache.surf
 	}
 	surf, err := renderOverlay(overlayScene{
-		items: previewItems, sel: 2, left: o.left, scale: c.scale * previewScale,
+		items: previewItems, sel: 2, left: left, scale: c.scale * previewScale,
 		maxH: 10000, nameMax: previewNameMax, shadow: ovShadowPanel, hint: "SCROLL",
 	})
 	if err != nil {
 		return nil
 	}
 	previewCache.surf.free()
-	previewCache.left, previewCache.scale, previewCache.surf = o.left, c.scale, surf
+	previewCache.left, previewCache.scale, previewCache.surf = left, c.scale, surf
 	return surf
 }
 
 // layout returns where the picture goes (x within the row) and the text
-// column's width; the picture's padding on the screen edge's side reaches
-// into the panel's padding.
-func (o overlayPreviewRow) layout(c *canvas, in rect, pic *surface) (picX, textW int32) {
+// column's width.
+func (o previewRow) layout(c *canvas, in rect, pic *surface, reach int32) (picX, textW int32) {
 	if pic == nil {
 		return in.Right, in.w()
 	}
-	picX = in.Right - pic.w + int32(float64(ovEdge)*previewScale*c.scale)
+	picX = in.Right - pic.w + reach
 	return picX, picX - c.px(previewGapL) - in.Left
 }
 
 // paragraphHeight is a paragraph's height; the first one is laid out word
 // by word for its underline.
-func (o overlayPreviewRow) paragraphHeight(c *canvas, i int, w int32) int32 {
+func (o previewRow) paragraphHeight(c *canvas, i int, w int32) int32 {
 	if i == 0 && o.underline != "" {
 		_, h := importGuideRow{o.paragraphs[0], o.underline}.layout(c, w)
 		return h
@@ -84,7 +89,7 @@ func (o overlayPreviewRow) paragraphHeight(c *canvas, i int, w int32) int32 {
 	return c.wrapHeight(o.paragraphs[i], w, fontBody)
 }
 
-func (o overlayPreviewRow) textHeight(c *canvas, w int32) int32 {
+func (o previewRow) textHeight(c *canvas, w int32) int32 {
 	h := c.px(previewTopL)
 	for i := range o.paragraphs {
 		if i > 0 {
@@ -95,10 +100,10 @@ func (o overlayPreviewRow) textHeight(c *canvas, w int32) int32 {
 	return h
 }
 
-func (o overlayPreviewRow) measure(c *canvas, width int32) int32 {
-	pic := o.picture(c)
+func (o previewRow) measure(c *canvas, width int32) int32 {
+	pic, reach := o.picture(c)
 	in := rect{c.px(padX), 0, width - c.px(padX), 0}
-	_, textW := o.layout(c, in, pic)
+	_, textW := o.layout(c, in, pic, reach)
 	h := o.textHeight(c, textW) + c.px(8)
 	if pic != nil {
 		h = max(h, pic.h)
@@ -106,10 +111,10 @@ func (o overlayPreviewRow) measure(c *canvas, width int32) int32 {
 	return h
 }
 
-func (o overlayPreviewRow) paint(c *canvas, r rect, _ rowState) {
+func (o previewRow) paint(c *canvas, r rect, _ rowState) {
 	in := inset(c, r)
-	pic := o.picture(c)
-	picX, textW := o.layout(c, in, pic)
+	pic, reach := o.picture(c)
+	picX, textW := o.layout(c, in, pic, reach)
 	if pic != nil {
 		c.blit(&dib{bmp: pic.bmp, w: pic.w, h: pic.h}, picX, r.Top+(r.h()-pic.h)/2)
 	}

@@ -10,7 +10,8 @@ import (
 
 // Hotkeys work anywhere in Windows, e.g. in a game: holding a pause key
 // pauses the sounds and lets go of push-to-talk and the mic, so the user can
-// talk on another channel; a stop key stops everything. Keys and mouse
+// talk on another channel; a toggle pause key pauses them until pressed
+// again; a stop key stops everything. Keys and mouse
 // buttons 3–5 work, alone or together. The keyboard (and the mouse, while a
 // binding holds a button) is only watched while a hotkey is set or an app
 // has keybinds of its own (input.Watcher); the watcher then also reports
@@ -31,13 +32,15 @@ func (a *App) keymap() input.Keymap {
 	return k
 }
 
-// bindingsFor is what pause, stop and the overlay's key are while app is in
-// the foreground. While a key is recorded in the panel, the overlay key
-// isn't taken from it, so it can be recorded again. Nor does the user's
+// bindingsFor is what pause, toggle pause, stop and the overlay's and launchpad's keys
+// are while app is in the foreground. While a key is recorded in the panel,
+// the overlay and launchpad keys aren't taken from it, so they can be
+// recorded again. Nor does the user's
 // push-to-talk count then. The overlay's preview in the panel plays with
 // the global key its page names, whatever app was in front before.
 func (a *App) bindingsFor(app string) input.Bindings {
-	b := input.Bindings{Pause: combos(a.keysFor(app, fnPause)), Stop: combos(a.keysFor(app, fnStop))}
+	b := input.Bindings{Pause: combos(a.keysFor(app, fnPause)), Stop: combos(a.keysFor(app, fnStop)),
+		TogglePause: combos(a.keysFor(app, fnTogglePause))}
 	if !a.ptt.capturing {
 		overlay := a.keysFor(app, fnOverlay)
 		if a.overlay.preview {
@@ -45,6 +48,9 @@ func (a *App) bindingsFor(app string) input.Bindings {
 		}
 		if len(overlay) > 0 {
 			b.Overlay = input.Combo(overlay[0])
+		}
+		if keys := a.keysFor(app, fnLaunchpad); len(keys) > 0 {
+			b.Launchpad = input.Combo(keys[0])
 		}
 		if a.talkPauses() {
 			b.Talk = combos(a.keysFor(app, fnPTT)) // the user's own presses pause (talk.go)
@@ -77,8 +83,8 @@ func (a *App) applyHotkeys() {
 		a.hotkeys, a.hotkeyErr = w, ""
 	}
 	if !sameKeymap(k, a.keys) { // not for every recording again
-		logx.Printf("hotkeys: watching %d pause and %d stop key(s), %d app(s) with their own, overlay key %q",
-			len(k.Global.Pause), len(k.Global.Stop), len(k.Apps), k.Global.Overlay.String())
+		logx.Printf("hotkeys: watching %d pause, %d toggle pause and %d stop key(s), %d app(s) with their own, overlay key %q, launchpad key %q",
+			len(k.Global.Pause), len(k.Global.TogglePause), len(k.Global.Stop), len(k.Apps), k.Global.Overlay.String(), k.Global.Launchpad.String())
 	}
 	if !slices.Equal(slices.Sorted(maps.Keys(k.Apps)), slices.Sorted(maps.Keys(a.keys.Apps))) {
 		a.refreshRunning() // apps with keys of their own came or went
@@ -91,12 +97,14 @@ func (a *App) applyHotkeys() {
 func sameKeymap(x, y input.Keymap) bool {
 	list := func(p, q []input.Combo) bool { return slices.EqualFunc(p, q, input.Combo.Equal) }
 	same := func(a, b input.Bindings) bool {
-		return list(a.Pause, b.Pause) && list(a.Stop, b.Stop) && a.Overlay.Equal(b.Overlay)
+		return list(a.Pause, b.Pause) && list(a.Stop, b.Stop) && list(a.TogglePause, b.TogglePause) &&
+			a.Overlay.Equal(b.Overlay) && a.Launchpad.Equal(b.Launchpad)
 	}
 	return same(x.Global, y.Global) && maps.EqualFunc(x.Apps, y.Apps, same)
 }
 
 func (a *App) closeHotkeys() {
+	a.endLaunchpad() // no release will be reported
 	if a.hotkeys != nil {
 		a.reclaimPTT()
 		a.hotkeys.Close()
@@ -104,13 +112,14 @@ func (a *App) closeHotkeys() {
 		logx.Printf("hotkeys: off")
 	}
 	a.ptt.userTalk, a.ptt.pauseKey = false, false // no release will be reported
+	a.endTalkDuck()
 	a.keys = input.Keymap{}
 	a.fgApp = "" // no app is followed without the watcher; keybindsChanged syncs held keys
 }
 
 // onHotkey runs on the UI thread.
 func (a *App) onHotkey(ev input.HotkeyEvent) {
-	if a.onOverlayEvent(ev) {
+	if a.onOverlayEvent(ev) || a.onLaunchpadEvent(ev) {
 		return
 	}
 	switch ev.Action {
@@ -137,6 +146,9 @@ func (a *App) onHotkey(ev input.HotkeyEvent) {
 		a.stopAll()
 	case input.ActionPause:
 		a.onPauseKey(ev.Down)
+	case input.ActionTogglePause:
+		paused, ok := a.tapPause()
+		logx.Printf("hotkey: toggle pause: paused %v (anything to pause: %v)", paused, ok)
 	}
 	a.render()
 }

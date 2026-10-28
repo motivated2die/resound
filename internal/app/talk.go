@@ -74,9 +74,12 @@ func (a *App) onTalk(down bool, index int) {
 			logx.Printf("push-to-talk taken over by the user's key (%s)", input.Combo(mine))
 			p.pressed, p.held = nil, nil
 		}
-		if len(a.engine.Voices()) > 0 || a.playback.holdLive {
+		switch duck := a.talkDuck(); {
+		case a.playback.holdLive || len(a.engine.Voices()) > 0 && duck == 0:
 			a.setHoldPause(true)
 			logx.Printf("hotkey: paused while the user holds push-to-talk")
+		case len(a.engine.Voices()) > 0:
+			a.duckTalk(duck) // the sounds play on, quieter
 		}
 		return
 	}
@@ -129,6 +132,7 @@ func (a *App) onPauseKey(down bool) {
 // push-to-talk again for what still wants it, muting the mic again for
 // long sounds.
 func (a *App) afterTalk() {
+	a.endTalkDuck()
 	if a.playback.holdResuming {
 		a.endHoldPause()
 	}

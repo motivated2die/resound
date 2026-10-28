@@ -24,6 +24,11 @@
   --warning-color: #f2c14e;       /* colWarning */
   --success-color: #50dea8;
   --ptt-active-color: #173b2e;
+  /* The launchpad (launchpad.js): the desktop badge's yellow (LaunchpadYellow) */
+  --launchpad-color: #ffc93c;
+  --launchpad-rgb: 255, 201, 60;
+  --on-launchpad: #2a2208;
+  --launchpad-active-color: #3a2f12;
 
   /* Highlight Colors */
   --highlight-color-default-border: rgb(180, 180, 180);
@@ -279,6 +284,7 @@ body {
 .icon[data-icon="info"] { --icon: url("../assets/icons/info.svg"); }
 .icon[data-icon="install_mobile"] { --icon: url("../assets/icons/install_mobile.svg"); }
 .icon[data-icon="mic"] { --icon: url("../assets/icons/mic.svg"); }
+.icon[data-icon="apps"] { --icon: url("../assets/icons/apps.svg"); }
 .icon[data-icon="pause"] { --icon: url("../assets/icons/pause.svg"); }
 .icon[data-icon="play_arrow"] { --icon: url("../assets/icons/play_arrow.svg"); }
 .icon[data-icon="qr_code_scanner"] { --icon: url("../assets/icons/qr_code_scanner.svg"); }
@@ -920,6 +926,63 @@ span.sound-text {
   color: rgba(255, 255, 255, 0.6);
 }
 
+/* The key that plays a button while the launchpad is held on the PC
+   (launchpad.js): in the grids' top right corner, at a list row's end. */
+.launchpad-key {
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  z-index: 3;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 5px;
+  border-radius: 7px;
+  background-color: var(--launchpad-color);
+  color: var(--on-launchpad);
+  font-weight: 800;
+  font-size: 13px;
+  line-height: 22px;
+  text-align: center;
+  text-shadow: none;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.45);
+  pointer-events: none;
+}
+
+/* The keys come and go with the launchpad (launchpad.js), not with every
+   tab they show on. */
+body.launchpad-keys-in .launchpad-key {
+  animation: launchpad-key-in 0.16s ease-out;
+}
+
+body.launchpad-keys-out .launchpad-key {
+  animation: launchpad-key-out 0.14s ease-in forwards;
+}
+
+.sounds-grid.layout-list .launchpad-key {
+  position: static;
+  flex: none;
+}
+
+@keyframes launchpad-key-in {
+  from {
+    transform: scale(0.6);
+    opacity: 0;
+  }
+}
+
+@keyframes launchpad-key-out {
+  to {
+    transform: scale(0.6);
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body .launchpad-key {
+    animation: none;
+  }
+}
+
 /* Sound Card Custom Colors */
 .sound-card.sound-color-red {
   background-color: var(--sound-color-red-bg);
@@ -1047,7 +1110,8 @@ nav#tabs-container::-webkit-scrollbar {
 
 /* The active tab's line and tint: one element that slides to the active tab
    and takes its width (tabs.js). Under the line, a slight glow fades down,
-   inside the tab. */
+   inside the tab. The tint is two layers, the accent's and the launchpad's,
+   so it can blend from one to the other (gradients don't transition). */
 .tab-indicator {
   position: absolute;
   top: 0;
@@ -1055,20 +1119,55 @@ nav#tabs-container::-webkit-scrollbar {
   height: 100%;
   pointer-events: none;
   border-top: 3px solid var(--v-primary-base);
-  background: linear-gradient(to bottom,
-      rgba(var(--accent-rgb), 0.17),
-      rgba(var(--accent-rgb), 0.07) 55%,
-      rgba(var(--accent-rgb), 0.05));
   box-shadow: inset 0 7px 8px -7px rgba(var(--accent-rgb), 0.55);
   transition: transform 0.28s cubic-bezier(0.3, 0.7, 0.2, 1),
     width 0.28s cubic-bezier(0.3, 0.7, 0.2, 1),
-    opacity var(--transition-speed) ease;
+    opacity var(--transition-speed) ease,
+    border-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+.tab-indicator::before,
+.tab-indicator::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  transition: opacity 0.3s ease;
+  --tint-rgb: var(--accent-rgb);
+  background: linear-gradient(to bottom,
+      rgba(var(--tint-rgb), 0.17),
+      rgba(var(--tint-rgb), 0.07) 55%,
+      rgba(var(--tint-rgb), 0.05));
+}
+
+.tab-indicator::after {
+  --tint-rgb: var(--launchpad-rgb);
+  opacity: 0;
 }
 
 @media (prefers-reduced-motion: reduce) {
   .tab-indicator {
     transition: opacity var(--transition-speed) ease;
   }
+}
+
+/* While the launchpad is held on the PC, the tab its keys play glows
+   yellow. */
+body.launchpad-active .tab-indicator {
+  border-top-color: var(--launchpad-color);
+  box-shadow: inset 0 7px 8px -7px rgba(var(--launchpad-rgb), 0.55);
+}
+
+body.launchpad-active .tab-indicator::before { opacity: 0; }
+body.launchpad-active .tab-indicator::after { opacity: 1; }
+
+body.launchpad-active .tab.active,
+body.launchpad-active .tab.active .icon {
+  color: var(--launchpad-color);
+}
+
+.tab.active,
+.tab.active .icon {
+  transition: color 0.3s ease;
 }
 
 .tab.active .icon {
@@ -1084,6 +1183,11 @@ nav#tabs-container::-webkit-scrollbar {
 #tabs-container .tab[data-swipe-target],
 #tabs-container .tab[data-swipe-target] .icon {
   color: var(--v-primary-base);
+}
+
+body.launchpad-active #tabs-container .tab[data-swipe-target],
+body.launchpad-active #tabs-container .tab[data-swipe-target] .icon {
+  color: var(--launchpad-color);
 }
 
 /* Arranging tabs in edit mode (tab-order.js): a long press lifts a tab,
@@ -1142,6 +1246,12 @@ header {
   overflow: hidden;
   /* ADDED: Clip ripples within the header bounds */
   transition: background-color 0.4s ease-out;
+}
+
+/* The bottom bar while the launchpad is held on the PC (launchpad.js) */
+header.launchpad-bg {
+  background-color: var(--launchpad-active-color);
+  transition: background-color 0.15s ease-in;
 }
 
 /* Style for the header when PTT is active */
@@ -1216,6 +1326,36 @@ header.ptt-active-bg {
 .app-title .logo {
   position: relative;
   top: -2px; /* optically centred against the two text lines */
+  display: block;
+  flex: none;
+}
+
+/* The logo is two copies of resound.svg (app.html): the launchpad's yellow
+   one sweeps over the mint one as a circle from the ripples' centre
+   (186, 151 of 512), and shrinks back to it when the launchpad ends. 80%
+   of the side reaches the logo's farthest point. */
+.logo-art {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.logo-launchpad {
+  clip-path: circle(0% at 36.3% 29.5%);
+  transition: clip-path 0.13s ease-in;
+}
+
+body.launchpad-active .logo-launchpad {
+  clip-path: circle(80% at 36.3% 29.5%);
+  transition: clip-path 0.23s cubic-bezier(0.2, 0.7, 0.3, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .logo-launchpad,
+  body.launchpad-active .logo-launchpad {
+    transition: none;
+  }
 }
 
 .title-group {
@@ -1261,6 +1401,10 @@ h1.brand {
 
 #status-indicator.connected {
   background-color: var(--success-color);
+}
+
+body.launchpad-active #status-indicator.connected {
+  background-color: var(--launchpad-color);
 }
 
 #server-status-text {
@@ -3132,6 +3276,14 @@ emoji-picker section#favorites
 
 .btn-talk:hover {
   background-color: var(--v-secondary-darken1);
+}
+
+/* While the launchpad is held on the PC, the talk button shows it: yellow,
+   with the launchpad's icon. Talk-through still works. */
+body.launchpad-active .btn-talk {
+  background-color: var(--launchpad-color);
+  color: var(--on-launchpad);
+  box-shadow: 0 0 12px rgba(var(--launchpad-rgb), 0.55);
 }
 
 /* Active/pressed state for talk-through */

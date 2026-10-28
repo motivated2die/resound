@@ -1058,6 +1058,15 @@ function createTabElement(name, id, iconName = null) {
     return tabElement;
 }
 
+// showTab opens a tab as a tap on it would, for the PC (launchpad.js). It
+// reports false for a tab this remote doesn't show (yet).
+function showTab(tabId) {
+    const tabElement = tabsContainerEl?.querySelector(`[data-tab-id="${CSS.escape(String(tabId))}"]`);
+    if (!tabElement) return false;
+    setActiveTab(tabElement, String(tabId));
+    return true;
+}
+
 async function setActiveTab(tabElement, tabId) {
     const currentTabStr = state.currentTab; // Already a string or null
     const newTabIdStr = String(tabId); // Ensure incoming ID is string
@@ -1236,6 +1245,9 @@ async function reloadLibrary(rev) {
     }
 }
 window.resoundRTC?.onEvent((msg) => { if (msg.e === 'library') reloadLibrary(msg.rev); });
+// A sound the PC started itself (the launchpad, the in-game overlay) shows
+// as if it had been tapped here.
+window.resoundRTC?.onEvent((msg) => { if (msg.e === 'played') trackPlaying(Number(msg.id), msg); });
 
 function reloadSoundsForCurrentTab() {
     if (state.currentTab !== null && typeof state.currentTab !== 'undefined') {
@@ -1822,6 +1834,9 @@ window.app = {
   setCardProgress,
   resetCardProgress,
   stopAllSounds,
+  // Used by launchpad.js.
+  showTab,
+  ripple: createRipple,
   // Reset functions (keep if needed)
   // resetCurrentPageVisuals: resetCurrentPageVisuals,
   // resetCurrentPageLayout: resetCurrentPageLayout,

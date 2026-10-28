@@ -104,7 +104,7 @@ func TestKeyConflict(t *testing.T) {
 		{keyTarget{"game.exe", fnPause}, input.Combo{vkV}, ""},
 		// A key the app shows from the global list can become its own.
 		{keyTarget{"plain.exe", fnPause}, input.Combo{vkG}, ""},
-		{keyTarget{"plain.exe", fnPTT}, input.Combo{vkG}, "a pause key in Plain already"},
+		{keyTarget{"plain.exe", fnPTT}, input.Combo{vkG}, "a hold-to-pause key in Plain already"},
 		{keyTarget{"", fnOverlay}, input.Combo{vkX}, "a stop key already"},
 		{keyTarget{"", fnOverlay}, input.Combo{vkMouse4}, "push-to-talk key Resound presses in Game"},
 		{keyTarget{"", fnOverlay}, input.Combo{vkScroll}, ""},
@@ -155,7 +155,7 @@ func TestRunningKeysStatus(t *testing.T) {
 	if s := a.runningKeysStatus(); s != "Keybinds for 2 apps" {
 		t.Errorf("both: %q", s)
 	}
-	if s := overrideSummary(&a.cfg.AppKeybinds[0]); s != "Push-to-talk, pause" {
+	if s := overrideSummary(&a.cfg.AppKeybinds[0]); s != "Push-to-talk, hold to pause" {
 		t.Errorf("summary %q", s)
 	}
 }

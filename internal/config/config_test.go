@@ -83,16 +83,19 @@ func TestKeybindsLoad(t *testing.T) {
 		t.Errorf("older config: %+v", c)
 	}
 
-	write(`{"pushToTalkKeys": [], "pushToTalkExtra": [[145], [96]],
+	write(`{"pushToTalkKeys": [], "pushToTalkExtra": [[145], [96]], "togglePauseHotkeys": [[], [120]],
 		"appKeybinds": [
-			{"exe": " Game.EXE ", "name": "Game", "pause": {"off": true, "keys": [[1]]}, "stop": {"keys": []}, "pushToTalk": {"keys": [[5]]},
-				"overlay": {"keys": [[119], [120]]}},
+			{"exe": " Game.EXE ", "name": "Game", "pause": {"off": true, "keys": [[1]]}, "stop": {"keys": []}, "pushToTalk": {"keys": [[5]]}, "togglePause": {"keys": [[], [121]]},
+				"overlay": {"keys": [[119], [120]]}, "launchpad": {"keys": [[20], [21]]}},
 			{"exe": "game.exe", "name": "twice"},
 			{"exe": "", "name": "nameless"}
 		]}`)
 	c = Load()
 	if len(c.PushToTalkKeys) != 1 || c.PushToTalkKeys[0] != 145 || len(c.PushToTalkExtra) != 1 {
 		t.Errorf("extra push-to-talk keys didn't move up: %v %v", c.PushToTalkKeys, c.PushToTalkExtra)
+	}
+	if len(c.TogglePauseHotkeys) != 1 || c.TogglePauseHotkeys[0][0] != 120 {
+		t.Errorf("toggle pause keys: %v", c.TogglePauseHotkeys)
 	}
 	if len(c.AppKeybinds) != 1 {
 		t.Fatalf("apps: %+v", c.AppKeybinds)
@@ -103,11 +106,15 @@ func TestKeybindsLoad(t *testing.T) {
 		t.Errorf("exe %q", a.Exe)
 	case a.Pause == nil || !a.Pause.Off || a.Pause.Keys != nil:
 		t.Errorf("pause %+v, want off without keys", a.Pause)
+	case a.TogglePause == nil || len(a.TogglePause.Keys) != 1 || a.TogglePause.Keys[0][0] != 121:
+		t.Errorf("toggle pause %+v, want the empty combination gone", a.TogglePause)
 	case a.Stop != nil:
 		t.Errorf("stop %+v, want no override", a.Stop)
 	case a.PushToTalk == nil || len(a.PushToTalk.Keys) != 1:
 		t.Errorf("push-to-talk %+v", a.PushToTalk)
 	case a.Overlay == nil || len(a.Overlay.Keys) != 1 || a.Overlay.Keys[0][0] != 119:
 		t.Errorf("overlay %+v, want its first key only", a.Overlay)
+	case a.Launchpad == nil || len(a.Launchpad.Keys) != 1 || a.Launchpad.Keys[0][0] != 20:
+		t.Errorf("launchpad %+v, want its first key only", a.Launchpad)
 	}
 }

@@ -45,7 +45,7 @@ Markers on the lines show what's going on. Hover over one to see why, click it t
 | **Muted for sounds** | On purpose: Resound mutes your mic while a long sound plays, see [mic mute](push-to-talk.md#mute-your-microphone-while-sounds-play) |
 | **Muted** | Your microphone is muted in Windows or on your headset |
 | **Holding …** | Resound holds your push-to-talk key while sounds play |
-| **Paused**, **Talking**, **Pause key held** | Playback is paused from the phone, by talk-through or by a pause key |
+| **Paused**, **Talking**, **Pause key held** | Playback is paused: from the phone, by a toggle pause key or Space on the launchpad (**Paused**), by talk-through, or while you hold a pause key |
 | **Elsewhere** | Sounds for others go to another device than VB-Cable (Advanced) |
 | **Output failed** | A device stopped working, was unplugged, or another app uses it exclusively (hover to see which). Click it to restart the outputs |
 | **Not connected** | The microphone you chose is unplugged |
@@ -59,7 +59,7 @@ While the audio flow is on screen, Resound listens to your microphone and to CAB
 | Page | What's there |
 |---|---|
 | Audio & voice chat | The audio flow, VB-Cable, mic mute, **Restart outputs**, **Windows sound**, Advanced output choice |
-| Keybinds | Push-to-talk, pause and stop keys and mouse buttons, everywhere or for one game |
+| Keybinds | Push-to-talk, hold-to-pause, toggle pause and stop keys and mouse buttons, everywhere or for one game |
 | Sound library | Folders, importing, loudness |
 | In-game overlay | The overlay's key or mouse button and screen edge |
 | Remote App | Pairing, the firewall, signing out devices |

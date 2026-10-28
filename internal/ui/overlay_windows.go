@@ -5,8 +5,6 @@ import (
 	"strings"
 	"time"
 	"unsafe"
-
-	"golang.org/x/sys/windows"
 )
 
 // The overlay shows over games without ever taking the focus: a layered
@@ -412,84 +410,42 @@ func primaryMonitor() (rect, float64) {
 
 // Overlay is the in-game overlay window. Its methods run on the UI thread.
 type Overlay struct {
-	hwnd  uintptr
-	scene overlayScene
-	surf  *surface
-	mon   rect
-
-	phase      overlayPhase
-	phaseStart time.Time
-	flashAt    time.Time // when the confirming flash began
-	holdStart  time.Time // when Esc went down to stop all sounds; zero = not held
-	holdFor    time.Duration
-	timer      bool
-	onHidden   func()
+	*layered
+	scene     overlayScene
+	flashAt   time.Time // when the confirming flash began
+	holdStart time.Time // when Esc went down to stop all sounds; zero = not held
+	holdFor   time.Duration
 }
-
-type overlayPhase int
-
-const (
-	ovHidden overlayPhase = iota
-	ovShowing
-	ovShown
-	ovHiding
-)
-
-var overlayWindow *Overlay // for the window procedure
 
 // NewOverlay creates the overlay window (hidden).
 func NewOverlay() (*Overlay, error) {
-	if _, err := getD2D(); err != nil {
-		return nil, fmt.Errorf("drawing the overlay: %w", err)
-	}
-	if err := registerClass(overlayClass, 0, windows.NewCallback(overlayProc)); err != nil {
-		return nil, err
-	}
-	h, err := createWindow(wsExLayered|wsExTransparent|wsExToolWindow|wsExTopmost|wsExNoActivate, wsPopup, overlayClass)
+	o := &Overlay{}
+	l, err := newLayered(func() { o.tick() })
 	if err != nil {
 		return nil, err
 	}
-	o := &Overlay{hwnd: h}
-	overlayWindow = o
+	o.layered = l
+	l.place = func(mon rect, w, h int32, p float64) (dst, src point, cw, ch int32) {
+		return overlayPlacement(mon, w, h, o.scene.left, int32(float64(ovEdge)*o.scene.scale), p)
+	}
 	return o, nil
 }
-
-func overlayProc(hwnd uintptr, m uint32, w, l uintptr) uintptr {
-	switch m {
-	case wmTimer:
-		if o := overlayWindow; o != nil && o.hwnd == hwnd {
-			o.tick()
-		}
-		return 0
-	case wmMouseActivate:
-		return maNoActivate
-	}
-	return defWindowProc(hwnd, m, w, l)
-}
-
-// Visible reports whether the overlay is showing (also while it slides).
-func (o *Overlay) Visible() bool { return o.phase != ovHidden && o.phase != ovHiding }
 
 // Show slides the overlay in with items, sel highlighted, at the left or
 // right edge of the primary screen. empty is shown when there are no items.
 func (o *Overlay) Show(items []OverlayItem, sel int, left bool, empty string) {
-	mon, scale := primaryMonitor()
-	o.mon = mon
+	now := time.Now()
+	scale := o.open(now)
 	o.scene = overlayScene{
 		items: items, sel: clampSelection(sel, len(items)), left: left, scale: scale,
-		maxH: int(float64(mon.h()) / scale * ovMaxShare), nameMax: ovNameMax, empty: empty,
+		maxH: int(float64(o.mon.h()) / scale * ovMaxShare), nameMax: ovNameMax, empty: empty,
 		shadow: ovShadowGame,
 	}
 	o.holdStart = time.Time{}
-	now := time.Now()
-	if o.phase == ovHidden || o.phase == ovHiding {
-		o.phase, o.phaseStart = ovShowing, now
-	}
-	o.flashAt, o.onHidden = time.Time{}, nil // opened again during a flash or slide-out
+	o.flashAt = time.Time{} // opened again during a flash
 	o.render()
 	o.present(o.slide(now))
-	// Topmost again: a game may have put itself above since.
-	procSetWindowPos.Call(o.hwnd, hwndTopmost, 0, 0, 0, 0, swpNoMove|swpNoSize|swpNoActivate|swpShowWindow)
+	o.raise()
 	o.startTimer()
 }
 
@@ -533,68 +489,20 @@ func (o *Overlay) HoldToStop(d time.Duration) {
 
 // Hide slides the overlay out; onHidden (if set) runs once it is gone.
 func (o *Overlay) Hide(onHidden func()) {
-	if o.phase == ovHidden {
-		if onHidden != nil {
-			onHidden()
-		}
-		return
-	}
-	if o.phase != ovHiding {
-		o.phase, o.phaseStart = ovHiding, time.Now()
-	}
-	o.onHidden = onHidden
 	o.flashAt = time.Time{}
-	o.startTimer()
-}
-
-func (o *Overlay) startTimer() {
-	if !o.timer {
-		procSetTimer.Call(o.hwnd, overlayTimerID, overlayFrameMS, 0)
-		o.timer = true
-	}
-}
-
-func (o *Overlay) stopTimer() {
-	if o.timer {
-		procKillTimer.Call(o.hwnd, overlayTimerID)
-		o.timer = false
-	}
-}
-
-// slide returns the slide-in progress (0 hidden at the edge, 1 in place).
-func (o *Overlay) slide(now time.Time) float64 {
-	el := now.Sub(o.phaseStart)
-	switch o.phase {
-	case ovShowing:
-		return easeOut(float64(el) / float64(overlaySlideIn))
-	case ovHiding:
-		return 1 - easeOut(float64(el)/float64(overlaySlideOut))
-	case ovShown:
-		return 1
-	}
-	return 0
+	o.layered.Hide(onHidden)
 }
 
 // tick advances the animations; the timer runs only while one does.
 func (o *Overlay) tick() {
 	now := time.Now()
-	p := o.slide(now)
-	switch {
-	case o.phase == ovShowing && p >= 1:
-		o.phase = ovShown
-	case o.phase == ovHiding && p <= 0:
-		o.phase = ovHidden
-		o.stopTimer()
-		procShowWindow.Call(o.hwnd, swHide)
+	p, gone := o.advance(now)
+	if gone {
 		o.scene.flash = 0
-		if f := o.onHidden; f != nil {
-			o.onHidden = nil
-			f()
-		}
+		o.gone()
 		return
 	}
 	if !o.flashAt.IsZero() && now.Sub(o.flashAt) >= overlayFlash {
-		o.flashAt = time.Time{}
 		o.Hide(nil)
 		p = o.slide(now)
 	}
@@ -615,34 +523,6 @@ func (o *Overlay) tick() {
 }
 
 func (o *Overlay) render() {
-	surf, err := renderOverlay(o.scene)
-	if err != nil {
-		return // keeps the last frame
-	}
-	o.surf.free()
-	o.surf = surf
-}
-
-// present puts the current frame on screen, slid in by p (0..1) and as
-// opaque as far as it slid.
-func (o *Overlay) present(p float64) {
-	if o.surf == nil {
-		return
-	}
-	dst, src, w, h := overlayPlacement(o.mon, o.surf.w, o.surf.h, o.scene.left, int32(float64(ovEdge)*o.scene.scale), p)
-	if w <= 0 || h <= 0 {
-		return
-	}
-	screen, _, _ := procGetDC.Call(0)
-	mem, _, _ := procCreateCompatibleDC.Call(screen)
-	old, _, _ := procSelectObject.Call(mem, o.surf.bmp)
-	size := struct{ CX, CY int32 }{w, h}
-	alpha := uint32(max(0, min(255, p*255)))
-	blend := uint32(0 | 0<<8 | alpha<<16 | 1<<24) // AC_SRC_OVER, constant alpha, AC_SRC_ALPHA
-	procUpdateLayeredWindow.Call(o.hwnd, screen, uintptr(unsafe.Pointer(&dst)), uintptr(unsafe.Pointer(&size)),
-		mem, uintptr(unsafe.Pointer(&src)), 0, uintptr(unsafe.Pointer(&blend)), ulwAlpha)
-	procSelectObject.Call(mem, old)
-	procDeleteDC.Call(mem)
-	procReleaseDC.Call(0, screen)
-	procShowWindow.Call(o.hwnd, swShowNoActivate)
+	surf, _ := renderOverlay(o.scene) // on failure, keeps the last frame
+	o.setFrame(surf)
 }

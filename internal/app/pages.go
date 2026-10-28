@@ -42,6 +42,8 @@ func (a *App) rows() []ui.Row {
 		return a.diagnosticsPage()
 	case pageOverlay:
 		return a.overlayPage()
+	case pageLaunchpad:
+		return a.launchpadPage()
 	case pageAppKeys:
 		return a.appKeysPage()
 	}
@@ -187,6 +189,7 @@ const (
 	helpOwnMixer      = "voicemeeter"
 	helpBeforeVBCable = "voicemeeter#before-you-install-vb-cable"
 	helpKeybinds      = "push-to-talk"
+	helpLaunchpad     = "launchpad"
 )
 
 // openHelpAt opens one help article ("" = the help center's start page).
@@ -215,11 +218,13 @@ func (a *App) settingsPage() []ui.Row {
 	appDetail, appTone := a.appSummary()
 	backupDetail, backupTone := a.backupSummary()
 	overlayDetail, overlayTone := a.overlaySummary()
+	launchpadDetail, launchpadTone := a.launchpadSummary()
 	return []ui.Row{
 		ui.Header("Settings", func() { a.showPage(pageHome) }),
 		ui.Nav("Audio & voice chat", audioDetail, audioTone, func() { a.openPage(pageAudio) }),
 		ui.Nav("Keybinds", keys, keysTone, func() { a.openPage(pageKeys) }),
 		ui.Nav("Sound library", lib, libTone, func() { a.openPage(pageLibrary) }),
+		ui.Nav("Launchpad", launchpadDetail, launchpadTone, func() { a.openPage(pageLaunchpad) }),
 		ui.Nav("In-game overlay", overlayDetail, overlayTone, func() { a.openPage(pageOverlay) }),
 		ui.Nav("Remote App", remote, remoteTone, func() { a.openPage(pageRemote) }),
 		ui.Nav("App & startup", appDetail, appTone, func() { a.openPage(pageApp) }),

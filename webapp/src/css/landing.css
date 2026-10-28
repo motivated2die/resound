@@ -14,6 +14,10 @@
     --muted: #9a9ca6;
     --caption: #7e818c;
     --berry: #f2416f;
+    /* The launchpad's yellow, as on the remote and the PC's badge */
+    --launchpad: #ffc93c;
+    --launchpad-rgb: 255, 201, 60;
+    --on-launchpad: #2a2208;
     --radius: 14px;
     --wrap: 1120px;
     --gutter: 20px;
@@ -60,6 +64,8 @@ code { font-family: Consolas, "Cascadia Mono", monospace; background: var(--rais
     -webkit-mask: var(--icon) center / contain no-repeat;
     mask: var(--icon) center / contain no-repeat;
 }
+.icon[data-icon="apps"] { --icon: url("../assets/icons/apps.svg"); }
+.icon[data-icon="favorite"] { --icon: url("../assets/icons/favorite.svg"); }
 .icon[data-icon="bolt"] { --icon: url("../assets/icons/bolt.svg"); }
 .icon[data-icon="close"] { --icon: url("../assets/icons/close.svg"); }
 .icon[data-icon="check_circle"] { --icon: url("../assets/icons/check_circle.svg"); }
@@ -825,6 +831,191 @@ h1 { font-size: clamp(32px, 5vw, 52px); line-height: 1.1; font-weight: 700; lett
 .ovl-status { min-height: 1.6em; margin-top: 14px; color: var(--accent); font-size: 15px; font-weight: 600; }
 .ovl-status.bad { color: var(--berry); }
 
+/* --- The demos in game (index.html #overlay, js/launchpad-demo.js) ---
+   Tabs above two framed cards, the launchpad's and the overlay's, which lie
+   on top of each other in one grid cell: both take the taller one's height,
+   so switching never moves the page. The selected tab's pill fills up,
+   from left to right, while the demos switch by themselves. */
+.demo-tabs .icon { font-size: 19px; }
+/* Pills of one width (the wider one's), on the cards' left edge. */
+.demo-tabs {
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: 1fr;
+    width: max-content;
+    gap: 8px;
+    margin-bottom: 18px;
+}
+.demo-tab {
+    --tab-rgb: var(--accent-rgb);
+    position: relative;
+    isolation: isolate;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 9px 22px;
+    border: 0;
+    border-radius: 999px;
+    background: none;
+    color: var(--muted);
+    font: inherit;
+    font-size: 15px;
+    font-weight: 600;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: color 0.2s ease;
+}
+.demo-tab.lp { --tab-rgb: var(--launchpad-rgb); }
+.demo-tab:hover { color: var(--text); }
+.demo-tab[aria-selected="true"] { color: rgb(var(--tab-rgb)); }
+/* The pill behind the label: grey on hover, faintly the tab's colour when
+   selected, and the progress, a lighter fill sliding in from the left. */
+.demo-tab-bg {
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    border-radius: inherit;
+    overflow: hidden;
+    background: transparent;
+    transition: background-color 0.2s ease;
+}
+.demo-tab:hover .demo-tab-bg { background: rgba(255, 255, 255, 0.05); }
+.demo-tab[aria-selected="true"] .demo-tab-bg { background: rgba(var(--tab-rgb), 0.07); }
+.demo-tab-fill {
+    position: absolute;
+    inset: 0;
+    background: rgba(var(--tab-rgb), 0.13);
+    transform: translateX(-100%);
+}
+.demo-tab[aria-selected="true"] .demo-tab-fill { transform: none; }
+.demo-tabs.cycling .demo-tab[aria-selected="true"] .demo-tab-fill { animation: demo-fill var(--demo-cycle, 5s) linear forwards; }
+.demo-tabs.cycling.paused .demo-tab[aria-selected="true"] .demo-tab-fill { animation-play-state: paused; }
+@keyframes demo-fill { from { transform: translateX(-100%); } to { transform: none; } }
+
+.demo-stack { display: grid; }
+.demo-stack > .ovl-card {
+    grid-area: 1 / 1;
+    align-content: center; /* the shorter card's content in its middle */
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.3s ease, visibility 0s linear 0.3s;
+}
+.demo-stack > .ovl-card.on { opacity: 1; visibility: visible; transition: opacity 0.3s ease; }
+@media (prefers-reduced-motion: reduce) {
+    .demo-stack > .ovl-card, .demo-stack > .ovl-card.on { transition: none; }
+}
+
+/* Tablets: the overlay's text runs to three lines, the launchpad's to two;
+   both take three, so the titles and boxes stay put. */
+@media (min-width: 721px) and (max-width: 960px) {
+    .demo-stack .ovl-copy .section-lead { min-height: calc(3 * 1.55em); }
+}
+
+/* The launchpad's card: the overlay's, in yellow, with six of the phone's
+   buttons (the hero's .tile) in a small screen. While its key is held, each
+   button shows its key in the corner, as on the remote (.launchpad-key). */
+.lp-card {
+    background:
+        radial-gradient(ellipse 420px 300px at 27% 50%, rgba(var(--launchpad-rgb), 0.06), transparent 70%),
+        linear-gradient(180deg, rgba(255, 255, 255, 0.025), rgba(255, 255, 255, 0.01));
+}
+.lp-eyebrow { color: var(--launchpad); }
+.lp-visual { position: relative; width: 210px; }
+/* The played button's confetti (launchpad-demo.js), under the screen: it
+   shows as it comes out from behind it. */
+.lp-confetti { position: absolute; inset: 0; z-index: 0; pointer-events: none; }
+.lp-confetti i { position: absolute; width: 6px; height: 9px; border-radius: 1px; }
+.lp-phone {
+    position: relative;
+    z-index: 1;
+    --play: 2.6s;
+    padding: 8px 8px 4px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 18px;
+    background: var(--background);
+    box-shadow: 0 18px 40px rgba(0, 0, 0, 0.45);
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+.lp-phone.held { border-color: rgba(var(--launchpad-rgb), 0.55); box-shadow: 0 18px 40px rgba(0, 0, 0, 0.45), 0 0 28px rgba(var(--launchpad-rgb), 0.18); }
+.lp-pads { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.lp-pads .tile {
+    aspect-ratio: 1;
+    font-size: 10px;
+    touch-action: manipulation;
+}
+.lp-pads .tile b { font-size: 28px; }
+.lp-key {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    z-index: 1;
+    min-width: 17px;
+    height: 17px;
+    padding: 0 4px;
+    border-radius: 5px;
+    background: var(--launchpad);
+    color: var(--on-launchpad);
+    font-style: normal;
+    font-weight: 800;
+    font-size: 11px;
+    line-height: 17px;
+    text-align: center;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.45);
+    opacity: 0;
+    transform: scale(0.6);
+    transition: opacity 0.16s ease-out, transform 0.16s ease-out;
+}
+.lp-phone.held .lp-key { opacity: 1; transform: none; }
+.lp-key.hit { animation: lp-key-hit 0.3s ease-out; }
+@keyframes lp-key-hit { 40% { transform: scale(1.35); } }
+.lp-tabs { display: flex; align-items: center; gap: 14px; padding: 8px 4px 4px; color: var(--caption); font-size: 10px; font-weight: 600; }
+.lp-tabs .icon { font-size: 11px; }
+.lp-tab { color: var(--accent); box-shadow: inset 0 -2px 0 currentColor; padding-bottom: 2px; transition: color 0.2s ease; }
+.lp-phone.held .lp-tab { color: var(--launchpad); }
+/* The room of the overlay's status line (.ovl-status), so both cards'
+   texts and boxes stand at the same height and nothing moves when they
+   switch. Not on phones, where the box is centred on the picture. */
+.lp-card .ovl-action::after { content: ""; display: block; min-height: 1.6em; margin-top: 14px; font-size: 15px; }
+.lp-callout { border-color: rgba(var(--launchpad-rgb), 0.35); background: rgba(var(--launchpad-rgb), 0.07); }
+.lp-callout:hover, .lp-callout[aria-pressed="true"] { border-color: rgba(var(--launchpad-rgb), 0.6); background: rgba(var(--launchpad-rgb), 0.11); }
+.lp-callout .kbd-big {
+    color: var(--launchpad);
+    text-shadow: 0 0 10px rgba(var(--launchpad-rgb), 0.45);
+    box-shadow:
+        inset 0 -1px 0 rgba(0, 0, 0, 0.5),
+        0 3px 0 #141519,
+        0 10px 18px rgba(0, 0, 0, 0.5),
+        0 0 26px rgba(var(--launchpad-rgb), 0.12);
+}
+.lp-callout .kbd-big.down {
+    box-shadow:
+        inset 0 -1px 0 rgba(0, 0, 0, 0.5),
+        0 1px 0 #141519,
+        0 4px 10px rgba(0, 0, 0, 0.45),
+        0 0 30px rgba(var(--launchpad-rgb), 0.28);
+}
+/* A button clicked instead of played by its key: the key glows, twice
+   (launchpad-demo.js hint); without a keyboard, the box. */
+.lp-callout .kbd-big.hint { animation: lp-key-hint 0.5s ease-in-out 2; }
+@keyframes lp-key-hint {
+    50% {
+        box-shadow:
+            inset 0 -1px 0 rgba(0, 0, 0, 0.5),
+            0 3px 0 #141519,
+            0 10px 18px rgba(0, 0, 0, 0.5),
+            0 0 0 2px rgba(var(--launchpad-rgb), 0.85),
+            0 0 34px rgba(var(--launchpad-rgb), 0.65);
+    }
+}
+.lp-callout.hint { animation: lp-box-hint 0.5s ease-in-out 2; }
+@keyframes lp-box-hint { 50% { border-color: var(--launchpad); box-shadow: 0 0 26px rgba(var(--launchpad-rgb), 0.4); } }
+@media (prefers-reduced-motion: reduce) {
+    .lp-key, .lp-phone { transition: none; }
+    .lp-key.hit { animation: none; }
+    .lp-callout .kbd-big.hint, .lp-callout.hint { animation-duration: 0.01s; animation-iteration-count: 1; }
+}
+
 /* --- Audio editor (index.html #editor) ---
    A framed card like the overlay's, the picture on the left: a small editor
    whose selection closes in on the loud part of a clip, a playhead runs
@@ -1316,6 +1507,9 @@ h3 { font-size: 18px; line-height: 1.3; margin-bottom: 6px; }
     /* Tablets: narrower, with room kept for the picture's highlight. */
     .ovl-card { grid-template-columns: 190px minmax(0, 1fr); column-gap: 48px; padding: 40px 40px 36px 28px; }
     .ovl-visual { width: 170px; }
+    .lp-visual { width: 190px; }
+    .lp-pads .tile { font-size: 9px; }
+    .lp-pads .tile b { font-size: 24px; }
     .ed-card { grid-template-columns: 280px minmax(0, 1fr); column-gap: 44px; padding: 40px 36px 40px 28px; }
     .flow { flex-direction: column; align-items: center; }
     .flow-node { width: 100%; max-width: 320px; }
@@ -1343,6 +1537,18 @@ h3 { font-size: 18px; line-height: 1.3; margin-bottom: 6px; }
     .ovl-action { align-self: center; }
     .ovl-callout { width: 100%; flex-direction: column; align-items: flex-start; gap: 12px; padding: 14px; font-size: 14px; }
     .ovl-status { font-size: 14px; }
+    .demo-tabs { width: 100%; margin-bottom: 22px; }
+    .demo-tab { padding: 8px 12px; font-size: 14px; }
+    /* The picture and the box beside it, centred on each other. */
+    .lp-card .ovl-visual, .lp-card .ovl-action { align-self: center; }
+    .lp-card .ovl-action::after { display: none; }
+    .lp-visual { width: 168px; }
+    .lp-phone { padding: 6px 6px 3px; border-radius: 14px; }
+    .lp-pads { gap: 4px; }
+    .lp-pads .tile { font-size: 8px; padding: 3px; }
+    .lp-pads .tile b { font-size: 20px; }
+    .lp-key { top: 3px; right: 3px; min-width: 14px; height: 14px; font-size: 9px; line-height: 14px; border-radius: 4px; }
+    .lp-tabs { gap: 10px; font-size: 8px; }
     /* The editor as a band too: the text, then the picture below it. */
     .ed-section { background: linear-gradient(180deg, rgba(255, 255, 255, 0.035), rgba(255, 255, 255, 0.015)); border-top: 1px solid rgba(255, 255, 255, 0.05); border-bottom: 1px solid rgba(255, 255, 255, 0.05); }
     .ed-card { grid-template-columns: minmax(0, 1fr); grid-template-areas: "copy" "visual"; row-gap: 28px; padding: 0; border: 0; border-radius: 0; background: none; }

@@ -28,6 +28,7 @@
     <script src="js/rtc.js"></script>
     <script src="js/landing.js"></script>
     <script src="js/overlay-demo.js" defer></script>
+    <script src="js/launchpad-demo.js" defer></script>
     <link rel="stylesheet" href="css/landing.css">
     <link rel="stylesheet" href="css/scrollbar.css">
 </head>
@@ -271,12 +272,12 @@
                     <article class="card feature">
                         <span class="icon feature-icon" data-icon="headset_mic" aria-hidden="true"></span>
                         <h3>Push-to-talk and keybinds</h3>
-                        <p>While a sound plays, Resound holds your game's push-to-talk key and can mute your mic. Pause and stop keys too, on keyboard or mouse, for every game or just one.</p>
+                        <p>While a sound plays, Resound holds your game's push-to-talk key and can mute your mic. Keys to stop, to pause while you hold them, or to pause until you press again, on keyboard or mouse, for every game or just one.</p>
                     </article>
                     <article class="card feature">
                         <span class="icon feature-icon" data-icon="keyboard" aria-hidden="true"></span>
-                        <h3>Your favorites inside your game</h3>
-                        <p>One key slides your favorites in at the edge of the screen, without leaving the game. Pause and stop keys are there for when shit hits the fan.</p>
+                        <h3>Your sounds inside your game</h3>
+                        <p>One key slides your favorites in at the edge of the screen. Hold another and your keyboard plays the buttons on your phone. Pause and stop keys are there for when shit hits the fan.</p>
                     </article>
                     <article class="card feature">
                         <span class="icon feature-icon" data-icon="update" aria-hidden="true"></span>
@@ -287,38 +288,88 @@
             </div>
         </section>
 
-        <!-- The in-game overlay, with a live demo (js/overlay-demo.js): a band on
-             phones, a framed card on wider screens -->
-        <section class="section ovl-section" id="overlay" aria-labelledby="overlay-title">
+        <!-- In game: two live demos on top of each other, the launchpad's (first)
+             and the overlay's, as framed cards (a band on phones). The tabs above
+             switch them, and do by themselves every few seconds while nobody
+             plays with them (js/launchpad-demo.js). Alt held shows the launchpad,
+             Ctrl pressed the overlay (js/overlay-demo.js). -->
+        <section class="section ovl-section" id="overlay" aria-label="Play sounds in game">
             <div class="wrap">
-                <div class="ovl-card">
-                    <!-- A small picture of the overlay; its highlight moves up and
-                         down (js/overlay-demo.js), as the wheel moves it -->
-                    <div class="ovl-visual" aria-hidden="true">
-                        <div class="ovb ovb-mini" data-ovl-preview>
-                            <div class="ovb-bar">
-                                <span class="ovb-item red"><b>📯</b><span class="ovb-name">Airhorn</span></span>
-                                <span class="ovb-item orange"><b>🥁</b><span class="ovb-name">Drumroll</span></span>
-                                <span class="ovb-item purple on"><b>😑</b><span class="ovb-name">Bruh</span></span>
-                                <span class="ovb-item green"><b>👏</b><span class="ovb-name">Applause</span></span>
-                                <span class="ovb-item blue"><b>🎺</b><span class="ovb-name">Trombone</span></span>
-                                <span class="ovb-item pink"><b>💥</b><span class="ovb-name">Boom</span></span>
+                <div class="demo-tabs" role="tablist" aria-label="Demos" data-demo-tabs>
+                    <button class="demo-tab lp" type="button" role="tab" id="demo-tab-launchpad" aria-controls="launchpad" aria-selected="true" data-demo-tab="launchpad">
+                        <span class="icon" data-icon="apps" aria-hidden="true"></span>Launchpad
+                        <i class="demo-tab-bg" aria-hidden="true"><i class="demo-tab-fill"></i></i>
+                    </button>
+                    <button class="demo-tab" type="button" role="tab" id="demo-tab-overlay" aria-controls="demo-overlay" aria-selected="false" tabindex="-1" data-demo-tab="overlay">
+                        <span class="icon" data-icon="favorite" aria-hidden="true"></span>In-game overlay
+                        <i class="demo-tab-bg" aria-hidden="true"><i class="demo-tab-fill"></i></i>
+                    </button>
+                </div>
+                <div class="demo-stack">
+                    <div class="ovl-card lp-card on" id="launchpad" role="tabpanel" aria-labelledby="demo-tab-launchpad" data-demo="launchpad">
+                        <!-- Six of the phone's buttons; while Alt is held, each shows
+                             the key that plays it (js/launchpad-demo.js) -->
+                        <div class="ovl-visual lp-visual" aria-hidden="true">
+                            <div class="lp-phone" data-lp-pads>
+                                <div class="lp-pads">
+                                    <div class="tile red"><b>📯</b><span>Airhorn</span><i class="lp-key">1</i></div>
+                                    <div class="tile"><b>🥁</b><span>Ba dum tss</span><i class="lp-key">2</i></div>
+                                    <div class="tile blue"><b>👏</b><span>Applause</span><i class="lp-key">3</i></div>
+                                    <div class="tile yellow"><b>😂</b><span>Laugh track</span><i class="lp-key">4</i></div>
+                                    <div class="tile purple"><b>🎺</b><span>Sad trombone</span><i class="lp-key">5</i></div>
+                                    <div class="tile green"><b>🦆</b><span>Quack</span><i class="lp-key">6</i></div>
+                                </div>
+                                <div class="lp-tabs">
+                                    <span class="icon" data-icon="favorite-fill"></span>
+                                    <span class="lp-tab">Sounds</span>
+                                    <span>Music</span>
+                                </div>
                             </div>
+                        </div>
+
+                        <div class="ovl-copy">
+                            <p class="eyebrow lp-eyebrow">Launchpad</p>
+                            <h2 id="launchpad-title" class="section-title">Never leave the game!</h2>
+                            <p class="section-lead">Holding the Launchpad key transforms your remote into a shortcut panel. Play sounds while your hands stay on the action.</p>
+                        </div>
+
+                        <div class="ovl-action">
+                            <button class="ovl-callout lp-callout" type="button" data-lp-hold aria-pressed="false">
+                                <kbd class="kbd-big" data-lp-key>Alt</kbd>
+                                <span data-lp-label><strong>Try it now:</strong> hold <kbd>Alt</kbd> and press <kbd>1</kbd> to <kbd>6</kbd>.</span>
+                            </button>
                         </div>
                     </div>
 
-                    <div class="ovl-copy">
-                        <p class="eyebrow">In-game overlay</p>
-                        <h2 id="overlay-title" class="section-title">Never leave the action!</h2>
-                        <p class="section-lead">Press one key in any game and your favorites slide in. Scroll to a sound, press the key again, and it plays.</p>
-                    </div>
+                    <div class="ovl-card" id="demo-overlay" role="tabpanel" aria-labelledby="demo-tab-overlay" data-demo="overlay">
+                        <!-- A small picture of the overlay; its highlight moves up and
+                             down (js/overlay-demo.js), as the wheel moves it -->
+                        <div class="ovl-visual" aria-hidden="true">
+                            <div class="ovb ovb-mini" data-ovl-preview>
+                                <div class="ovb-bar">
+                                    <span class="ovb-item red"><b>📯</b><span class="ovb-name">Airhorn</span></span>
+                                    <span class="ovb-item orange"><b>🥁</b><span class="ovb-name">Drumroll</span></span>
+                                    <span class="ovb-item purple on"><b>😑</b><span class="ovb-name">Bruh</span></span>
+                                    <span class="ovb-item green"><b>👏</b><span class="ovb-name">Applause</span></span>
+                                    <span class="ovb-item blue"><b>🎺</b><span class="ovb-name">Trombone</span></span>
+                                    <span class="ovb-item pink"><b>💥</b><span class="ovb-name">Boom</span></span>
+                                </div>
+                            </div>
+                        </div>
 
-                    <div class="ovl-action">
-                        <button class="ovl-callout" type="button" data-ovl-open>
-                            <kbd class="kbd-big" data-ovl-key>Alt</kbd>
-                            <span data-ovl-label><strong>Try it now:</strong> press <kbd>Alt</kbd> to bring up the overlay.</span>
-                        </button>
-                        <p class="ovl-status" data-ovl-status aria-live="polite"></p>
+                        <div class="ovl-copy">
+                            <p class="eyebrow">In-game overlay</p>
+                            <h2 id="overlay-title" class="section-title">Favorites at your fingertips!</h2>
+                            <p class="section-lead">Press one key in any game and your favorites slide in. Scroll to a sound, press the key again, and it plays.</p>
+                        </div>
+
+                        <div class="ovl-action">
+                            <button class="ovl-callout" type="button" data-ovl-open>
+                                <kbd class="kbd-big" data-ovl-key>Ctrl</kbd>
+                                <span data-ovl-label><strong>Try it now:</strong> press <kbd>Ctrl</kbd> to bring up the overlay.</span>
+                            </button>
+                            <p class="ovl-status" data-ovl-status aria-live="polite"></p>
+                        </div>
                     </div>
                 </div>
             </div>

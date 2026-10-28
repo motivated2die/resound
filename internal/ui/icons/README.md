@@ -29,4 +29,5 @@ Any single-color SVG works: stroked (Tabler, `currentColor`) or filled (Font Awe
 ## Licenses
 
 - Tabler Icons: MIT, © Paweł Kuna.
+- `play-pause.svg` is Resound's own, drawn like Tabler's player icons.
 - Font Awesome Free icons: CC BY 4.0. Their license comment is kept inside each SVG, which is the attribution Font Awesome asks for.

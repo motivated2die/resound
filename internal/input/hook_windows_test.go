@@ -243,6 +243,95 @@ func TestOverlayHookLive(t *testing.T) {
 	}
 }
 
+// TestLaunchpadHookLive checks with real input that the launchpad lasts
+// while its key is held, also through the checks for lost releases (Windows
+// never counts a swallowed key as down), that it keeps keys and the wheel
+// from other programs meanwhile, and that letting go ends it. F24 is the
+// launchpad key, F23 a key pressed while it is held; one wheel notch:
+//
+//	$env:RESOUND_HOOK_TEST="1"; go test -run LaunchpadHookLive -v ./internal/input
+func TestLaunchpadHookLive(t *testing.T) {
+	if os.Getenv("RESOUND_HOOK_TEST") != "1" {
+		t.Skip("set RESOUND_HOOK_TEST=1 to inject input into the desktop")
+	}
+	startObserver(t)
+	events := make(chan HotkeyEvent, 16)
+	w, err := StartWatcher(Keymap{Global: Bindings{Launchpad: Combo{0x87}}}, func(ev HotkeyEvent) { events <- ev })
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer w.Close()
+	key := func(vk uint16, down bool) {
+		in := keyboardInput{Type: inputKeyboard, VK: vk}
+		if !down {
+			in.Flags = keyeventfKeyUp
+		}
+		if err := sendInput(unsafe.Pointer(&in), unsafe.Sizeof(in)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	expect := func(want HotkeyEvent) {
+		t.Helper()
+		select {
+		case ev := <-events:
+			if ev != want {
+				t.Fatalf("event %+v, want %+v", ev, want)
+			}
+		case <-time.After(time.Second):
+			t.Fatalf("no %v event", want.Action)
+		}
+	}
+	none := func(what string, d time.Duration) {
+		t.Helper()
+		select {
+		case ev := <-events:
+			t.Fatalf("%s: event %+v", what, ev)
+		case <-time.After(d):
+		}
+	}
+	expectSeen := func(ch chan uint32, seen bool, what string) {
+		t.Helper()
+		select {
+		case v := <-ch:
+			if !seen {
+				t.Fatalf("%s reached other programs (%#x)", what, v)
+			}
+		case <-time.After(300 * time.Millisecond):
+			if seen {
+				t.Fatalf("%s didn't reach other programs", what)
+			}
+		}
+	}
+
+	key(0x87, true)
+	expect(HotkeyEvent{Action: ActionLaunchpad, Down: true})
+	expectSeen(obs.keys, false, "the launchpad key")
+	s, _, _ := procGetAsyncKeyState.Call(0x87)
+	t.Logf("GetAsyncKeyState(F24) while held and swallowed: %#x", s&0xFFFF)
+	none("held through the checks for lost releases", 3*staleCheckMS*time.Millisecond)
+
+	key(0x86, true) // F23: swallowed, no launchpad key
+	key(0x86, false)
+	expectSeen(obs.keys, false, "F23 while held")
+	none("F23", 100*time.Millisecond)
+
+	in := mouseInput{Type: inputMouse, MouseData: uint32(0xFFFFFF88) /* -120 */, Flags: 0x0800 /* MOUSEEVENTF_WHEEL */}
+	if err := sendInput(unsafe.Pointer(&in), unsafe.Sizeof(in)); err != nil {
+		t.Fatal(err)
+	}
+	expect(HotkeyEvent{Action: ActionLaunchpadTab, Down: true, Steps: 1})
+	expectSeen(obs.wheels, false, "the wheel while held")
+
+	key(0x87, false)
+	expect(HotkeyEvent{Action: ActionLaunchpad})
+	expectSeen(obs.keys, false, "the launchpad key's release")
+
+	key(0x86, true) // keys pass again
+	key(0x86, false)
+	expectSeen(obs.keys, true, "F23 after")
+	none("after", 200*time.Millisecond)
+}
+
 // TestHandOverLive checks with real input that a pause or stop key, while
 // push-to-talk keys are lent to the hook, reaches other programs only after
 // the push-to-talk release, and as it was pressed otherwise. F23 stands in

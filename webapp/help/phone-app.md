@@ -8,6 +8,7 @@ The Resound app is your soundboard: tabs of buttons that play on your PC. Everyt
 - **STOP** (bottom right) stops all sounds at once.
 - **Pause and resume:** while something plays, a play/pause button appears in the top bar.
 - **Talk-through:** hold the microphone button next to STOP. The sounds pause and your microphone is live, so you can say something; let go and they continue. Push-to-talk stays held meanwhile.
+- **Launchpad:** while you hold the [launchpad](launchpad.md) key on your PC, each button shows the key that plays it, and the app turns yellow.
 
 ## Tabs
 
