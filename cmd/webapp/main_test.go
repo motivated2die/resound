@@ -123,7 +123,7 @@ func TestWebIcons(t *testing.T) {
 		css   string
 		files []string
 	}{
-		{"css/styles.css", []string{"app.html", "js/app.js", "js/editMode.js", "js/layout.js", "js/sound-settings.js"}},
+		{"css/styles.css", []string{"app.html", "js/app.js", "js/editMode.js", "js/layout.js", "js/sound-settings.js", "js/launchpad.js"}},
 		{"css/landing.css", []string{"index.html"}},
 	}
 	attr := regexp.MustCompile(`data-icon="([a-z_-]+)"`)

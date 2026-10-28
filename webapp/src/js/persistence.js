@@ -282,8 +282,11 @@ const persistence = (() => {
 
     // --- Layouts -------------------------------------------------------------
 
+    // pushLayout saves a tab's layout on the PC, then says so ('layoutSaved'):
+    // the launchpad's keys follow the order the PC knows (launchpad.js).
     const pushLayout = (tabKey) => {
         const key = String(tabKey);
+        const saved = () => document.dispatchEvent(new CustomEvent('layoutSaved', { detail: { tabKey: key } }));
         return send(`layout-${key}`, 'POST', `/api/layouts/${encodeURIComponent(key)}`, () => {
             const s = ensure();
             const orders = {};
@@ -295,7 +298,7 @@ const persistence = (() => {
                 sort: s.tabLayouts[key]?.sortMode || CUSTOM_SORT,
                 orders,
             };
-        });
+        }).then(saved);
     };
 
     const setCurrentLayoutMode = (tabKey, layoutMode) => {
