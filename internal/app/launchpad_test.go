@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/motivated2die/resound/internal/audio"
 	"github.com/motivated2die/resound/internal/config"
@@ -138,5 +139,76 @@ func TestLaunchpadStep(t *testing.T) {
 	}
 	if len(a.launchpad.keys) != 2 || a.tabName(more) != "More" {
 		t.Fatalf("on More: %d keys, named %q", len(a.launchpad.keys), a.tabName(more))
+	}
+}
+
+// Space stops all sounds when pressed; with LaunchpadSpacePause, a tap
+// pauses or resumes them, and holding it (the timer firing) stops them. A
+// tap's release may come after the launchpad ended.
+func TestLaunchpadSpace(t *testing.T) {
+	a := launchpadApp(t)
+	a.engine = audio.NewEngine() // no outputs: nothing plays
+	a.playback.init()
+	a.ptt.init()
+	var timers []func()
+	old := afterUI
+	afterUI = func(_ *App, _ time.Duration, fn func()) { timers = append(timers, fn) }
+	t.Cleanup(func() { afterUI = old })
+	fire := func() {
+		for _, fn := range timers {
+			fn()
+		}
+		timers = nil
+	}
+	space := func(down bool) { a.onLaunchpadEvent(input.HotkeyEvent{Action: input.ActionLaunchpadSpace, Down: down}) }
+	paused := func() { a.playback.pausedActive, a.playback.paused = true, []uint64{7} }
+
+	a.startLaunchpad()
+	paused()
+	space(true)
+	if a.playback.pausedActive || len(timers) != 0 {
+		t.Fatalf("a press stops all: paused %v, %d timers", a.playback.pausedActive, len(timers))
+	}
+	space(false)
+
+	a.cfg.LaunchpadSpacePause = true
+	space(true)
+	space(false)
+	if a.playback.pausedActive {
+		t.Fatal("a tap with nothing playing paused nothing, and must not say paused")
+	}
+	fire() // the tap's timer, too late
+	paused()
+	space(true)
+	space(false)
+	if a.playback.pausedActive {
+		t.Fatal("a tap resumes")
+	}
+	fire()
+
+	paused()
+	space(true)
+	fire() // held long enough
+	if a.playback.pausedActive || a.launchpad.space != 0 {
+		t.Fatalf("held: paused %v, timing %d", a.playback.pausedActive, a.launchpad.space)
+	}
+	paused()
+	space(false) // the long press's release
+	if !a.playback.pausedActive {
+		t.Fatal("the release after a long press toggled the pause")
+	}
+
+	space(true)
+	a.endLaunchpad()
+	space(false)
+	if a.playback.pausedActive {
+		t.Fatal("a tap let go after the launchpad ended still resumes")
+	}
+	fire()
+	paused()
+	space(true) // not held: nothing
+	space(false)
+	if !a.playback.pausedActive || len(timers) != 0 {
+		t.Fatal("Space without the launchpad did something")
 	}
 }

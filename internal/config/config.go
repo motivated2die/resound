@@ -128,6 +128,10 @@ type Config struct {
 	// "top-left", "top-right", "bottom-left", "bottom-center",
 	// "bottom-right"; "" = top center.
 	LaunchpadBadgeAt string `json:"launchpadBadgeAt,omitempty"`
+	// LaunchpadSpacePause makes Space, while the launchpad is held, pause
+	// or resume all sounds when tapped and stop them when held; otherwise
+	// a press stops them.
+	LaunchpadSpacePause bool `json:"launchpadSpacePause,omitempty"`
 	// PanelPos is where the user moved the panel by its tab: its top left
 	// corner in screen pixels. nil = docked next to the tray icon. It is
 	// only used while that point is on a screen, kept inside its work area.

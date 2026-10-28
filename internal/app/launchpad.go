@@ -16,7 +16,8 @@ import (
 // then), the phone in use (server.ActiveView) labels the buttons of the tab
 // it shows with keys, 1–9, 0, then A–Z, in the order they stand on it
 // (library.ShownSounds), and pressing one plays that sound as a tap would.
-// Space stops all sounds; the arrow keys and the wheel switch tabs, on the
+// Space stops all sounds (or, as set, a tap pauses or resumes them and a
+// long press stops them); the arrow keys and the wheel switch tabs, on the
 // phone too. Letting go of the key takes the labels away. Meanwhile a round
 // badge shows on the screen (ui.LaunchpadBadge), with the tab's name and,
 // for a moment, a sound played from it; each of them can be turned off.
@@ -32,21 +33,26 @@ import (
 // the letters.
 const launchpadKeys = "1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZ"
 
+// launchpadSpaceHold is how long Space is held to stop all sounds when a
+// tap pauses (LaunchpadSpacePause); as long as Esc in the overlay.
+const launchpadSpaceHold = input.EscHoldTime
+
 // launchpadState is the launchpad's UI-thread state.
 type launchpadState struct {
-	held  bool
-	conn  uint64            // the remote it shows on; 0 = none
-	tab   string            // the tab its keys play; while not held, the one shown last
-	keys  map[uint16]uint64 // key ('1'…'Z') → sound
-	sent  string            // what conn was sent last (launchpadSig)
-	badge *ui.LaunchpadBadge
-	err   string // why the badge can't be shown, if it can't
+	held   bool
+	conn   uint64            // the remote it shows on; 0 = none
+	tab    string            // the tab its keys play; while not held, the one shown last
+	keys   map[uint16]uint64 // key ('1'…'Z') → sound
+	sent   string            // what conn was sent last (launchpadSig)
+	badge  *ui.LaunchpadBadge
+	err    string // why the badge can't be shown, if it can't
+	space  uint64 // the Space press being timed (LaunchpadSpacePause); 0 = none
+	spaces uint64 // Space presses so far, to tell them apart
 }
 
 // onLaunchpadEvent handles the launchpad's hotkey events; it reports false
 // for other events. UI thread.
 func (a *App) onLaunchpadEvent(ev input.HotkeyEvent) bool {
-	lp := &a.launchpad
 	switch ev.Action {
 	case input.ActionLaunchpad:
 		if ev.Down {
@@ -56,13 +62,8 @@ func (a *App) onLaunchpadEvent(ev input.HotkeyEvent) bool {
 		}
 	case input.ActionLaunchpadKey:
 		a.launchpadPlay(ev.Key)
-	case input.ActionLaunchpadStop:
-		if lp.held {
-			logx.Printf("launchpad: stopping all sounds")
-			a.reclaimPTT()
-			a.stopAll()
-			a.launchpadNote("", "All sounds stopped", true)
-		}
+	case input.ActionLaunchpadSpace:
+		a.launchpadSpace(ev.Down)
 	case input.ActionLaunchpadTab:
 		a.launchpadStep(ev.Steps)
 	default:
@@ -98,6 +99,57 @@ func (a *App) endLaunchpad() {
 		lp.badge.Hide()
 	}
 	logx.Printf("launchpad: off")
+}
+
+// launchpadSpace handles Space going down or up. A press stops all sounds;
+// with LaunchpadSpacePause, a tap pauses or resumes them instead, and
+// holding it for launchpadSpaceHold stops them. Its release may come after
+// the launchpad ended: a tap begun while it was held still counts.
+func (a *App) launchpadSpace(down bool) {
+	lp := &a.launchpad
+	switch {
+	case down && !lp.held:
+	case down && !a.cfg.LaunchpadSpacePause:
+		a.launchpadStopAll()
+	case down:
+		lp.spaces++
+		press := lp.spaces
+		lp.space = press
+		afterUI(a, launchpadSpaceHold, func() {
+			if lp.space == press { // still held
+				lp.space = 0
+				a.launchpadStopAll()
+			}
+		})
+	case lp.space != 0: // let go in time: a tap
+		lp.space = 0
+		a.launchpadPause()
+	}
+}
+
+func (a *App) launchpadStopAll() {
+	logx.Printf("launchpad: stopping all sounds")
+	a.reclaimPTT()
+	a.stopAll()
+	a.launchpadNote("", "All sounds stopped", true)
+}
+
+// launchpadPause pauses or resumes all sounds, like the phone's pause
+// button. Without any, it pauses nothing: a later tap would only resume
+// nothing.
+func (a *App) launchpadPause() {
+	if !a.playback.pausedActive && len(a.engine.Voices()) == 0 {
+		a.launchpadNote("", "Nothing is playing", false)
+		return
+	}
+	paused := a.togglePause()
+	logx.Printf("launchpad: paused=%v", paused)
+	a.render() // the audio flow shows the pause
+	if paused {
+		a.launchpadNote("", "Paused", true)
+	} else {
+		a.launchpadNote("", "Resumed", true)
+	}
 }
 
 // activeView is the remote in use, if any.
@@ -274,10 +326,14 @@ func (a *App) launchpadPage() []ui.Row {
 	rows := []ui.Row{
 		ui.HeaderButton("Launchpad", a.back, ui.IconHelp, "Help", "How the launchpad works: opens the help article", func() { a.openHelpAt(helpLaunchpad) }),
 		ui.Paragraph(how, ui.ToneMuted),
-		ui.Paragraph("While you hold it, Space stops all sounds, and the arrow keys or the mouse wheel switch tabs. Your game gets none of these keys meanwhile.", ui.ToneMuted),
+		ui.Paragraph("While you hold it, "+a.spaceDoes()+", and the arrow keys or the mouse wheel switch tabs. Your game gets none of these keys meanwhile.", ui.ToneMuted),
 		ui.Section("Key"),
 		a.keybindCard(keyTarget{fn: fnLaunchpad}),
 		a.appKeysNote(fnLaunchpad, "A game can have a launchpad key of its own, or no launchpad at all."),
+		ui.Section("Space"),
+		ui.ToggleInfo("Tap Space to pause",
+			"A tap pauses all sounds or resumes them, like the phone's pause button. Hold Space to stop them. Off: a press stops them.",
+			a.cfg.LaunchpadSpacePause, a.toggleSpacePause),
 		ui.Section("On-screen badge"),
 		ui.ToggleInfo("Show a badge while you hold the key",
 			"A round yellow badge on your screen says the launchpad is on, without looking at your phone.",
@@ -299,6 +355,20 @@ func (a *App) launchpadPage() []ui.Row {
 		rows = append(rows, ui.Paragraph(a.launchpad.err, ui.ToneBad))
 	}
 	return append(rows, ui.Spacer(4))
+}
+
+// spaceDoes says what Space does while the launchpad is held.
+func (a *App) spaceDoes() string {
+	if a.cfg.LaunchpadSpacePause {
+		return "tapping Space pauses or resumes all sounds and holding it stops them"
+	}
+	return "Space stops all sounds"
+}
+
+func (a *App) toggleSpacePause() {
+	a.cfg.LaunchpadSpacePause = !a.cfg.LaunchpadSpacePause
+	a.save()
+	a.render()
 }
 
 // setLaunchpadOption flips one of the badge's switches (the No… settings).

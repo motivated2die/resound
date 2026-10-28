@@ -51,12 +51,14 @@ const (
 	// (ActionLaunchpad, Down), letting go ends it. While it is held, every
 	// new press of a key or of the middle or side buttons is kept from the
 	// other programs: a digit or letter reports ActionLaunchpadKey with Key
-	// ('0'–'9', numpad digits as those, 'A'–'Z'), Space ActionLaunchpadStop,
-	// the arrow keys and the mouse wheel ActionLaunchpadTab by Steps
-	// (positive: the next tab). Other keys do nothing.
+	// ('0'–'9', numpad digits as those, 'A'–'Z'), Space ActionLaunchpadSpace
+	// (Down, and Up when it is let go, even after the launchpad ended: a
+	// long press can mean something else), the arrow keys and the mouse
+	// wheel ActionLaunchpadTab by Steps (positive: the next tab). Other keys
+	// do nothing.
 	ActionLaunchpad
 	ActionLaunchpadKey
-	ActionLaunchpadStop
+	ActionLaunchpadSpace
 	ActionLaunchpadTab
 )
 
@@ -66,11 +68,12 @@ const EscHoldTime = 700 * time.Millisecond
 
 func (a Action) String() string {
 	return [...]string{"pause", "stop", "overlay open", "overlay select", "overlay close", "overlay scroll", "overlay Esc down", "overlay stop", "push-to-talk hand-over", "app", "talk",
-		"launchpad", "launchpad key", "launchpad stop", "launchpad tab"}[a]
+		"launchpad", "launchpad key", "launchpad Space", "launchpad tab"}[a]
 }
 
 // HotkeyEvent is a hotkey becoming active (Down) or inactive. Stop keys and
-// the overlay's events only report Down, as do the launchpad's but its own.
+// the overlay's events only report Down, as do the launchpad's but its own
+// and Space's.
 type HotkeyEvent struct {
 	Action Action
 	Down   bool
@@ -391,6 +394,7 @@ type Filter struct {
 	swallowed   map[uint16]bool // keys whose press was swallowed
 	wheel       int             // wheel delta short of a whole step
 	launchpad   Combo           // the combination holding the launchpad; nil = not held
+	space       bool            // Space went down while the launchpad was held and isn't up yet
 }
 
 // Key records a press or release. It returns the hotkey events it causes
@@ -404,11 +408,15 @@ func (f *Filter) Key(b *Bindings, vk uint16, down bool) (events []HotkeyEvent, s
 			return nil, true // auto-repeat
 		}
 		delete(f.swallowed, vk)
+		if vk == vkSpace && f.space {
+			f.space = false
+			events = append(events, HotkeyEvent{Action: ActionLaunchpadSpace})
+		}
 		if vk == vkEscape && f.escHeld { // let go before EscHoldTime
 			f.SetOpen(false)
 			return []HotkeyEvent{{Action: ActionOverlayClose, Down: true}}, true
 		}
-		events = f.Matcher.Key(b, vk, false)
+		events = append(events, f.Matcher.Key(b, vk, false)...)
 		f.overlayHeld = b != nil && f.held(b.Overlay)
 		return append(events, f.launchpadLetGo()...), true
 	}
@@ -417,6 +425,7 @@ func (f *Filter) Key(b *Bindings, vk uint16, down bool) (events []HotkeyEvent, s
 	case f.launchpad != nil && press:
 		f.hold(vk)
 		f.swallowed[vk] = true
+		f.space = f.space || vk == vkSpace
 		return launchpadInput(vk), true
 	case press && b != nil && f.completesWith(b.Launchpad, vk):
 		f.hold(vk)
@@ -460,7 +469,7 @@ func launchpadInput(vk uint16) []HotkeyEvent {
 	case vk >= vkNumpad0 && vk <= vkNumpad0+9:
 		return []HotkeyEvent{{Action: ActionLaunchpadKey, Down: true, Key: '0' + vk - vkNumpad0}}
 	case vk == vkSpace:
-		return []HotkeyEvent{{Action: ActionLaunchpadStop, Down: true}}
+		return []HotkeyEvent{{Action: ActionLaunchpadSpace, Down: true}}
 	case vk == vkLeft || vk == vkUp:
 		return []HotkeyEvent{{Action: ActionLaunchpadTab, Down: true, Steps: -1}}
 	case vk == vkRight || vk == vkDown:
