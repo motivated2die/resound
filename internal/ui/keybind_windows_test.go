@@ -113,10 +113,18 @@ func TestKeybindDuck(t *testing.T) {
 		t.Fatal("a slider while recording")
 	}
 
+	// The label and its info icon sit on the track up to half way.
+	if l := (keybindRow{spec(50, false)}).layout(c, r); l.duck.info == (rect{}) || l.duck.info.Right > l.duck.track.Right {
+		t.Fatalf("at 50: info %v on track %v", l.duck.info, l.duck.track)
+	}
+	if l := (keybindRow{spec(55, false)}).layout(c, r); l.duck.info != (rect{}) || l.duck.label != (rect{}) {
+		t.Fatal("the label shows past half way")
+	}
+
 	var rows []Row
-	for _, v := range []int{0, 35, 100} {
+	for _, v := range []int{0, 35, 60, 100} {
 		rows = append(rows, Keybind(spec(v, false)))
 	}
-	rows = append(rows, Keybind(spec(60, true)))
+	rows = append(rows, Keybind(spec(20, true)))
 	savePNG(t, renderRowsMeasured(t, rows, 1.5), "keybind-duck")
 }

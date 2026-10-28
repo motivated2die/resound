@@ -4,17 +4,19 @@ import "strconv"
 
 // The ducking slider: what holding push-to-talk yourself does to the
 // sounds, at the bottom of the push-to-talk card (KeybindSpec.Duck). A
-// caption, "Ducking" with an info icon, over a full-width rounded track
-// with a rectangular knob to drag. All the way left the knob says "Pause"
-// (the sounds pause); further right they keep playing, louder the further
-// it goes, the knob saying how loud, up to 100% at the right end. The
-// track fills up to the knob in a tint of the accent, a pause icon at its
-// left end and a speaker at its right one, under the knob when it is there.
+// full-width rounded track with a rectangular knob to drag. All the way left
+// the knob says "Pause" (the sounds pause), a small triangle beside it
+// pointing the way it pulls; further right they keep playing, louder the
+// further it goes, the knob saying how loud, up to 100% at the right end.
+// The track fills up to the knob's right edge in a tint of the accent, with
+// a pause icon at its left end. At its right end, a speaker, then "Ducking"
+// in light grey with an info icon; they give way to the knob once it is
+// pulled past half way.
 
 // DuckSpec describes the ducking slider of a push-to-talk card.
 type DuckSpec struct {
 	Value     int    // 0: pause; 1–100: the sounds' volume while the key is held
-	Inherited bool   // the global value, in an app's card: muted, "Global" beside it
+	Inherited bool   // the global value, in an app's card: muted, labelled so
 	Info      string // the info icon's tooltip
 	// OnChange gets every new value while the knob is dragged (done false)
 	// and the last one on release (done true).
@@ -23,33 +25,48 @@ type DuckSpec struct {
 
 // Logical sizes.
 const (
-	duckCaptionL = 24 // "Ducking" and the info icon
-	duckTrackL   = 34
-	duckRadiusL  = 9
+	duckTrackL   = 27
+	duckRadiusL  = 8
 	duckKnobWL   = 72
 	duckInsetL   = 3 // between the track and the knob
 	duckIconL    = 13
-	duckStep     = 5 // the knob snaps to these
+	duckPadL     = 10 // the icons from the track's ends
+	duckLabelMax = 50 // the label shows up to this value
+	duckStep     = 5  // the knob snaps to these
 )
 
-// duckLayout is where the slider's parts go, in device pixels.
+// duckLayout is where the slider's parts go, in device pixels; label and
+// info are empty while the knob is past duckLabelMax.
 type duckLayout struct {
-	label, info, scope, track rect
+	track, speaker, label, info rect
+}
+
+// duckLabel is the label on the track.
+func duckLabel(s DuckSpec) string {
+	if s.Inherited {
+		return "Ducking (global)"
+	}
+	return "Ducking"
 }
 
 // layoutDuck lays the slider out from top between left and right, and
 // returns its bottom.
 func layoutDuck(c *canvas, s DuckSpec, left, right, top int32) (duckLayout, int32) {
 	var l duckLayout
-	l.label = rect{left, top, left + c.textWidth("Ducking", fontBody) + c.px(2), top + c.px(duckCaptionL)}
-	size := c.px(20)
-	y := top + (c.px(duckCaptionL)-size)/2
-	l.info = rect{l.label.Right + c.px(1), y, l.label.Right + c.px(1) + size, y + size}
-	if s.Inherited {
-		l.scope = rect{right - c.textWidth("GLOBAL", fontCaption), top, right, top + c.px(duckCaptionL)}
+	l.track = rect{left, top, right, top + c.px(duckTrackL)}
+	mid := (l.track.Top + l.track.Bottom) / 2
+	// From the right: the info icon, the label, the speaker. The speaker
+	// stays put when they hide, so nothing jumps while the knob is dragged.
+	x := l.track.Right - c.px(duckPadL)
+	size := c.px(18)
+	info := rect{x - size, mid - size/2, x, mid + size/2}
+	w := c.textWidth(duckLabel(s), fontBody) + c.px(2)
+	label := rect{info.Left - c.px(1) - w, l.track.Top, info.Left - c.px(1), l.track.Bottom}
+	if s.Value <= duckLabelMax {
+		l.info, l.label = info, label
 	}
-	trackTop := l.label.Bottom + c.px(4)
-	l.track = rect{left, trackTop, right, trackTop + c.px(duckTrackL)}
+	x, icon := label.Left-c.px(8), c.px(duckIconL)
+	l.speaker = rect{x - icon, mid - icon/2, x, mid + icon/2}
 	return l, l.track.Bottom
 }
 
@@ -89,31 +106,26 @@ func DuckText(value int) string {
 
 // paintDuck draws the slider on a card of colour bg.
 func paintDuck(c *canvas, l duckLayout, s DuckSpec, bg uint32, hoverInfo, hover, press bool) {
-	fg := colText
-	if s.Inherited {
-		fg = colMuted
-	}
-	c.text("Ducking", l.label, fontBody, fg, dtLeft)
-	infoCol := colCaption
-	if hoverInfo {
-		infoCol = colText
-	}
-	c.icon(IconInfo, l.info, 14, infoCol)
-	if l.scope != (rect{}) {
-		c.text("GLOBAL", l.scope, fontCaption, colCaption, dtRight)
-	}
-
 	radius := c.px(duckRadiusL)
-	c.roundRect(l.track, radius, shade(bg, -14))
+	trackBg := shade(bg, -14)
+	c.roundRect(l.track, radius, trackBg)
 	knob := duckKnob(c, l.track, s.Value)
-	if s.Value > 0 { // the sounds' volume: the track fills up to the knob
-		fill := rect{l.track.Left, l.track.Top, (knob.Left + knob.Right) / 2, l.track.Bottom}
-		c.roundRect(fill, radius, mix(shade(bg, -14), colAccent, 0.2))
+	if s.Value > 0 { // the sounds' volume: the track fills up to the knob's right edge
+		fill := rect{l.track.Left, l.track.Top, knob.Right + c.px(duckInsetL), l.track.Bottom}
+		c.roundRect(fill, radius, mix(trackBg, colAccent, 0.2))
 	}
-	pad, icon := c.px(10), c.px(duckIconL)
+	pad, icon := c.px(duckPadL), c.px(duckIconL)
 	mid := (l.track.Top + l.track.Bottom) / 2
 	c.icon(IconPause, rect{l.track.Left + pad, mid - icon/2, l.track.Left + pad + icon, mid + icon/2}, duckIconL, colCaption)
-	c.icon(IconVolume, rect{l.track.Right - pad - icon, mid - icon/2, l.track.Right - pad, mid + icon/2}, duckIconL, colCaption)
+	c.icon(IconVolume, l.speaker, duckIconL, colCaption)
+	if l.label != (rect{}) {
+		c.text(duckLabel(s), l.label, fontBody, colMuted, dtLeft)
+		infoCol := colCaption
+		if hoverInfo {
+			infoCol = colText
+		}
+		c.icon(IconInfo, l.info, 14, infoCol)
+	}
 
 	knobBg, knobFg := colControl, colText
 	switch {
@@ -126,4 +138,27 @@ func paintDuck(c *canvas, l duckLayout, s DuckSpec, bg uint32, hoverInfo, hover,
 	}
 	c.roundRect(knob, radius-c.px(duckInsetL), knobBg)
 	c.text(DuckText(s.Value), knob, fontBold, knobFg, dtCenter)
+	if s.Value == 0 { // pull me: a small triangle pointing right, beside the knob
+		col := colMuted
+		if hover || press {
+			col = colText
+		}
+		paintTriangleRight(c, knob.Right+c.px(7), mid, c.px(4), col)
+	}
+}
+
+// paintTriangleRight fills a small triangle pointing right, its left edge
+// at x, centred on y, half as high as it is wide times two.
+func paintTriangleRight(c *canvas, x, y, half int32, color uint32) {
+	for dy := -half; dy <= half; dy++ {
+		w := half - abs32i(dy) + 1
+		c.fill(rect{x, y + dy, x + w, y + dy + 1}, color)
+	}
+}
+
+func abs32i(v int32) int32 {
+	if v < 0 {
+		return -v
+	}
+	return v
 }
