@@ -921,8 +921,14 @@ h1 { font-size: clamp(32px, 5vw, 52px); line-height: 1.1; font-weight: 700; lett
         linear-gradient(180deg, rgba(255, 255, 255, 0.025), rgba(255, 255, 255, 0.01));
 }
 .lp-eyebrow { color: var(--launchpad); }
-.lp-visual { width: 210px; }
+.lp-visual { position: relative; width: 210px; }
+/* The played button's confetti (launchpad-demo.js), under the screen: it
+   shows as it comes out from behind it. */
+.lp-confetti { position: absolute; inset: 0; z-index: 0; pointer-events: none; }
+.lp-confetti i { position: absolute; width: 6px; height: 9px; border-radius: 1px; }
 .lp-phone {
+    position: relative;
+    z-index: 1;
     --play: 2.6s;
     padding: 8px 8px 4px;
     border: 1px solid rgba(255, 255, 255, 0.08);

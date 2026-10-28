@@ -4,7 +4,8 @@
 // It works like the launchpad in Resound (internal/app/launchpad.go): while
 // Alt is held, the phone's buttons show the keys that play them, 1 to 6
 // here; pressing one plays that button (the hero's pad animation,
-// landing.js), and letting go of Alt takes the keys away. Alt is shared with
+// landing.js, with confetti bursting out from behind the screen), and
+// letting go of Alt takes the keys away. Alt is shared with
 // the overlay's demo: held for HOLD_MS, or with a digit, it is the
 // launchpad's (tookAlt); a short tap opens the overlay. Without a keyboard,
 // the box holds the key until it is tapped again. The buttons only play by
@@ -22,10 +23,11 @@
     const HOLD_MS = 280;      // Alt held this long is the launchpad's, not a tap
     const CYCLE_MS = 6500;    // each demo, while nobody plays with them
     const PLAY_MS = 2600;     // a pad's progress bar (--play in css/landing.css)
+    const CONFETTI = ['#ffc93c', '#ffe17a', '#50dea8', '#f2416f', '#6aa8ff', '#b388ff'];
 
     const touch = window.matchMedia('(pointer: coarse)').matches;
     const still = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    let section, tabs, cards, pads, tiles, box, key, label;
+    let section, tabs, cards, pads, tiles, box, key, label, behind;
     let current = 'launchpad';
     let held = false;      // the keys show
     let altDown = false;
@@ -43,6 +45,9 @@
         tabs = [...section.querySelectorAll('[data-demo-tab]')];
         cards = [...section.querySelectorAll('[data-demo]')];
         tiles = [...pads.querySelectorAll('.tile')];
+        behind = document.createElement('div'); // confetti, under the screen
+        behind.className = 'lp-confetti';
+        pads.before(behind);
         label = document.querySelector('[data-lp-label]');
         key = document.querySelector('[data-lp-key]');
 
@@ -111,6 +116,39 @@
             key.classList.remove('hit');
             void key.offsetWidth;
             key.classList.add('hit');
+        }
+        confetti(tile);
+    }
+
+    // confetti sends a handful of pieces from behind the played button out
+    // past the screen's edges, away from its middle, as if blown out from
+    // under it; they fall a little as they fade. Not with reduced motion.
+    function confetti(tile) {
+        if (still || !behind || !document.body.animate) return;
+        const area = behind.getBoundingClientRect();
+        const screen = pads.getBoundingClientRect();
+        const t = tile.getBoundingClientRect();
+        const x = t.left + t.width / 2 - area.left, y = t.top + t.height / 2 - area.top;
+        // Away from the screen's middle; the middle column goes up or down.
+        const way = Math.atan2(t.top + t.height / 2 - (screen.top + screen.height / 2),
+            t.left + t.width / 2 - (screen.left + screen.width / 2));
+        const out = Math.hypot(screen.width, screen.height) / 2; // far enough to clear the screen
+        for (let i = 0; i < 16; i++) {
+            const bit = document.createElement('i');
+            bit.style.left = x + 'px';
+            bit.style.top = y + 'px';
+            bit.style.background = CONFETTI[i % CONFETTI.length];
+            behind.append(bit);
+            const angle = way + (Math.random() * 2 - 1) * 1.1; // about 60° either side
+            const dist = out + 20 + Math.random() * 70;
+            const dx = Math.cos(angle) * dist, dy = Math.sin(angle) * dist;
+            const spin = (Math.random() * 2 - 1) * 540;
+            const anim = bit.animate([
+                { transform: 'translate(-50%, -50%) rotate(0deg)', opacity: 1 },
+                { transform: `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px)) rotate(${spin / 2}deg)`, opacity: 1, offset: 0.6 },
+                { transform: `translate(calc(-50% + ${dx * 1.1}px), calc(-50% + ${dy + 60}px)) rotate(${spin}deg)`, opacity: 0 },
+            ], { duration: 900 + Math.random() * 400, easing: 'cubic-bezier(0.15, 0.7, 0.3, 1)', fill: 'forwards' });
+            anim.onfinish = () => bit.remove();
         }
     }
 
