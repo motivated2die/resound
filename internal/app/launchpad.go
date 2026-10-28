@@ -317,15 +317,17 @@ func (a *App) launchpadSummary() (string, ui.Tone) {
 }
 
 func (a *App) launchpadPage() []ui.Row {
-	how := "Hold a key in any game and play the buttons of your phone's tab with your keyboard."
+	// Beside a small picture of three buttons with their keys, like the
+	// overlay's page.
+	how, key := "Hold a key in any game and your phone's buttons show numbers. Press one to play that sound.", ""
 	if len(a.cfg.LaunchpadKeys) > 0 {
-		key := input.Combo(a.cfg.LaunchpadKeys).String()
-		how = "Hold " + key + " in a game: your phone shows a key on each button of its tab, 1 to 9, 0, then A to Z. Press one to play that sound."
+		key = input.Combo(a.cfg.LaunchpadKeys).String()
+		how = "Hold " + key + " in a game: your phone shows a key on each button, 1 to 9, 0, then A to Z. Press one to play that sound."
 	}
 	rows := []ui.Row{
 		ui.HeaderButton("Launchpad", a.back, ui.IconHelp, "Help", "How the launchpad works: opens the help article", func() { a.openHelpAt(helpLaunchpad) }),
-		ui.Paragraph(how, ui.ToneMuted),
-		ui.Paragraph("While you hold it, the arrow keys or the mouse wheel switch tabs, and Space stops or pauses sounds (below). Your game gets none of these keys meanwhile.", ui.ToneMuted),
+		ui.LaunchpadPreview(key, how,
+			"The arrow keys or the wheel switch tabs, Space stops or pauses sounds (below). Your game gets none of these keys meanwhile."),
 		ui.Section("Key"),
 		a.keybindCard(keyTarget{fn: fnLaunchpad}),
 		a.appKeysNote(fnLaunchpad, "A game can have a launchpad key of its own, or no launchpad at all."),

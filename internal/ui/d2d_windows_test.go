@@ -183,6 +183,32 @@ func TestOverlayPreviewRow(t *testing.T) {
 	savePNG(t, img, "overlay-page")
 }
 
+// The launchpad's preview row lays out beside its text like the overlay's.
+func TestLaunchpadPreviewRow(t *testing.T) {
+	if _, err := getD2D(); err != nil {
+		t.Skipf("no Direct2D: %v", err)
+	}
+	surf, err := renderLaunchpadPreview(1.5)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if surf.w <= surf.h || surf.h < int32(1.5*(2*lpvPad+lpvButton)) {
+		t.Errorf("picture %d×%d, want three buttons side by side", surf.w, surf.h)
+	}
+	surf.free()
+	rows := []Row{
+		Header("Launchpad", func() {}),
+		LaunchpadPreview("F7", "Hold F7 in a game: your phone shows a key on each button, 1 to 9, 0, then A to Z. Press one to play that sound.",
+			"The arrow keys or the wheel switch tabs, Space stops or pauses sounds (below). Your game gets none of these keys meanwhile."),
+		Section("Key"),
+		Text("F7", "", ToneGood),
+		Section("Without a key"),
+		LaunchpadPreview("", "Hold a key in any game and your phone's buttons show numbers. Press one to play that sound."),
+	}
+	img := renderRowsMeasured(t, rows, 1.5)
+	savePNG(t, img, "launchpad-page")
+}
+
 // renderRowsMeasured is renderRows measuring with a device context, so
 // wrapped text gets its height as in the panel.
 func renderRowsMeasured(t *testing.T, rows []Row, scale float64) image.Image {
