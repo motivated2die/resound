@@ -290,9 +290,9 @@ func TestMixerDuck(t *testing.T) {
 	m.Add(2, NewStaticSource("b", 48000, samples), 1, true, time.Now()) // a custom volume of 100%
 	m.SetDuck(0.25)
 	out := make([]float32, 2*duckRampFrames/2)
-	m.Read(out) // half the ramp's time: from a gain of 1 to 0.5
-	if first, last := out[0], out[len(out)-2]; first < 0.59 || last < 0.299 || last > 0.301 {
-		t.Fatalf("gliding down: %v … %v, want from 0.6 to 0.3", first, last)
+	m.Read(out) // half the ramp's time: half way from a gain of 1 to 0.25
+	if first, last := out[0], out[len(out)-2]; first < 0.59 || last < 0.374 || last > 0.376 {
+		t.Fatalf("gliding down: %v … %v, want from 0.6 to 0.375", first, last)
 	}
 	for prev, i := out[0], 2; i < len(out); i += 2 {
 		if d := prev - out[i]; d < 0 || d > 0.001 {
@@ -301,6 +301,9 @@ func TestMixerDuck(t *testing.T) {
 		prev = out[i]
 	}
 	m.Read(out) // the rest of the way
+	if got := out[len(out)-2]; got < 0.149 || got > 0.151 {
+		t.Fatalf("not there after the ramp's time: %v", got)
+	}
 	m.Read(out)
 	if got := out[len(out)-2]; got < 0.149 || got > 0.151 {
 		t.Fatalf("ducked: %v, want 0.6 × 0.25", got)

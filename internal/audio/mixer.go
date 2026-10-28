@@ -55,8 +55,10 @@ type Mixer struct {
 	// duck lowers the whole mix on top of every volume (SetDuck), e.g.
 	// while the user talks; duckNow is where the render thread's ramp
 	// towards it is.
-	duck    atomic.Uint32
-	duckNow float32
+	duck     atomic.Uint32
+	duckNow  float32
+	duckWant float32 // the target duckStep was worked out for
+	duckStep float32 // the glide's change per frame
 
 	// Level meters: the voices before the master volume (the sounds
 	// themselves) and the final mix sent to the device.
@@ -68,7 +70,7 @@ type Mixer struct {
 
 // NewMixer creates a mixer whose events are tagged with role.
 func NewMixer(role string, events chan<- Event) *Mixer {
-	m := &Mixer{role: role, events: events, duckNow: 1}
+	m := &Mixer{role: role, events: events, duckNow: 1, duckWant: 1}
 	m.SetVolume(1)
 	m.SetDuck(1)
 	return m
@@ -81,13 +83,13 @@ func (m *Mixer) SetVolume(v float32) { m.volume.Store(math.Float32bits(v)) }
 func (m *Mixer) Volume() float32 { return math.Float32frombits(m.volume.Load()) }
 
 // SetDuck sets a gain (0..1) applied to the whole mix after every volume:
-// 1 leaves it alone. The mix glides to it over duckRampFrames, so the
-// change never clicks.
+// 1 leaves it alone. The mix glides there over duckRampFrames, however far
+// it goes, so the change is gentle and never clicks.
 func (m *Mixer) SetDuck(g float32) { m.duck.Store(math.Float32bits(max(0, min(1, g)))) }
 
-// duckRampFrames is how many frames the duck gain takes from 0 to 1 (about
-// 50 ms at 48 kHz).
-const duckRampFrames = 2400
+// duckRampFrames is how many frames a change of the duck gain takes (about
+// 400 ms at 48 kHz).
+const duckRampFrames = 19200
 
 // Add queues a new voice. With absolute, gain replaces the master volume
 // (per-sound custom volume); otherwise it scales it. The mixer owns src from
@@ -268,7 +270,11 @@ func (m *Mixer) applyDuck(out []float32) {
 	if g == 1 && want == 1 {
 		return
 	}
-	const step = 1.0 / duckRampFrames
+	if want != m.duckWant { // a new target: the whole way in duckRampFrames
+		m.duckWant = want
+		m.duckStep = max(abs32(want-g)/duckRampFrames, 1e-7)
+	}
+	step := m.duckStep
 	for i := 0; i+1 < len(out); i += 2 {
 		switch {
 		case g < want:

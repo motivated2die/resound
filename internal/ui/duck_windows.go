@@ -9,9 +9,9 @@ import "strconv"
 // pointing the way it pulls; further right they keep playing, louder the
 // further it goes, the knob saying how loud, up to 100% at the right end.
 // The track fills up to the knob's right edge in a tint of the accent, with
-// a pause icon at its left end. At its right end, a speaker, then "Ducking"
-// in light grey with an info icon; they give way to the knob once it is
-// pulled past half way.
+// a pause icon at its left end and a speaker at its right one. Left of the
+// speaker, an info icon and "Ducking" in light grey, which give way to the
+// knob once it is pulled past half way.
 
 // DuckSpec describes the ducking slider of a push-to-talk card.
 type DuckSpec struct {
@@ -55,18 +55,15 @@ func layoutDuck(c *canvas, s DuckSpec, left, right, top int32) (duckLayout, int3
 	var l duckLayout
 	l.track = rect{left, top, right, top + c.px(duckTrackL)}
 	mid := (l.track.Top + l.track.Bottom) / 2
-	// From the right: the info icon, the label, the speaker. The speaker
-	// stays put when they hide, so nothing jumps while the knob is dragged.
-	x := l.track.Right - c.px(duckPadL)
-	size := c.px(18)
-	info := rect{x - size, mid - size/2, x, mid + size/2}
-	w := c.textWidth(duckLabel(s), fontBody) + c.px(2)
-	label := rect{info.Left - c.px(1) - w, l.track.Top, info.Left - c.px(1), l.track.Bottom}
-	if s.Value <= duckLabelMax {
-		l.info, l.label = info, label
-	}
-	x, icon := label.Left-c.px(8), c.px(duckIconL)
+	// From the right: the speaker at the end, the label, its info icon.
+	x, icon := l.track.Right-c.px(duckPadL), c.px(duckIconL)
 	l.speaker = rect{x - icon, mid - icon/2, x, mid + icon/2}
+	if s.Value <= duckLabelMax {
+		w := c.textWidth(duckLabel(s), fontBody) + c.px(2)
+		l.label = rect{l.speaker.Left - c.px(8) - w, l.track.Top, l.speaker.Left - c.px(8), l.track.Bottom}
+		size := c.px(18)
+		l.info = rect{l.label.Left - c.px(1) - size, mid - size/2, l.label.Left - c.px(1), mid + size/2}
+	}
 	return l, l.track.Bottom
 }
 
