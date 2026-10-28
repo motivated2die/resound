@@ -107,3 +107,63 @@ func saveScreen(t *testing.T, r rect, path string) {
 	defer f.Close()
 	_ = png.Encode(f, img)
 }
+
+// TestLaunchpadBadgeLive shows the real launchpad badge, next to the
+// overlay (two layered windows at once), at the top middle of the primary
+// screen, plays a sound on it and moves it to the bottom right corner: it
+// must not take the focus, must sit where expected, and must be gone after
+// hiding. With RESOUND_RENDER_DIR set it saves a screenshot of it.
+//
+//	$env:RESOUND_OVERLAY_LIVE="1"; go test -run LaunchpadBadgeLive -v ./internal/ui
+func TestLaunchpadBadgeLive(t *testing.T) {
+	if os.Getenv("RESOUND_OVERLAY_LIVE") != "1" {
+		t.Skip("set RESOUND_OVERLAY_LIVE=1 to show the badge on the screen")
+	}
+	runtime.LockOSThread()
+	defer runtime.UnlockOSThread()
+	InitDPIAwareness()
+	o, err := NewOverlay()
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, err := NewLaunchpadBadge()
+	if err != nil {
+		t.Fatal(err)
+	}
+	fg, _, _ := procGetForegroundWindow.Call()
+	mon, _ := primaryMonitor()
+	o.Show(overlayTestItems, 3, true, "")
+	b.Show(BadgeTopCenter, "Favorites")
+	pump(250 * time.Millisecond)
+	var r rect
+	procGetWindowRect.Call(b.hwnd, uintptr(unsafe.Pointer(&r)))
+	mid := (mon.Left + mon.Right) / 2
+	if r.Top != mon.Top || (r.Left+r.Right)/2 < mid-2 || (r.Left+r.Right)/2 > mid+2 {
+		t.Errorf("badge window %+v not at the top middle of %+v", r, mon)
+	}
+	b.Played("🚗", "Car horn", true)
+	pump(100 * time.Millisecond)
+	if dir := os.Getenv("RESOUND_RENDER_DIR"); dir != "" {
+		saveScreen(t, r, filepath.Join(dir, "launchpad-live.png"))
+	}
+	b.Show(BadgeBottomRight, "Favorites")
+	pump(1500 * time.Millisecond) // the sound's name goes, the tab's comes back
+	procGetWindowRect.Call(b.hwnd, uintptr(unsafe.Pointer(&r)))
+	if r.Right != mon.Right || r.Bottom != mon.Bottom {
+		t.Errorf("badge window %+v not at the bottom right of %+v", r, mon)
+	}
+	if b.scene.text != "Favorites" || b.scene.emoji != "" {
+		t.Errorf("after the sound's time: %q %q, want the tab's name again", b.scene.emoji, b.scene.text)
+	}
+	if now, _, _ := procGetForegroundWindow.Call(); now != fg {
+		t.Errorf("the badge took the focus: foreground %#x, was %#x", now, fg)
+	}
+	o.Hide(nil)
+	b.Hide()
+	pump(250 * time.Millisecond)
+	for _, h := range []uintptr{o.hwnd, b.hwnd} {
+		if visible, _, _ := procIsWindowVisible.Call(h); visible != 0 {
+			t.Error("still visible after hiding")
+		}
+	}
+}
