@@ -10,6 +10,11 @@
 //
 // On touch screens a swipe moves the highlight instead of the page, and
 // swiping on past either end of the list closes the bar.
+//
+// Alt is shared with the launchpad's demo (js/launchpad-demo.js): a tap is
+// the overlay's, a hold or Alt with a digit the launchpad's
+// (launchpadDemo.tookAlt). Opening and closing are announced to the page
+// ("ovl-demo" events), so the demos' tabs follow.
 (() => {
     'use strict';
 
@@ -61,6 +66,8 @@
         document.addEventListener('touchstart', onTouchStart, { passive: true });
         document.addEventListener('touchmove', onTouchMove, { passive: false });
     });
+
+    window.overlayDemo = { isOpen: () => open };
 
     // animatePreview moves the small picture's highlight as the wheel would:
     // one notch up, two down, one up, over and over, while it is in view.
@@ -164,6 +171,11 @@
         live.classList.add('open');
         trigger.setAttribute('aria-expanded', 'true');
         say('');
+        announce();
+    }
+
+    function announce() {
+        document.dispatchEvent(new CustomEvent('ovl-demo', { detail: { open } }));
     }
 
     function close(after) {
@@ -173,6 +185,7 @@
         live.classList.add('closing');
         live.classList.remove('open');
         trigger.setAttribute('aria-expanded', 'false');
+        announce();
         clearTimeout(closeTimer);
         closeTimer = setTimeout(() => {
             live.hidden = true;
@@ -312,7 +325,7 @@
         if (e.key === 'Alt') {
             pressKeys(false);
             e.preventDefault(); // Firefox would show its menu bar
-            if (altAlone) (open ? play : show)();
+            if (altAlone && (open || !window.launchpadDemo?.tookAlt())) (open ? play : show)();
             altAlone = false;
             return;
         }

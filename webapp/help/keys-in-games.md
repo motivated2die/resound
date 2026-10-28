@@ -1,6 +1,6 @@
 # Keys don't work in a game
 
-Resound presses your push-to-talk key and listens for its pause, stop and overlay keys the same way any keyboard tool does. When that doesn't reach a game, it is usually one of these.
+Resound presses your push-to-talk key and listens for its pause, stop, overlay and launchpad keys the same way any keyboard tool does. When that doesn't reach a game, it is usually one of these.
 
 ## The game runs as administrator
 
@@ -28,6 +28,12 @@ Windows doesn't let programs exchange keys with programs running as administrato
 - Check the game is listed under **App keybinds** with the functions you set (its line says which, such as *Push-to-talk, pause*). A function that says *Global* on its card uses the global keys.
 - Resound knows a game by its program file. If the game starts through a launcher, add the game itself while it runs, not the launcher.
 - A function set to **None** is off in that game: its global key does nothing there. The **↺** arrow brings the global keys back.
+
+## The launchpad shows no keys on the phone
+
+- Check that it has a key: Settings → **Launchpad**.
+- The keys show on the Resound app you used last. Tap the one you want, then hold the key again.
+- If another window comes to the front while you hold the key, or Windows shows a security prompt, the launchpad ends: let go and hold it again.
 
 ## The overlay doesn't show
 

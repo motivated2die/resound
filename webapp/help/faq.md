@@ -14,7 +14,7 @@ In the system tray next to the clock, often hidden behind the **^** arrow. Pin i
 
 ## Do I need a phone?
 
-No. The app also runs on the PC itself, in a window of its own: the button in the top right corner of **Web app** on the home page. In games, the [in-game overlay](overlay.md) plays your favorites with one key.
+No. The app also runs on the PC itself, in a window of its own: the button in the top right corner of **Web app** on the home page. In games, the [in-game overlay](overlay.md) plays your favorites with one key, and the [launchpad](launchpad.md) plays any button with your keyboard.
 
 ## Does the phone need internet?
 

@@ -14,6 +14,10 @@
     --muted: #9a9ca6;
     --caption: #7e818c;
     --berry: #f2416f;
+    /* The launchpad's yellow, as on the remote and the PC's badge */
+    --launchpad: #ffc93c;
+    --launchpad-rgb: 255, 201, 60;
+    --on-launchpad: #2a2208;
     --radius: 14px;
     --wrap: 1120px;
     --gutter: 20px;
@@ -60,6 +64,8 @@ code { font-family: Consolas, "Cascadia Mono", monospace; background: var(--rais
     -webkit-mask: var(--icon) center / contain no-repeat;
     mask: var(--icon) center / contain no-repeat;
 }
+.icon[data-icon="apps"] { --icon: url("../assets/icons/apps.svg"); }
+.icon[data-icon="favorite"] { --icon: url("../assets/icons/favorite.svg"); }
 .icon[data-icon="bolt"] { --icon: url("../assets/icons/bolt.svg"); }
 .icon[data-icon="close"] { --icon: url("../assets/icons/close.svg"); }
 .icon[data-icon="check_circle"] { --icon: url("../assets/icons/check_circle.svg"); }
@@ -825,6 +831,136 @@ h1 { font-size: clamp(32px, 5vw, 52px); line-height: 1.1; font-weight: 700; lett
 .ovl-status { min-height: 1.6em; margin-top: 14px; color: var(--accent); font-size: 15px; font-weight: 600; }
 .ovl-status.bad { color: var(--berry); }
 
+/* --- The demos in game (index.html #overlay, js/launchpad-demo.js) ---
+   Tabs above two framed cards, the launchpad's and the overlay's, which lie
+   on top of each other in one grid cell: both take the taller one's height,
+   so switching never moves the page. The selected tab's line fills up while
+   the demos switch by themselves. */
+.demo-tabs { display: flex; justify-content: center; gap: 6px; margin-bottom: 18px; }
+.demo-tab {
+    --tab-rgb: var(--accent-rgb);
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 9px 16px 13px;
+    border: 0;
+    border-radius: 10px 10px 0 0;
+    background: none;
+    color: var(--muted);
+    font: inherit;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: color 0.2s ease, background-color 0.2s ease;
+}
+.demo-tab.lp { --tab-rgb: var(--launchpad-rgb); }
+.demo-tab .icon { font-size: 19px; }
+.demo-tab:hover { color: var(--text); background: rgba(255, 255, 255, 0.03); }
+.demo-tab[aria-selected="true"] { color: rgb(var(--tab-rgb)); }
+.demo-tab-line {
+    position: absolute;
+    left: 12px;
+    right: 12px;
+    bottom: 0;
+    height: 3px;
+    border-radius: 2px;
+    background: rgba(255, 255, 255, 0.08);
+    overflow: hidden;
+}
+.demo-tab-fill {
+    position: absolute;
+    inset: 0;
+    background: rgb(var(--tab-rgb));
+    transform-origin: left;
+    transform: scaleX(0);
+}
+.demo-tab[aria-selected="true"] .demo-tab-fill { transform: scaleX(1); }
+.demo-tabs.cycling .demo-tab[aria-selected="true"] .demo-tab-fill { animation: demo-fill var(--demo-cycle, 5s) linear forwards; }
+.demo-tabs.cycling.paused .demo-tab[aria-selected="true"] .demo-tab-fill { animation-play-state: paused; }
+@keyframes demo-fill { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+
+.demo-stack { display: grid; }
+.demo-stack > .ovl-card {
+    grid-area: 1 / 1;
+    align-content: center; /* the shorter card's content in its middle */
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.3s ease, visibility 0s linear 0.3s;
+}
+.demo-stack > .ovl-card.on { opacity: 1; visibility: visible; transition: opacity 0.3s ease; }
+@media (prefers-reduced-motion: reduce) {
+    .demo-stack > .ovl-card, .demo-stack > .ovl-card.on { transition: none; }
+}
+
+/* The launchpad's card: the overlay's, in yellow, with six of the phone's
+   buttons (the hero's .tile) in a small screen. While its key is held, each
+   button shows its key in the corner, as on the remote (.launchpad-key). */
+.lp-card {
+    background:
+        radial-gradient(ellipse 420px 300px at 27% 50%, rgba(var(--launchpad-rgb), 0.06), transparent 70%),
+        linear-gradient(180deg, rgba(255, 255, 255, 0.025), rgba(255, 255, 255, 0.01));
+}
+.lp-eyebrow { color: var(--launchpad); }
+.lp-visual { width: 210px; }
+.lp-phone {
+    --play: 2.6s;
+    padding: 8px 8px 4px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 18px;
+    background: var(--background);
+    box-shadow: 0 18px 40px rgba(0, 0, 0, 0.45);
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+.lp-phone.held { border-color: rgba(var(--launchpad-rgb), 0.55); box-shadow: 0 18px 40px rgba(0, 0, 0, 0.45), 0 0 28px rgba(var(--launchpad-rgb), 0.18); }
+.lp-pads { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.lp-pads .tile {
+    aspect-ratio: 1;
+    font-size: 10px;
+    cursor: pointer;
+    touch-action: manipulation;
+    transition: transform 0.12s ease, filter 0.12s ease;
+}
+.lp-pads .tile b { font-size: 28px; }
+.lp-pads .tile:active { transform: scale(0.93); }
+@media (hover: hover) { .lp-pads .tile:hover { filter: brightness(1.18); } }
+.lp-key {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    z-index: 1;
+    min-width: 17px;
+    height: 17px;
+    padding: 0 4px;
+    border-radius: 5px;
+    background: var(--launchpad);
+    color: var(--on-launchpad);
+    font-style: normal;
+    font-weight: 800;
+    font-size: 11px;
+    line-height: 17px;
+    text-align: center;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.45);
+    opacity: 0;
+    transform: scale(0.6);
+    transition: opacity 0.16s ease-out, transform 0.16s ease-out;
+}
+.lp-phone.held .lp-key { opacity: 1; transform: none; }
+.lp-key.hit { animation: lp-key-hit 0.3s ease-out; }
+@keyframes lp-key-hit { 40% { transform: scale(1.35); } }
+.lp-tabs { display: flex; align-items: center; gap: 14px; padding: 8px 4px 4px; color: var(--caption); font-size: 10px; font-weight: 600; }
+.lp-tabs .icon { font-size: 11px; }
+.lp-tab { color: var(--accent); box-shadow: inset 0 -2px 0 currentColor; padding-bottom: 2px; transition: color 0.2s ease; }
+.lp-phone.held .lp-tab { color: var(--launchpad); }
+.lp-callout { border-color: rgba(var(--launchpad-rgb), 0.35); background: rgba(var(--launchpad-rgb), 0.07); }
+.lp-callout:hover, .lp-callout[aria-pressed="true"] { border-color: rgba(var(--launchpad-rgb), 0.6); background: rgba(var(--launchpad-rgb), 0.11); }
+.lp-callout .kbd-big { color: var(--launchpad); }
+.lp-status { color: var(--launchpad); }
+@media (prefers-reduced-motion: reduce) {
+    .lp-key, .lp-phone { transition: none; }
+    .lp-key.hit { animation: none; }
+}
+
 /* --- Audio editor (index.html #editor) ---
    A framed card like the overlay's, the picture on the left: a small editor
    whose selection closes in on the loud part of a clip, a playhead runs
@@ -1316,6 +1452,9 @@ h3 { font-size: 18px; line-height: 1.3; margin-bottom: 6px; }
     /* Tablets: narrower, with room kept for the picture's highlight. */
     .ovl-card { grid-template-columns: 190px minmax(0, 1fr); column-gap: 48px; padding: 40px 40px 36px 28px; }
     .ovl-visual { width: 170px; }
+    .lp-visual { width: 190px; }
+    .lp-pads .tile { font-size: 9px; }
+    .lp-pads .tile b { font-size: 24px; }
     .ed-card { grid-template-columns: 280px minmax(0, 1fr); column-gap: 44px; padding: 40px 36px 40px 28px; }
     .flow { flex-direction: column; align-items: center; }
     .flow-node { width: 100%; max-width: 320px; }
@@ -1343,6 +1482,15 @@ h3 { font-size: 18px; line-height: 1.3; margin-bottom: 6px; }
     .ovl-action { align-self: center; }
     .ovl-callout { width: 100%; flex-direction: column; align-items: flex-start; gap: 12px; padding: 14px; font-size: 14px; }
     .ovl-status { font-size: 14px; }
+    .demo-tabs { margin-bottom: 22px; }
+    .demo-tab { padding: 8px 12px 12px; font-size: 14px; }
+    .lp-visual { width: 168px; }
+    .lp-phone { padding: 6px 6px 3px; border-radius: 14px; }
+    .lp-pads { gap: 4px; }
+    .lp-pads .tile { font-size: 8px; padding: 3px; }
+    .lp-pads .tile b { font-size: 20px; }
+    .lp-key { top: 3px; right: 3px; min-width: 14px; height: 14px; font-size: 9px; line-height: 14px; border-radius: 4px; }
+    .lp-tabs { gap: 10px; font-size: 8px; }
     /* The editor as a band too: the text, then the picture below it. */
     .ed-section { background: linear-gradient(180deg, rgba(255, 255, 255, 0.035), rgba(255, 255, 255, 0.015)); border-top: 1px solid rgba(255, 255, 255, 0.05); border-bottom: 1px solid rgba(255, 255, 255, 0.05); }
     .ed-card { grid-template-columns: minmax(0, 1fr); grid-template-areas: "copy" "visual"; row-gap: 28px; padding: 0; border: 0; border-radius: 0; background: none; }

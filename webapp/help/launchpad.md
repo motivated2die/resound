@@ -1,6 +1,6 @@
 # Launchpad
 
-Play any button on your phone with your keyboard, without taking your hands off it: hold one key, and your phone shows a key on each button of the tab it shows. Press a button's key to play it.
+Play any button on your phone with your keyboard, without taking your hands off it: hold one key, and your phone shows a key on each button of the tab it shows. Press a button's key to play it. You can try it on the [Resound website](/#launchpad).
 
 ## Turn it on
 
@@ -54,7 +54,7 @@ A game can have a launchpad key of its own, or no launchpad at all, like any oth
 
 ## Limits
 
-- The launchpad, the overlay and push-to-talk need different keys.
+- Each key does one thing: the launchpad key can't also be the overlay key, a pause or stop key, or a push-to-talk key.
 - If another window comes to the front, or Windows shows a security prompt, while you hold the key, the launchpad ends: press the key again.
 - Games running as administrator don't let Resound see your keys. See [Keys don't work in a game](keys-in-games.md).
 - To turn the launchpad off, remove its key with **✕** on its page.
