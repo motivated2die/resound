@@ -41,7 +41,9 @@ func TestActiveView(t *testing.T) {
 	s.dropView(2)
 	active(1, "favorites")
 	s.dropView(2) // again: no change to tell
-	for i := range 6 { // 5 reports, 1 drop
+
+	// 5 reports, 1 drop.
+	for i := range 6 {
 		select {
 		case <-changed:
 		case <-time.After(2 * time.Second):
