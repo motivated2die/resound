@@ -1,10 +1,11 @@
 package ui
 
 // LaunchpadPreview is a small, fixed picture of the launchpad for the panel,
-// beside paragraphs as in OverlayPreview: three of the phone's buttons in a
-// dark screen, emoji only like the overlay's picture, each with its key in
+// beside paragraphs as in OverlayPreview: three of the phone's buttons
+// stacked in a narrow dark screen, emoji only like the overlay's picture, each with its key in
 // the launchpad's yellow in the corner, the middle one playing, as if its
-// key had just been pressed. About as wide as the overlay's picture.
+// key had just been pressed. Upright like the overlay's bar, it leaves the
+// text beside it most of the row.
 func LaunchpadPreview(underline string, paragraphs ...string) Row {
 	return previewRow{paragraphs, underline, func(c *canvas) (*surface, int32) {
 		return launchpadPreviewPicture(c), int32(float64(ovShadowPanel.pad()) * c.scale) // its shadow's room
@@ -14,7 +15,7 @@ func LaunchpadPreview(underline string, paragraphs ...string) Row {
 // The picture's sizes, logical pixels at the panel's scale.
 const (
 	lpvPad     = 6  // the screen around the buttons
-	lpvButton  = 36 // a button's side
+	lpvButton  = 38 // a button's side
 	lpvGap     = 5  // between buttons
 	lpvRadius  = 7  // a button's corners
 	lpvScreenR = 11 // the screen's corners
@@ -63,8 +64,8 @@ func renderLaunchpadPreview(scale float64) (*surface, error) {
 	s := float32(scale)
 	px := func(v int) float32 { return float32(v) * s }
 	n := len(lpvItems)
-	screenW := px(2*lpvPad + n*lpvButton + (n-1)*lpvGap)
-	screenH := px(2*lpvPad + lpvButton)
+	screenW := px(2*lpvPad + lpvButton)
+	screenH := px(2*lpvPad + n*lpvButton + (n-1)*lpvGap)
 	pad := ovShadowPanel.pad()
 	surf, err := newSurface(int32(screenW+px(2*pad)+0.5), int32(screenH+px(2*pad)+0.5))
 	if err != nil {
@@ -84,8 +85,8 @@ func renderLaunchpadPreview(scale float64) (*surface, error) {
 	p.fillRound(screen, px(lpvScreenR), lpvScreenBorder)
 	p.fillRound(rectF{screen.L + border, screen.T + border, screen.R - border, screen.B - border}, px(lpvScreenR)-border, lpvScreenColor)
 	for i, it := range lpvItems {
-		x := screen.L + px(lpvPad+i*(lpvButton+lpvGap))
-		b := rectF{x, screen.T + px(lpvPad), x + px(lpvButton), screen.T + px(lpvPad+lpvButton)}
+		y := screen.T + px(lpvPad+i*(lpvButton+lpvGap))
+		b := rectF{screen.L + px(lpvPad), y, screen.L + px(lpvPad+lpvButton), y + px(lpvButton)}
 		inner := b
 		if i == 1 { // playing: an outline, and the progress over the left part
 			p.fillRound(b, px(lpvRadius), lpvPlayEdge)

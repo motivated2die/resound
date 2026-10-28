@@ -192,8 +192,8 @@ func TestLaunchpadPreviewRow(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if surf.w <= surf.h || surf.h < int32(1.5*(2*lpvPad+lpvButton)) {
-		t.Errorf("picture %d×%d, want three buttons side by side", surf.w, surf.h)
+	if surf.h <= surf.w || surf.w < int32(1.5*(2*lpvPad+lpvButton)) {
+		t.Errorf("picture %d×%d, want three buttons stacked", surf.w, surf.h)
 	}
 	surf.free()
 	rows := []Row{
