@@ -981,6 +981,7 @@ h1 { font-size: clamp(32px, 5vw, 52px); line-height: 1.1; font-weight: 700; lett
 .lp-callout:hover, .lp-callout[aria-pressed="true"] { border-color: rgba(var(--launchpad-rgb), 0.6); background: rgba(var(--launchpad-rgb), 0.11); }
 .lp-callout .kbd-big {
     color: var(--launchpad);
+    text-shadow: 0 0 10px rgba(var(--launchpad-rgb), 0.45);
     box-shadow:
         inset 0 -1px 0 rgba(0, 0, 0, 0.5),
         0 3px 0 #141519,
