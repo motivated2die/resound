@@ -16,6 +16,7 @@ const launchpad = (() => {
     const USE_EVERY_MS = 2000; // reports of use alone, at most this often
     const INPUT_MS = 1500;     // a tab change this soon after input is the user's
     const YELLOW_RIPPLE = 'rgba(255, 201, 60, 0.35)';
+    const KEYS_ANIM_MS = 200;  // the keys' coming and going (styles.css launchpad-key-in/-out)
 
     let supported = true; // an older PC answers 404
     let ready = false;    // the app has loaded its tabs
@@ -25,6 +26,7 @@ const launchpad = (() => {
     let lastInput = 0;
     let lastUseReport = 0;
     let following = null; // a tab being opened for the PC
+    let animation = null; // the keys' coming or going: its class on the body and timer
 
     const container = document.getElementById('sounds-container');
     const talkButton = document.getElementById('talk-through-button');
@@ -47,13 +49,15 @@ const launchpad = (() => {
         if (lastInput - lastUseReport >= USE_EVERY_MS) report(true);
     };
 
-    // decorate puts the keys on the cards shown, or takes them off.
+    // decorate puts the keys on the cards shown, or takes them off; keys
+    // going away stay while they animate out.
     const decorate = () => {
+        const leaving = !active && animation?.cls === 'launchpad-keys-out';
         container?.querySelectorAll('.sound-card[data-sound-id]').forEach((card) => {
             let label = card.querySelector(':scope > .launchpad-key');
             const key = active ? keys.get(card.dataset.soundId) : undefined;
             if (!key) {
-                label?.remove();
+                if (!leaving) label?.remove();
                 return;
             }
             if (!label) {
@@ -66,9 +70,32 @@ const launchpad = (() => {
         });
     };
 
+    // animateKeys lets the keys animate in or out for a moment: only when
+    // the launchpad starts or ends, not on every tab they show on.
+    const animateKeys = (cls) => {
+        if (animation) {
+            clearTimeout(animation.timer);
+            document.body.classList.remove(animation.cls);
+        }
+        if (matchMedia('(prefers-reduced-motion: reduce)').matches) {
+            animation = null;
+            return;
+        }
+        document.body.classList.add(cls);
+        animation = {
+            cls,
+            timer: setTimeout(() => {
+                document.body.classList.remove(cls);
+                animation = null;
+                if (!active) decorate(); // the keys that animated out
+            }, KEYS_ANIM_MS),
+        };
+    };
+
     const setActive = (on) => {
         if (on === active) return;
         active = on;
+        animateKeys(on ? 'launchpad-keys-in' : 'launchpad-keys-out');
         document.body.classList.toggle('launchpad-active', on);
         header?.classList.toggle('launchpad-bg', on);
         const icon = talkButton?.querySelector('.icon');
@@ -98,7 +125,8 @@ const launchpad = (() => {
 
     const init = () => {
         // Any input counts as use. Capture: the page's own handlers may stop it.
-        ['pointerdown', 'keydown', 'wheel'].forEach((type) =>
+        // touchend: a swipe to another tab (tabs.js) clicks it without a pointerdown.
+        ['pointerdown', 'touchend', 'keydown', 'wheel'].forEach((type) =>
             addEventListener(type, input, { capture: true, passive: true }));
         document.addEventListener('visibilitychange', () => { if (!document.hidden) report(true); });
         document.addEventListener('appReady', () => { ready = true; report(false); });

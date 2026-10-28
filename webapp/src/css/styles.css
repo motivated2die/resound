@@ -946,7 +946,16 @@ span.sound-text {
   text-shadow: none;
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.45);
   pointer-events: none;
+}
+
+/* The keys come and go with the launchpad (launchpad.js), not with every
+   tab they show on. */
+body.launchpad-keys-in .launchpad-key {
   animation: launchpad-key-in 0.16s ease-out;
+}
+
+body.launchpad-keys-out .launchpad-key {
+  animation: launchpad-key-out 0.14s ease-in forwards;
 }
 
 .sounds-grid.layout-list .launchpad-key {
@@ -961,8 +970,15 @@ span.sound-text {
   }
 }
 
+@keyframes launchpad-key-out {
+  to {
+    transform: scale(0.6);
+    opacity: 0;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
-  .launchpad-key {
+  body .launchpad-key {
     animation: none;
   }
 }
@@ -1169,6 +1185,11 @@ body.launchpad-active .tab.active .icon {
   color: var(--v-primary-base);
 }
 
+body.launchpad-active #tabs-container .tab[data-swipe-target],
+body.launchpad-active #tabs-container .tab[data-swipe-target] .icon {
+  color: var(--launchpad-color);
+}
+
 /* Arranging tabs in edit mode (tab-order.js): a long press lifts a tab,
    which then follows the finger; its place in the bar shows as a dashed
    slot. A long press must not select the label or open the callout. */
@@ -1305,6 +1326,36 @@ header.ptt-active-bg {
 .app-title .logo {
   position: relative;
   top: -2px; /* optically centred against the two text lines */
+  display: block;
+  flex: none;
+}
+
+/* The logo is two copies of resound.svg (app.html): the launchpad's yellow
+   one sweeps over the mint one as a circle from the ripples' centre
+   (186, 151 of 512), and shrinks back to it when the launchpad ends. 80%
+   of the side reaches the logo's farthest point. */
+.logo-art {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.logo-launchpad {
+  clip-path: circle(0% at 36.3% 29.5%);
+  transition: clip-path 0.4s ease-in;
+}
+
+body.launchpad-active .logo-launchpad {
+  clip-path: circle(80% at 36.3% 29.5%);
+  transition: clip-path 0.7s cubic-bezier(0.2, 0.7, 0.3, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .logo-launchpad,
+  body.launchpad-active .logo-launchpad {
+    transition: none;
+  }
 }
 
 .title-group {
@@ -1350,6 +1401,10 @@ h1.brand {
 
 #status-indicator.connected {
   background-color: var(--success-color);
+}
+
+body.launchpad-active #status-indicator.connected {
+  background-color: var(--launchpad-color);
 }
 
 #server-status-text {
