@@ -21,9 +21,18 @@ import (
 // swallow the key instead, and can't take mouse buttons.
 //
 // The overlay is the exception (Filter): its key, and Esc and the mouse
-// wheel while it is open, are kept from the game. The wheel needs the mouse
-// hook too, installed while the overlay is open. Swallowing in a low-level
-// hook keeps the input from every program, raw input (most games) included.
+// wheel while it is open, are kept from the game. So is the launchpad: its
+// key, and while it is held every new press and the wheel. The wheel needs
+// the mouse hook too, installed while the overlay is open or the launchpad
+// held. Swallowing in a low-level hook keeps the input from every program,
+// raw input (most games) included.
+//
+// Windows never counts a swallowed key as down (GetAsyncKeyState), so the
+// check for releases lost to the secure desktop can't judge the
+// launchpad's keys while it is held. It ends instead when the input desktop
+// can't be opened (the secure desktop, the lock screen) or another window
+// comes to the front (one running as administrator gets the keys without
+// the hook seeing them); pressing and letting go of its key ends it too.
 //
 // Every mouse event passes through a low-level mouse hook's thread, moves
 // included, so the hook is only installed while it is needed, and its
@@ -68,6 +77,8 @@ var (
 	procGetAsyncKeyState    = user32.NewProc("GetAsyncKeyState")
 	procSetWinEventHook     = user32.NewProc("SetWinEventHook")
 	procUnhookWinEvent      = user32.NewProc("UnhookWinEvent")
+	procOpenInputDesktop    = user32.NewProc("OpenInputDesktop")
+	procCloseDesktop        = user32.NewProc("CloseDesktop")
 	procGetModuleHandleW    = windows.NewLazySystemDLL("kernel32.dll").NewProc("GetModuleHandleW")
 )
 
@@ -93,6 +104,7 @@ const (
 	llkhfExtended = 0x01
 	llkhfUp       = 0x80
 
+	desktopReadObjects     = 0x0001
 	eventSystemForeground  = 0x0003
 	winEventSkipOwnProcess = 0x0002 // WINEVENT_OUTOFCONTEXT (0) as well
 
@@ -149,6 +161,7 @@ type hookThread struct {
 
 	fgWnd uintptr // the foreground window last looked at
 	fgApp string  // the app whose bindings apply (checkForeground)
+	lpWnd uintptr // the foreground window when the launchpad started
 }
 
 // handOver is a swallowed press of a pause or stop key or mouse button,
@@ -197,6 +210,7 @@ var mouseCallback = windows.NewCallback(func(code, wparam uintptr, m *msLLHookSt
 var winEventCallback = windows.NewCallback(func(hook, event, hwnd, object, child, thread, at uintptr) uintptr {
 	if t := activeThread(); t != nil {
 		t.followForeground()
+		t.checkLaunchpad()
 	}
 	return 0
 })
@@ -210,7 +224,7 @@ func (t *hookThread) input(vk uint16, scan, flags uint32, down bool) bool {
 		t.deliver(events)
 		return true
 	}
-	wasOpen := t.filter.Open()
+	wasOpen, wasLaunchpad := t.filter.Open(), t.filter.Launchpad()
 	events, swallow := t.filter.Key(b, vk, down)
 	// No hand-over while the user holds a push-to-talk key: the keys lent
 	// are theirs now, and letting go of them would cut them off.
@@ -219,10 +233,31 @@ func (t *hookThread) input(vk uint16, scan, flags uint32, down bool) bool {
 	}
 	t.deliver(events)
 	t.timeEsc(events)
-	if t.filter.Open() != wasOpen || !down && IsMouse(vk) { // a button let go may end the mouse hook's need
+	if t.filter.Launchpad() && !wasLaunchpad {
+		t.lpWnd, _, _ = procGetForegroundWindow.Call()
+	}
+	if t.filter.Open() != wasOpen || t.filter.Launchpad() != wasLaunchpad || !down && IsMouse(vk) { // a button let go may end the mouse hook's need
 		t.syncMouseLater()
 	}
 	return swallow
+}
+
+// checkLaunchpad ends a launchpad whose key's release may never come: the
+// input desktop is another one (the secure desktop, the lock screen), or
+// another window came to the front.
+func (t *hookThread) checkLaunchpad() {
+	if !t.filter.Launchpad() {
+		return
+	}
+	fg, _, _ := procGetForegroundWindow.Call()
+	desk, _, _ := procOpenInputDesktop.Call(0, 0, desktopReadObjects)
+	if desk != 0 {
+		procCloseDesktop.Call(desk)
+	}
+	if desk == 0 || fg != 0 && fg != t.lpWnd {
+		t.deliver(t.filter.EndLaunchpad())
+		t.syncMouse()
+	}
 }
 
 // mouse handles a mouse event other than a move and reports whether it must
@@ -407,7 +442,7 @@ func (t *hookThread) syncMouseLater() {
 // hook saw go down is held or on its way, so its release isn't missed.
 // Hook thread, outside the callbacks.
 func (t *hookThread) syncMouse() {
-	need := t.filter.Open() || t.w.keymap.Load().For(t.fgApp).UsesMouse()
+	need := t.filter.Open() || t.filter.Launchpad() || t.w.keymap.Load().For(t.fgApp).UsesMouse()
 	for _, vk := range t.filter.Held() {
 		need = need || IsMouse(vk)
 	}
@@ -503,6 +538,7 @@ func (w *Watcher) run(started chan<- error) {
 			t.deliver(t.filter.EscTimeout())
 			t.syncMouse()
 		case msg.Message == wmTimer:
+			t.checkLaunchpad()
 			t.releaseStale()
 			t.followForeground() // in case a WinEvent was missed
 		case msg.Message == wmSetOverlay:
@@ -533,10 +569,14 @@ func (w *Watcher) run(started chan<- error) {
 
 // releaseStale treats keys and buttons that aren't down any more as
 // released. A key passed on is given inFlightTime to come back through the
-// hook first.
+// hook first. Keys the launchpad swallowed are left alone while it is held:
+// Windows never counts them as down (checkLaunchpad).
 func (t *hookThread) releaseStale() {
 	held := t.filter.Held()
 	for _, vk := range held {
+		if t.filter.Launchpad() && t.filter.Swallowed(vk) {
+			continue
+		}
 		if at, ok := t.inFlight[vk]; ok {
 			if time.Since(at) < inFlightTime {
 				continue

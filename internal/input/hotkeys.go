@@ -6,8 +6,8 @@ import (
 )
 
 // Hotkeys: keys and mouse buttons the user holds or presses anywhere in
-// Windows to pause or stop Resound's sounds, or to open the in-game overlay
-// (see Watcher). Each app can have bindings of its own (Keymap). The
+// Windows to pause or stop Resound's sounds, to open the in-game overlay, or
+// to hold the launchpad (see Watcher). Each app can have bindings of its own (Keymap). The
 // matching is portable and tested; watching the keyboard and mouse is
 // Windows-only (hook_windows.go).
 
@@ -46,6 +46,18 @@ const (
 	// is the combination the press completed. Like a pause, it lasts while a
 	// talk combination is held. Its keys always pass to the game.
 	ActionTalk
+
+	// The launchpad's events (Filter): its key going down starts it
+	// (ActionLaunchpad, Down), letting go ends it. While it is held, every
+	// new press of a key or of the middle or side buttons is kept from the
+	// other programs: a digit or letter reports ActionLaunchpadKey with Key
+	// ('0'–'9', numpad digits as those, 'A'–'Z'), Space ActionLaunchpadStop,
+	// the arrow keys and the mouse wheel ActionLaunchpadTab by Steps
+	// (positive: the next tab). Other keys do nothing.
+	ActionLaunchpad
+	ActionLaunchpadKey
+	ActionLaunchpadStop
+	ActionLaunchpadTab
 )
 
 // EscHoldTime is how long Esc is held in the open overlay to stop all
@@ -53,17 +65,19 @@ const (
 const EscHoldTime = 700 * time.Millisecond
 
 func (a Action) String() string {
-	return [...]string{"pause", "stop", "overlay open", "overlay select", "overlay close", "overlay scroll", "overlay Esc down", "overlay stop", "push-to-talk hand-over", "app", "talk"}[a]
+	return [...]string{"pause", "stop", "overlay open", "overlay select", "overlay close", "overlay scroll", "overlay Esc down", "overlay stop", "push-to-talk hand-over", "app", "talk",
+		"launchpad", "launchpad key", "launchpad stop", "launchpad tab"}[a]
 }
 
 // HotkeyEvent is a hotkey becoming active (Down) or inactive. Stop keys and
-// the overlay's events only report Down.
+// the overlay's events only report Down, as do the launchpad's but its own.
 type HotkeyEvent struct {
 	Action Action
 	Down   bool
-	Steps  int    // ActionOverlayScroll only
+	Steps  int    // ActionOverlayScroll and ActionLaunchpadTab only
 	App    string // ActionApp only
 	Index  int    // ActionTalk only
+	Key    uint16 // ActionLaunchpadKey only: '0'–'9' or 'A'–'Z'
 }
 
 // Bindings are the hotkey combinations; any one of them triggers its action.
@@ -71,6 +85,7 @@ type HotkeyEvent struct {
 type Bindings struct {
 	Pause, Stop []Combo
 	Overlay     Combo // opens the in-game overlay; empty = no overlay
+	Launchpad   Combo // held: the launchpad; empty = none
 	// Talk are the push-to-talk combinations Resound presses, while the
 	// user's own presses of them count (ActionTalk); none otherwise.
 	Talk []Combo
@@ -78,13 +93,13 @@ type Bindings struct {
 
 // Empty reports whether no hotkey is set.
 func (b Bindings) Empty() bool {
-	return len(b.Pause) == 0 && len(b.Stop) == 0 && len(b.Overlay) == 0 && len(b.Talk) == 0
+	return len(b.Pause) == 0 && len(b.Stop) == 0 && len(b.Overlay) == 0 && len(b.Talk) == 0 && len(b.Launchpad) == 0
 }
 
 // UsesMouse reports whether a combination holds a mouse button, which the
 // mouse hook must watch.
 func (b Bindings) UsesMouse() bool {
-	for _, list := range [][]Combo{b.Pause, b.Stop, {b.Overlay}, b.Talk} {
+	for _, list := range [][]Combo{b.Pause, b.Stop, {b.Overlay, b.Launchpad}, b.Talk} {
 		for _, c := range list {
 			if slices.ContainsFunc(c, IsMouse) {
 				return true
@@ -264,18 +279,44 @@ func (m *Matcher) held(c Combo) bool {
 		return false
 	}
 	for _, want := range c {
-		found := false
-		for vk := range m.down {
-			if sameKey(vk) == sameKey(want) {
-				found = true
-				break
-			}
-		}
-		if !found {
+		if !m.isDown(want) {
 			return false
 		}
 	}
 	return true
+}
+
+// isDown reports whether want, or its other left/right variant, is down.
+func (m *Matcher) isDown(want uint16) bool {
+	for vk := range m.down {
+		if sameKey(vk) == sameKey(want) {
+			return true
+		}
+	}
+	return false
+}
+
+// completesWith reports whether pressing vk would complete c: c holds vk,
+// and its other keys are down already.
+func (m *Matcher) completesWith(c Combo, vk uint16) bool {
+	if !slices.ContainsFunc(c, func(k uint16) bool { return sameKey(k) == sameKey(vk) }) {
+		return false
+	}
+	for _, want := range c {
+		if sameKey(want) != sameKey(vk) && !m.isDown(want) {
+			return false
+		}
+	}
+	return true
+}
+
+// hold records vk as down without matching anything: a press the launchpad
+// took, which starts no pause, stop or talk.
+func (m *Matcher) hold(vk uint16) {
+	if m.down == nil {
+		m.down = map[uint16]bool{}
+	}
+	m.down[vk] = true
 }
 
 // handsOver reports whether events start a pause or a stop: the moment the
@@ -321,14 +362,27 @@ func SameCombo(a, b Combo) bool {
 // Filter decides this inside the hook callback, which must answer at once,
 // so it also keeps whether the overlay is open: a quick Esc right after
 // opening is caught even before the UI thread has caught up.
+//
+// The launchpad takes more, but only while its key is held: every new press
+// (keys, the middle and side buttons) and the wheel, so nothing typed into
+// it reaches the game. Keys held before it started still pass, their
+// releases too, so the game never keeps a key it saw go down. It starts no
+// pause, stop or talk meanwhile; one that started before ends as usual. Its
+// start closes the overlay.
 
 const (
 	vkEscape   = 0x1B
+	vkSpace    = 0x20
+	vkLeft     = 0x25
+	vkUp       = 0x26
+	vkRight    = 0x27
+	vkDown     = 0x28
+	vkNumpad0  = 0x60
 	wheelDelta = 120 // one notch (WHEEL_DELTA); precise wheels send less per event
 )
 
-// Filter adds the overlay to a Matcher. It is not safe for concurrent use;
-// the Watcher drives it from its hook thread.
+// Filter adds the overlay and the launchpad to a Matcher. It is not safe for
+// concurrent use; the Watcher drives it from its hook thread.
 type Filter struct {
 	Matcher
 	open        bool
@@ -336,6 +390,7 @@ type Filter struct {
 	overlayHeld bool
 	swallowed   map[uint16]bool // keys whose press was swallowed
 	wheel       int             // wheel delta short of a whole step
+	launchpad   Combo           // the combination holding the launchpad; nil = not held
 }
 
 // Key records a press or release. It returns the hotkey events it causes
@@ -355,7 +410,23 @@ func (f *Filter) Key(b *Bindings, vk uint16, down bool) (events []HotkeyEvent, s
 		}
 		events = f.Matcher.Key(b, vk, false)
 		f.overlayHeld = b != nil && f.held(b.Overlay)
-		return events, true
+		return append(events, f.launchpadLetGo()...), true
+	}
+	press := down && !f.down[vk]
+	switch {
+	case f.launchpad != nil && press:
+		f.hold(vk)
+		f.swallowed[vk] = true
+		return launchpadInput(vk), true
+	case press && b != nil && f.completesWith(b.Launchpad, vk):
+		f.hold(vk)
+		f.swallowed[vk] = true
+		f.launchpad, f.wheel = b.Launchpad, 0
+		if f.open {
+			f.SetOpen(false)
+			events = []HotkeyEvent{{Action: ActionOverlayClose, Down: true}}
+		}
+		return append(events, HotkeyEvent{Action: ActionLaunchpad, Down: true}), true
 	}
 	if down && vk == vkEscape && f.open {
 		f.swallowed[vk] = true
@@ -375,14 +446,67 @@ func (f *Filter) Key(b *Bindings, vk uint16, down bool) (events []HotkeyEvent, s
 		return append(events, HotkeyEvent{Action: action, Down: true}), true
 	}
 	f.overlayHeld = held
+	if !down {
+		events = append(events, f.launchpadLetGo()...) // a key of its combination may pass, e.g. Ctrl
+	}
 	return events, false
 }
 
+// launchpadInput is what a press does while the launchpad is held.
+func launchpadInput(vk uint16) []HotkeyEvent {
+	switch {
+	case vk >= '0' && vk <= '9', vk >= 'A' && vk <= 'Z':
+		return []HotkeyEvent{{Action: ActionLaunchpadKey, Down: true, Key: vk}}
+	case vk >= vkNumpad0 && vk <= vkNumpad0+9:
+		return []HotkeyEvent{{Action: ActionLaunchpadKey, Down: true, Key: '0' + vk - vkNumpad0}}
+	case vk == vkSpace:
+		return []HotkeyEvent{{Action: ActionLaunchpadStop, Down: true}}
+	case vk == vkLeft || vk == vkUp:
+		return []HotkeyEvent{{Action: ActionLaunchpadTab, Down: true, Steps: -1}}
+	case vk == vkRight || vk == vkDown:
+		return []HotkeyEvent{{Action: ActionLaunchpadTab, Down: true, Steps: 1}}
+	}
+	return nil
+}
+
+// launchpadLetGo ends the launchpad once its combination isn't held any
+// more, whatever the bindings are now (another app may have come to the
+// front meanwhile).
+func (f *Filter) launchpadLetGo() []HotkeyEvent {
+	if f.launchpad == nil || f.held(f.launchpad) {
+		return nil
+	}
+	return f.EndLaunchpad()
+}
+
+// EndLaunchpad ends the launchpad at once, e.g. when its key's release
+// can't arrive (the secure desktop). Keys whose press it swallowed keep
+// having their releases swallowed.
+func (f *Filter) EndLaunchpad() []HotkeyEvent {
+	if f.launchpad == nil {
+		return nil
+	}
+	f.launchpad, f.wheel = nil, 0
+	return []HotkeyEvent{{Action: ActionLaunchpad}}
+}
+
+// Launchpad reports whether the launchpad is held.
+func (f *Filter) Launchpad() bool { return f.launchpad != nil }
+
+// Swallowed reports whether vk's press was swallowed and its release hasn't
+// come yet.
+func (f *Filter) Swallowed(vk uint16) bool { return f.swallowed[vk] }
+
 // Wheel records a mouse wheel turn (delta as in WM_MOUSEWHEEL: positive
 // away from the user). While the overlay is open it is swallowed and moves
-// the highlight a step per notch.
+// the highlight a step per notch; while the launchpad is held it moves a
+// tab per notch (towards the user: the next one).
 func (f *Filter) Wheel(delta int) (events []HotkeyEvent, swallow bool) {
-	if !f.open {
+	action := ActionOverlayScroll
+	switch {
+	case f.launchpad != nil:
+		action = ActionLaunchpadTab
+	case !f.open:
 		return nil, false
 	}
 	f.wheel += delta
@@ -391,7 +515,7 @@ func (f *Filter) Wheel(delta int) (events []HotkeyEvent, swallow bool) {
 	if steps == 0 {
 		return nil, true
 	}
-	return []HotkeyEvent{{Action: ActionOverlayScroll, Down: true, Steps: -steps}}, true
+	return []HotkeyEvent{{Action: action, Down: true, Steps: -steps}}, true
 }
 
 // EscTimeout is called EscHoldTime after ActionOverlayEscDown. With Esc
