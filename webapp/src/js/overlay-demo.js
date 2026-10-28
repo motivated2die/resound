@@ -1,7 +1,7 @@
 // The in-game overlay's live demo on the landing page (index.html
 // #overlay). It works like the overlay in Resound (internal/app/overlay.go):
-// Alt (Resound lets the user pick the key) slides a bar of favorites in at
-// the left edge; the wheel moves the highlight and stops at the ends; Alt
+// Ctrl (Resound lets the user pick the key) slides a bar of favorites in at
+// the left edge; the wheel moves the highlight and stops at the ends; Ctrl
 // again "plays" the highlighted sound (the highlight flashes green and its
 // emoji flies out of the bar with a little confetti); Esc
 // closes it, held for 700 ms it "stops all sounds" (the bar turns red
@@ -11,10 +11,8 @@
 // On touch screens a swipe moves the highlight instead of the page, and
 // swiping on past either end of the list closes the bar.
 //
-// Alt is shared with the launchpad's demo (js/launchpad-demo.js): a tap is
-// the overlay's, a hold or Alt with a digit the launchpad's
-// (launchpadDemo.tookAlt). Opening and closing are announced to the page
-// ("ovl-demo" events), so the demos' tabs follow.
+// The launchpad's demo (js/launchpad-demo.js) has Alt. Opening and closing
+// are announced to the page ("ovl-demo" events), so the demos' tabs follow.
 (() => {
     'use strict';
 
@@ -44,7 +42,7 @@
     let sel = Math.floor((SOUNDS.length - 1) / 2); // the middle one first, then where it was left
     let holdTimer = 0, closeTimer = 0, statusTimer = 0;
     let wheel = 0;
-    let altAlone = false; // Alt is down and no other key came with it
+    let ctrlAlone = false; // Ctrl is down and no other key, click or wheel came with it
 
     document.addEventListener('DOMContentLoaded', () => {
         trigger = document.querySelector('[data-ovl-open]');
@@ -52,7 +50,7 @@
         if (!trigger) return;
         build();
         animatePreview(document.querySelector('[data-ovl-preview]'));
-        if (touch) { // no Alt key to press: the box is the way in
+        if (touch) { // no Ctrl key to press: the box is the way in
             document.querySelector('[data-ovl-key]')?.remove();
             const label = document.querySelector('[data-ovl-label]');
             if (label) label.innerHTML = '<strong>Try it now:</strong> tap here to bring up the overlay.';
@@ -61,7 +59,10 @@
         trigger.addEventListener('click', () => (open ? close() : show()));
         document.addEventListener('keydown', onKeyDown, true);
         document.addEventListener('keyup', onKeyUp, true);
-        window.addEventListener('blur', () => { altAlone = false; pressKeys(false); stopHold(); });
+        window.addEventListener('blur', () => { ctrlAlone = false; pressKeys(false); stopHold(); });
+        // Ctrl + a click (a link in a new tab) or the wheel (zoom) isn't a press of Ctrl.
+        window.addEventListener('pointerdown', () => { ctrlAlone = false; }, true);
+        window.addEventListener('wheel', (e) => { if (e.ctrlKey) ctrlAlone = false; }, { capture: true, passive: true });
         window.addEventListener('wheel', onWheel, { passive: false });
         document.addEventListener('touchstart', onTouchStart, { passive: true });
         document.addEventListener('touchmove', onTouchMove, { passive: false });
@@ -88,9 +89,9 @@
         }).observe(preview);
     }
 
-    // pressKeys shows the page's big Alt keys going down while Alt is held.
+    // pressKeys shows the overlay's big Ctrl keys going down while Ctrl is held.
     function pressKeys(down) {
-        document.querySelectorAll('.kbd-big').forEach((k) => k.classList.toggle('down', down));
+        document.querySelectorAll('[data-ovl-key], .ovl-tip .kbd-big').forEach((k) => k.classList.toggle('down', down));
     }
 
     // build adds the live overlay to the page, hidden.
@@ -135,7 +136,7 @@
         tip.className = 'ovl-tip';
         tip.innerHTML = touch
             ? '<span><strong>Swipe</strong> to pick a sound, <strong>tap it again</strong> to play it. Swipe past the end to close.</span>'
-            : '<kbd class="kbd-big">Alt</kbd><span><strong>Press Alt</strong> to play the highlighted sound, or <strong>scroll</strong> to pick another. <kbd>Esc</kbd> closes, held it stops all sounds.</span>';
+            : '<kbd class="kbd-big">Ctrl</kbd><span><strong>Press Ctrl</strong> to play the highlighted sound, or <strong>scroll</strong> to pick another. <kbd>Esc</kbd> closes, held it stops all sounds.</span>';
         live.append(shade, ovb, tip);
         document.body.append(live);
         render();
@@ -282,16 +283,15 @@
 
     // --- keys -----------------------------------------------------------------
 
-    // Alt counts when it is pressed and let go alone, so Alt+Tab and other
-    // combinations still work as usual.
+    // Ctrl counts when it is pressed and let go alone, so Ctrl+C and other
+    // shortcuts still work as usual.
     function onKeyDown(e) {
-        if (e.key === 'Alt') {
-            if (!e.repeat) altAlone = true;
+        if (e.key === 'Control') {
+            if (!e.repeat) ctrlAlone = !e.altKey; // not while the launchpad's Alt is held
             pressKeys(true);
-            e.preventDefault();
             return;
         }
-        altAlone = false;
+        ctrlAlone = false;
         if (!open) return;
         switch (e.key) {
         case 'Escape':
@@ -322,11 +322,10 @@
     }
 
     function onKeyUp(e) {
-        if (e.key === 'Alt') {
+        if (e.key === 'Control') {
             pressKeys(false);
-            e.preventDefault(); // Firefox would show its menu bar
-            if (altAlone && (open || !window.launchpadDemo?.tookAlt())) (open ? play : show)();
-            altAlone = false;
+            if (ctrlAlone) (open ? play : show)();
+            ctrlAlone = false;
             return;
         }
         if (e.key === 'Escape' && holdTimer) { // let go before the hold: just close

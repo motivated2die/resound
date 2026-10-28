@@ -5,9 +5,8 @@
 // Alt is held, the phone's buttons show the keys that play them, 1 to 6
 // here; pressing one plays that button (the hero's pad animation,
 // landing.js, with confetti bursting out from behind the screen), and
-// letting go of Alt takes the keys away. Alt is shared with
-// the overlay's demo: held for HOLD_MS, or with a digit, it is the
-// launchpad's (tookAlt); a short tap opens the overlay. Without a keyboard,
+// letting go of Alt takes the keys away. Alt going down shows its card
+// (the overlay's demo has Ctrl). Without a keyboard,
 // the box holds the key until it is tapped again. The buttons only play by
 // their keys, the point of the launchpad: clicked, the Alt key glows
 // instead (without a keyboard, the box, unless it holds the key).
@@ -20,7 +19,6 @@
 (() => {
     'use strict';
 
-    const HOLD_MS = 280;      // Alt held this long is the launchpad's, not a tap
     const CYCLE_MS = 6500;    // each demo, while nobody plays with them
     const PLAY_MS = 2600;     // a pad's progress bar (--play in css/landing.css)
     const CONFETTI = ['#ffc93c', '#ffe17a', '#50dea8', '#f2416f', '#6aa8ff', '#b388ff'];
@@ -31,11 +29,7 @@
     let current = 'launchpad';
     let held = false;      // the keys show
     let altDown = false;
-    let tookAlt = false;   // this Alt press was the launchpad's
-    let altTimer = 0;
     const playTimers = new WeakMap();
-
-    window.launchpadDemo = { tookAlt: () => tookAlt };
 
     document.addEventListener('DOMContentLoaded', () => {
         section = document.getElementById('overlay');
@@ -173,44 +167,34 @@
     function onKeyDown(e) {
         const overlayOpen = window.overlayDemo?.isOpen();
         if (e.key === 'Alt') {
-            if (!e.repeat && !altDown) {
+            e.preventDefault(); // Firefox would show its menu bar
+            if (!e.repeat && !altDown && !overlayOpen) {
                 altDown = true;
-                tookAlt = false;
-                clearTimeout(altTimer);
-                if (!overlayOpen) altTimer = setTimeout(take, HOLD_MS);
+                key?.classList.add('down');
+                setHeld(true);
             }
-            return; // overlay-demo.js keeps Alt from the page
+            return;
         }
-        if (!altDown || overlayOpen) return;
-        const i = digit(e);
-        if (i < 0 && !held) return;
+        if (!altDown) return;
         e.preventDefault(); // Alt + a digit switches browser tabs in some browsers
         e.stopPropagation();
-        if (i < 0 || e.repeat) return;
-        take();
-        play(i);
+        const i = digit(e);
+        if (i >= 0 && !e.repeat) play(i);
     }
 
     function onKeyUp(e) {
         if (e.key !== 'Alt') return;
-        altDown = false;
-        clearTimeout(altTimer);
-        if (tookAlt) setHeld(false);
+        e.preventDefault();
+        if (!altDown) return;
+        letGo();
         cycle.touched();
     }
 
-    // take makes the Alt held now the launchpad's.
-    function take() {
-        clearTimeout(altTimer);
-        if (!altDown) return;
-        tookAlt = true;
-        setHeld(true);
-    }
-
     function letGo() {
+        if (!altDown) return;
         altDown = false;
-        clearTimeout(altTimer);
-        if (tookAlt) setHeld(false);
+        key?.classList.remove('down');
+        setHeld(false);
     }
 
     // --- tabs -------------------------------------------------------------------
