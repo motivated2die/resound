@@ -53,6 +53,7 @@ type Engine struct {
 	enabled map[string]bool
 	errs    map[string]error
 	volumes map[string]float32
+	duck    float32 // SetDuck, for outputs opened later too
 
 	nextID atomic.Uint64
 	events chan Event
@@ -65,6 +66,7 @@ func NewEngine() *Engine {
 		enabled: map[string]bool{},
 		errs:    map[string]error{},
 		volumes: map[string]float32{RoleMonitor: 1, RoleCable: 1},
+		duck:    1,
 		events:  make(chan Event, 256),
 	}
 }
@@ -97,6 +99,7 @@ func (e *Engine) SetOutput(role, deviceID string, enabled bool) error {
 		return fmt.Errorf("%s output: %w", role, err)
 	}
 	out.Mixer.SetVolume(vol)
+	out.Mixer.SetDuck(e.duck)
 	e.outputs[role] = out
 	return nil
 }
@@ -108,6 +111,18 @@ func (e *Engine) SetVolume(role string, v float32) {
 	e.volumes[role] = v
 	if o := e.outputs[role]; o != nil {
 		o.Mixer.SetVolume(v)
+	}
+}
+
+// SetDuck lowers every output's whole mix to gain g (0..1) on top of the
+// volumes, e.g. while the user talks over the sounds; 1 ends it. The
+// outputs glide there (Mixer.SetDuck).
+func (e *Engine) SetDuck(g float32) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	e.duck = g
+	for _, o := range e.outputs {
+		o.Mixer.SetDuck(g)
 	}
 }
 
