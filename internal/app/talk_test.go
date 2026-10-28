@@ -308,3 +308,50 @@ func TestTogglePauseKey(t *testing.T) {
 	ta.onHotkey(input.HotkeyEvent{Action: input.ActionPause})
 	ta.fire()
 }
+
+// Ducking: the global value, and an app's own while it is in front;
+// holding push-to-talk ducks until afterTalk or the watcher closing.
+func TestTalkDuck(t *testing.T) {
+	ta := newTalkApp(t)
+	if ta.talkDuck() != 0 {
+		t.Fatal("pause by default")
+	}
+	ta.setDuck("", 40, true)
+	ta.setDuck("plain.exe", 70, true)
+	ta.fgApp = "game.exe"
+	if ta.talkDuck() != 40 {
+		t.Fatalf("game keeps the global ducking: %d", ta.talkDuck())
+	}
+	ta.fgApp = "plain.exe"
+	if ta.talkDuck() != 70 {
+		t.Fatalf("plain's own: %d", ta.talkDuck())
+	}
+	if s := ta.duckSpec("game.exe"); s == nil || !s.Inherited || s.Value != 40 {
+		t.Fatalf("game's slider: %+v", s)
+	}
+	if s := ta.duckSpec("plain.exe"); s == nil || s.Inherited || s.Value != 70 {
+		t.Fatalf("plain's slider: %+v", s)
+	}
+	if got := overrideSummary(ta.appKeybinds("plain.exe")); got != "Ducking" {
+		t.Errorf("plain's summary: %q", got)
+	}
+
+	ta.duckTalk(40)
+	if !ta.playback.ducked {
+		t.Fatal("not ducked")
+	}
+	ta.afterTalk()
+	if ta.playback.ducked {
+		t.Fatal("still ducked after the talk")
+	}
+	ta.duckTalk(40)
+	ta.closeHotkeys()
+	if ta.playback.ducked {
+		t.Fatal("still ducked after the watcher closed")
+	}
+
+	ta.cfg.NoPushToTalkPauses = true
+	if ta.duckSpec("") != nil {
+		t.Fatal("a slider while the user's push-to-talk does nothing")
+	}
+}

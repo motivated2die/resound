@@ -112,6 +112,7 @@ func (a *App) closeHotkeys() {
 		logx.Printf("hotkeys: off")
 	}
 	a.ptt.userTalk, a.ptt.pauseKey = false, false // no release will be reported
+	a.endTalkDuck()
 	a.keys = input.Keymap{}
 	a.fgApp = "" // no app is followed without the watcher; keybindsChanged syncs held keys
 }

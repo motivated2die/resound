@@ -46,6 +46,9 @@ type playbackState struct {
 	// holdResumeDelay, unless holdGen changed meanwhile.
 	holdResuming bool
 	holdGen      int
+	// ducked: the sounds play quieter while the user holds push-to-talk
+	// (duck.go).
+	ducked bool
 
 	vmu    sync.Mutex
 	voices map[uint64]voiceMeta

@@ -98,6 +98,11 @@ type Config struct {
 	// after it is let go (app.onTalk): the user's release has ended it in the
 	// game.
 	NoPushToTalkPauses bool `json:"noPushToTalkPauses,omitempty"`
+	// PushToTalkDuck is what those presses do to the sounds instead of
+	// pausing them: 0 pauses them (the default), 1–100 keeps them playing
+	// at that volume (a percentage on the volume sliders' curve, on top of
+	// every other volume) while the key is held; 100 leaves them as loud.
+	PushToTalkDuck int `json:"pushToTalkDuck,omitempty"`
 	// NoSoundOverlap plays one sound at a time: a sound played for others
 	// stops every sound playing (app.replaceVoices). By default (false)
 	// sounds overlap freely.
@@ -149,8 +154,11 @@ type AppKeybinds struct {
 	// Name is shown in the panel, e.g. "VALORANT".
 	Name       string       `json:"name,omitempty"`
 	PushToTalk *KeyOverride `json:"pushToTalk,omitempty"`
-	Pause      *KeyOverride `json:"pause,omitempty"`
-	Stop       *KeyOverride `json:"stop,omitempty"`
+	// PushToTalkDuck replaces PushToTalkDuck in the program; nil keeps
+	// the global one.
+	PushToTalkDuck *int         `json:"pushToTalkDuck,omitempty"`
+	Pause          *KeyOverride `json:"pause,omitempty"`
+	Stop           *KeyOverride `json:"stop,omitempty"`
 	// TogglePause replaces TogglePauseHotkeys.
 	TogglePause *KeyOverride `json:"togglePause,omitempty"`
 	// Overlay replaces OverlayKeys (one combination) or, Off, turns the

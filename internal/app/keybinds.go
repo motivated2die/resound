@@ -178,7 +178,7 @@ func override(e *config.AppKeybinds, fn keyFunc) **config.KeyOverride {
 
 // hasOverrides reports whether an app replaces any of the global keys.
 func hasOverrides(e *config.AppKeybinds) bool {
-	return e.PushToTalk != nil || e.Pause != nil || e.Stop != nil || e.TogglePause != nil || e.Overlay != nil || e.Launchpad != nil
+	return e.PushToTalk != nil || e.PushToTalkDuck != nil || e.Pause != nil || e.Stop != nil || e.TogglePause != nil || e.Overlay != nil || e.Launchpad != nil
 }
 
 // keybind is a function's keys in one scope, as they apply there: an app
@@ -347,11 +347,21 @@ func (a *App) setKeysOff(t keyTarget) {
 	}
 }
 
-// resetKeys gives t's app the global keys of its function again.
+// resetKeys gives t's app the global keys of its function again, and for
+// push-to-talk the global ducking.
 func (a *App) resetKeys(t keyTarget) {
 	a.ptt.note = ""
-	if o := override(a.appKeybinds(t.app), t.fn); o != nil && *o != nil {
+	e := a.appKeybinds(t.app)
+	changed := false
+	if o := override(e, t.fn); o != nil && *o != nil {
 		*o = nil
+		changed = true
+	}
+	if t.fn == fnPTT && e != nil && e.PushToTalkDuck != nil {
+		e.PushToTalkDuck = nil
+		changed = true
+	}
+	if changed {
 		logx.Printf("keybinds: %s uses the global keys", t)
 		a.keybindsChanged()
 	}
@@ -397,6 +407,9 @@ func overrideSummary(e *config.AppKeybinds) string {
 	for _, fn := range appKeyFuncs {
 		if o := override(e, fn); *o != nil {
 			parts = append(parts, strings.ToLower(fn.title()))
+		}
+		if fn == fnPTT && e.PushToTalkDuck != nil {
+			parts = append(parts, "ducking")
 		}
 	}
 	if len(parts) == 0 {

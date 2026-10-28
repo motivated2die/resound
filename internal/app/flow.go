@@ -274,7 +274,7 @@ func (a *App) tick() bool {
 // phone, a hotkey), so a badge never outlives its state.
 func (a *App) heldKey() string {
 	pb := &a.playback
-	return fmt.Sprintf("%s|%v|%v%v%v%v%v", pb.mutedMic, a.ptt.pressed, pb.pausedActive, pb.talkLive, pb.holdLive, a.ptt.userTalk, a.soundsPaused())
+	return fmt.Sprintf("%s|%v|%v%v%v%v%v%v", pb.mutedMic, a.ptt.pressed, pb.pausedActive, pb.talkLive, pb.holdLive, a.ptt.userTalk, a.soundsPaused(), pb.ducked)
 }
 
 // --- building the flow -------------------------------------------------------------
@@ -379,6 +379,10 @@ func (a *App) audioFlow() ui.AudioFlow {
 			// A key or the phone's talk button is held, but nothing is paused.
 			f.YouPipe.Badge = &ui.Badge{Icon: ui.IconPause, Label: label, Tip: tip, OnClick: onClick}
 		}
+	} else if pb.ducked {
+		f.YouPipe.Badge = &ui.Badge{Icon: ui.IconMic, Label: "You talk",
+			Tip:     "The sounds play quieter while you hold your push-to-talk key (Ducking). Letting go brings them back to full volume. Click for the keys.",
+			OnClick: func() { a.openPage(pageKeys) }}
 	}
 	if s, ok := a.outputStatus(audio.RoleMonitor); ok && !s.Running && s.Err != nil {
 		f.YouPipe = ui.Pipe{State: ui.PipeBroken, Badge: &ui.Badge{

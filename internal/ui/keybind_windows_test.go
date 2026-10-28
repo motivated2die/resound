@@ -72,3 +72,51 @@ func TestKeybindLayout(t *testing.T) {
 		t.Errorf("clicking chip 2's button removed %v", removed)
 	}
 }
+
+// Push-to-talk's card with the ducking slider: its knob says Pause at the
+// left end and the volume elsewhere, and dragging the track picks a value
+// in steps of duckStep; a recording card hides it.
+func TestKeybindDuck(t *testing.T) {
+	var got []int
+	spec := func(v int, inherited bool) KeybindSpec {
+		return KeybindSpec{ID: "ptt", Icon: IconMic, Title: "Push-to-talk", Info: "x", Keys: []string{"V"},
+			OnAdd: func() {}, OnRemove: func(int) {},
+			Duck: &DuckSpec{Value: v, Inherited: inherited, Info: "y", OnChange: func(v int, done bool) { got = append(got, v) }}}
+	}
+	if DuckText(0) != "Pause" || DuckText(35) != "35%" {
+		t.Fatalf("knob texts %q %q", DuckText(0), DuckText(35))
+	}
+	dc, _, _ := procCreateCompatibleDC.Call(0)
+	defer procDeleteDC.Call(dc)
+	f := newFonts(1)
+	defer f.destroy()
+	c := &canvas{dc: dc, scale: 1, fonts: f}
+	r := rect{0, 0, popupWidthL, 0}
+	k := keybindRow{spec(0, false)}
+	l := k.layout(c, r)
+	if !l.hasDuck || l.duck.track.w() < r.w()/2 {
+		t.Fatalf("no full-width slider: %+v", l.duck)
+	}
+	if k.dragIDAt(kbSegDuck) == "" || k.dragIDAt(kbSegAdd) != "" {
+		t.Fatal("only the track drags")
+	}
+	x0, x1 := duckRange(c, l.duck.track)
+	for _, x := range []int32{x0 - 50, x0 + (x1-x0)*33/100, x1 + 50} {
+		k.dragTo(c, r, "duck:ptt", x, false)
+	}
+	if len(got) != 2 || got[0] != 35 || got[1] != 100 {
+		t.Fatalf("dragged to %v, want [35 100] (the left end is the value already)", got)
+	}
+	rec := spec(40, false)
+	rec.Recording = true
+	if (keybindRow{rec}).layout(c, r).hasDuck {
+		t.Fatal("a slider while recording")
+	}
+
+	var rows []Row
+	for _, v := range []int{0, 35, 100} {
+		rows = append(rows, Keybind(spec(v, false)))
+	}
+	rows = append(rows, Keybind(spec(60, true)))
+	savePNG(t, renderRowsMeasured(t, rows, 1.5), "keybind-duck")
+}

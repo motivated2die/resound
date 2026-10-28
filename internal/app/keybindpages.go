@@ -100,6 +100,12 @@ func (a *App) keybindCard(t keyTarget) ui.Row {
 	default:
 		s.OnReset, s.ResetTip = func() { a.resetKeys(t) }, "Use the global keys again"
 	}
+	if t.fn == fnPTT && len(kb.keys) > 0 {
+		s.Duck = a.duckSpec(t.app)
+		if _, own := a.duckFor(t.app); own && s.OnReset == nil {
+			s.OnReset, s.ResetTip = func() { a.resetKeys(t) }, "Use the global ducking again"
+		}
+	}
 	if kb.own && !kb.off {
 		s.OnRemove = func(i int) { a.removeKeys(t, i) }
 	}
@@ -176,7 +182,7 @@ func (a *App) keyOptionRows() []ui.Row {
 	}
 	if a.anyPTT() && a.cfg.PushToTalkWhilePlaying {
 		rows = append(rows, ui.ToggleInfo("My push-to-talk pauses sounds",
-			"Hold your push-to-talk key yourself while sounds play: they pause so you can talk. "+
+			"Hold your push-to-talk key yourself while sounds play: they pause so you can talk, or play on quieter (Ducking, on the Push-to-talk card). "+
 				"Letting go resumes them, and Resound presses push-to-talk again, as your release ended it in the game.",
 			!a.cfg.NoPushToTalkPauses, a.togglePTTPauses))
 	}

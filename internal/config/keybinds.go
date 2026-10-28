@@ -26,6 +26,7 @@ func (c *Config) cleanKeybinds() {
 	if len(c.PushToTalkExtra) == 0 {
 		c.PushToTalkExtra = nil
 	}
+	c.PushToTalkDuck = max(0, min(100, c.PushToTalkDuck))
 	seen := map[string]bool{}
 	apps := c.AppKeybinds[:0]
 	for _, a := range c.AppKeybinds {
@@ -43,6 +44,10 @@ func (c *Config) cleanKeybinds() {
 			} else if len((*o).Keys) == 0 {
 				*o = nil
 			}
+		}
+		if a.PushToTalkDuck != nil {
+			d := max(0, min(100, *a.PushToTalkDuck))
+			a.PushToTalkDuck = &d
 		}
 		for _, o := range []*KeyOverride{a.Overlay, a.Launchpad} {
 			if o != nil && len(o.Keys) > 1 {
