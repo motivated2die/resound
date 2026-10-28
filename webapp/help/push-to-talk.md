@@ -125,12 +125,12 @@ While a sound plays, Resound holds your push-to-talk key. You can still press th
 
 Press the key again within that moment and the sound stays paused. Holding a pause key at the same time keeps the sound paused until you let go of both.
 
+With the switch off, your key is just a key: but when you let go of it while a sound plays, many games end push-to-talk, and the rest of the sound isn't heard until the next one starts. The switch shows under **Options** while Resound holds push-to-talk for sounds.
+
 ### Talk over the sound instead: ducking
 
-Below your keys, the **Push-to-talk** card has a **Ducking** slider. All the way left (**Pause**), holding your key pauses the sound as above. Drag the knob to the right and the sound keeps playing while you hold your key, at the volume the knob shows: quieter the further left, as loud as before at **100%**. You talk over it, your microphone live, and when you let go it plays at full volume again.
+Below your keys, the **Push-to-talk** card has a ducking slider. All the way left (**Pause**), holding your key pauses the sound as above. Drag the knob to the right and the sound keeps playing while you hold your key, at the volume the knob shows: quieter the further left, as loud as before at **100%**. You talk over it, your microphone live, and when you let go it fades back to full volume. Hover the **ⓘ** beside **Ducking** on the slider for a reminder.
 
-Ducking only changes the volume while you hold your key; your other volumes apply as always. A game with its own push-to-talk keys can have its own ducking too: its card shows the global one, marked **Global**, until you move the knob there. **↺** on the card brings back the global keys and ducking. The slider shows while **My push-to-talk pauses sounds** is on.
-
-With the switch off, your key is just a key: but when you let go of it while a sound plays, many games end push-to-talk, and the rest of the sound isn't heard until the next one starts. The switch shows under **Options** while Resound holds push-to-talk for sounds.
+Ducking only changes the volume while you hold your key; your other volumes apply as always. A game you added under **App keybinds** can have its own ducking: its slider shows the global one, as **Ducking (global)**, until you move the knob there. **↺** on its card brings back the global keys and ducking. The slider shows while **My push-to-talk pauses sounds** is on.
 
 Keys not working in a game? See [Keys don't work in a game](keys-in-games.md).
