@@ -40,7 +40,7 @@ type spPart int
 const (
 	spFavorites spPart = iota // hotbar sounds
 	spColors                  // the sounds' colors
-	spKeys                    // push-to-talk, stop and pause keys
+	spKeys                    // push-to-talk, stop and toggle pause keys
 	spMuteMic                 // muting the mic while sounds play
 )
 
@@ -598,7 +598,7 @@ func (a *App) spKeysDetail() string {
 		if text != "" {
 			text += " · "
 		}
-		text += "Pause: " + input.Combo(s.Pause).String() + ". Soundpad's pause key switches; in Resound, sounds pause while you hold it"
+		text += "Toggle pause: " + input.Combo(s.Pause).String()
 	}
 	return text + "."
 }
@@ -817,7 +817,7 @@ func (a *App) applySoundpad(sounds []spSound) spResult {
 		for _, k := range []struct {
 			fn   keyFunc
 			keys [][]uint16
-		}{{fnPTT, s.PushToTalk}, {fnStop, nonNil(s.Stop)}, {fnPause, nonNil(s.Pause)}} {
+		}{{fnPTT, s.PushToTalk}, {fnStop, nonNil(s.Stop)}, {fnTogglePause, nonNil(s.Pause)}} {
 			n, notes := a.carryOverKeys("Soundpad", k.fn, k.keys)
 			r.keys += n
 			r.notes = append(r.notes, notes...)

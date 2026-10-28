@@ -135,14 +135,13 @@ func (a *App) launchpadStopAll() {
 }
 
 // launchpadPause pauses or resumes all sounds, like the phone's pause
-// button. Without any, it pauses nothing: a later tap would only resume
-// nothing.
+// button (tapPause).
 func (a *App) launchpadPause() {
-	if !a.playback.pausedActive && len(a.engine.Voices()) == 0 {
+	paused, ok := a.tapPause()
+	if !ok {
 		a.launchpadNote("", "Nothing is playing", false)
 		return
 	}
-	paused := a.togglePause()
 	logx.Printf("launchpad: paused=%v", paused)
 	a.render() // the audio flow shows the pause
 	if paused {
@@ -326,14 +325,16 @@ func (a *App) launchpadPage() []ui.Row {
 	rows := []ui.Row{
 		ui.HeaderButton("Launchpad", a.back, ui.IconHelp, "Help", "How the launchpad works: opens the help article", func() { a.openHelpAt(helpLaunchpad) }),
 		ui.Paragraph(how, ui.ToneMuted),
-		ui.Paragraph("While you hold it, "+a.spaceDoes()+", and the arrow keys or the mouse wheel switch tabs. Your game gets none of these keys meanwhile.", ui.ToneMuted),
+		ui.Paragraph("While you hold it, the arrow keys or the mouse wheel switch tabs, and Space stops or pauses sounds (below). Your game gets none of these keys meanwhile.", ui.ToneMuted),
 		ui.Section("Key"),
 		a.keybindCard(keyTarget{fn: fnLaunchpad}),
 		a.appKeysNote(fnLaunchpad, "A game can have a launchpad key of its own, or no launchpad at all."),
 		ui.Section("Space"),
-		ui.ToggleInfo("Tap Space to pause",
-			"A tap pauses all sounds or resumes them, like the phone's pause button. Hold Space to stop them. Off: a press stops them.",
-			a.cfg.LaunchpadSpacePause, a.toggleSpacePause),
+		// Greyed out while the launchpad is off (no key anywhere), like the
+		// overlay's screen edge.
+		ui.Segmented([]string{"Space to stop", "Space to pause"}, map[bool]int{false: 0, true: 1}[a.cfg.LaunchpadSpacePause],
+			!a.keyUsed(fnLaunchpad), func(i int) { a.setSpacePause(i == 1) }),
+		ui.Paragraph(a.spaceHelp(), ui.ToneMuted),
 		ui.Section("On-screen badge"),
 		ui.ToggleInfo("Show a badge while you hold the key",
 			"A round yellow badge on your screen says the launchpad is on, without looking at your phone.",
@@ -357,16 +358,19 @@ func (a *App) launchpadPage() []ui.Row {
 	return append(rows, ui.Spacer(4))
 }
 
-// spaceDoes says what Space does while the launchpad is held.
-func (a *App) spaceDoes() string {
+// spaceHelp explains the Space mode chosen.
+func (a *App) spaceHelp() string {
 	if a.cfg.LaunchpadSpacePause {
-		return "tapping Space pauses or resumes all sounds and holding it stops them"
+		return "Tap Space to pause and unpause sounds. Hold Space to stop them."
 	}
-	return "Space stops all sounds"
+	return "Tap Space to stop all playing sounds."
 }
 
-func (a *App) toggleSpacePause() {
-	a.cfg.LaunchpadSpacePause = !a.cfg.LaunchpadSpacePause
+func (a *App) setSpacePause(on bool) {
+	if on == a.cfg.LaunchpadSpacePause {
+		return
+	}
+	a.cfg.LaunchpadSpacePause = on
 	a.save()
 	a.render()
 }

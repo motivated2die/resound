@@ -267,3 +267,44 @@ func TestHoldingBadgeWhileUserTalks(t *testing.T) {
 		t.Fatalf("badge %q while the user holds the key", badge)
 	}
 }
+
+// A toggle pause key pauses like the phone's pause button: push-to-talk
+// (held for the sound) goes up when it pauses and down again when the next
+// press resumes, sent by Resound after the key, which reached the game as
+// it is (no hand-over). With nothing playing it pauses nothing. While a
+// pause key holds the pause, it changes nothing.
+func TestTogglePauseKey(t *testing.T) {
+	ta := newTalkApp(t)
+	ta.cfg.TogglePauseHotkeys = [][]uint16{{vkF9}}
+	tap := func() { ta.onHotkey(input.HotkeyEvent{Action: input.ActionTogglePause, Down: true}) }
+	pb := &ta.playback
+
+	tap()
+	if pb.pausedActive || ta.sentSince() != "" {
+		t.Fatalf("nothing plays: paused %v", pb.pausedActive)
+	}
+
+	pb.remaining[7] = 1 // a sound plays (without an output, it stands in)
+	ta.holdPlayback(false)
+	if got := ta.sentSince(); got != "+Pause" {
+		t.Fatalf("playing: %q", got)
+	}
+	tap()
+	if got := ta.sentSince(); !pb.pausedActive || got != "-Pause" {
+		t.Fatalf("paused %v, sent %q; want push-to-talk up", pb.pausedActive, got)
+	}
+	pb.paused = []uint64{7} // what pauseActive paused, had the engine played it
+	tap()
+	if got := ta.sentSince(); pb.pausedActive || got != "+Pause" {
+		t.Fatalf("resumed: paused %v, sent %q; want push-to-talk down", pb.pausedActive, got)
+	}
+
+	ta.onHotkey(input.HotkeyEvent{Action: input.ActionPause, Down: true})
+	ta.sentSince()
+	tap()
+	if pb.pausedActive || !pb.holdLive || ta.sentSince() != "" {
+		t.Fatalf("under a pause key: toggle paused %v, hold %v", pb.pausedActive, pb.holdLive)
+	}
+	ta.onHotkey(input.HotkeyEvent{Action: input.ActionPause})
+	ta.fire()
+}

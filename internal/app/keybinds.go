@@ -10,10 +10,12 @@ import (
 	"github.com/motivated2die/resound/internal/logx"
 )
 
-// Keybinds: what keys and mouse buttons do, everywhere and per app. Five
+// Keybinds: what keys and mouse buttons do, everywhere and per app. Six
 // functions can be bound: push-to-talk (Resound presses its keys while
-// sounds play), pause (held: the sounds pause, push-to-talk and the mic are
-// let go), stop (pressed: all sounds stop), the overlay's key (opens the
+// sounds play), hold to pause (held: the sounds pause, push-to-talk and the
+// mic are let go), toggle pause (pressed: the sounds pause until pressed
+// again, like the phone's pause button), stop (pressed: all sounds stop),
+// the overlay's key (opens the
 // in-game overlay, overlay.go) and the launchpad's (held: keys play the
 // phone's buttons, launchpad.go). The global keys apply everywhere. An app
 // the user added (config.AppKeybinds) can replace them function by function
@@ -35,19 +37,20 @@ const (
 	fnStop
 	fnOverlay
 	fnLaunchpad
+	fnTogglePause // after the others: the panel's card IDs number them
 )
 
 // appKeyFuncs are the functions an app can bind for itself, in the panel's
 // order.
-var appKeyFuncs = []keyFunc{fnPTT, fnPause, fnStop, fnOverlay, fnLaunchpad}
+var appKeyFuncs = []keyFunc{fnPTT, fnPause, fnTogglePause, fnStop, fnOverlay, fnLaunchpad}
 
 func (f keyFunc) title() string {
-	return [...]string{"Push-to-talk", "Pause", "Stop", "Overlay", "Launchpad"}[f]
+	return [...]string{"Push-to-talk", "Hold to pause", "Stop", "Overlay", "Launchpad", "Toggle pause"}[f]
 }
 
-// noun names a key of the function in a sentence: "the pause key".
+// noun names a key of the function in a sentence: "the overlay key".
 func (f keyFunc) noun() string {
-	return [...]string{"a push-to-talk key", "a pause key", "a stop key", "the overlay key", "the launchpad key"}[f]
+	return [...]string{"a push-to-talk key", "a hold-to-pause key", "a stop key", "the overlay key", "the launchpad key", "a toggle pause key"}[f]
 }
 
 // maxKeys is how many combinations a function takes in one scope: more
@@ -93,6 +96,8 @@ func (a *App) globalKeys(fn keyFunc) [][]uint16 {
 		return c.PauseHotkeys
 	case fnStop:
 		return c.StopHotkeys
+	case fnTogglePause:
+		return c.TogglePauseHotkeys
 	case fnOverlay:
 		if len(c.OverlayKeys) > 0 {
 			return [][]uint16{c.OverlayKeys}
@@ -123,6 +128,8 @@ func (a *App) setGlobalKeys(fn keyFunc, keys [][]uint16) {
 		c.PauseHotkeys = keys
 	case fnStop:
 		c.StopHotkeys = keys
+	case fnTogglePause:
+		c.TogglePauseHotkeys = keys
 	case fnOverlay:
 		c.OverlayKeys = nil
 		if len(keys) > 0 {
@@ -159,6 +166,8 @@ func override(e *config.AppKeybinds, fn keyFunc) **config.KeyOverride {
 		return &e.Pause
 	case fnStop:
 		return &e.Stop
+	case fnTogglePause:
+		return &e.TogglePause
 	case fnOverlay:
 		return &e.Overlay
 	case fnLaunchpad:
@@ -169,7 +178,7 @@ func override(e *config.AppKeybinds, fn keyFunc) **config.KeyOverride {
 
 // hasOverrides reports whether an app replaces any of the global keys.
 func hasOverrides(e *config.AppKeybinds) bool {
-	return e.PushToTalk != nil || e.Pause != nil || e.Stop != nil || e.Overlay != nil || e.Launchpad != nil
+	return e.PushToTalk != nil || e.Pause != nil || e.Stop != nil || e.TogglePause != nil || e.Overlay != nil || e.Launchpad != nil
 }
 
 // keybind is a function's keys in one scope, as they apply there: an app

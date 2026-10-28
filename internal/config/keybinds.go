@@ -18,6 +18,7 @@ func (c *Config) cleanKeybinds() {
 		return out
 	}
 	c.PauseHotkeys, c.StopHotkeys = clean(c.PauseHotkeys), clean(c.StopHotkeys)
+	c.TogglePauseHotkeys = clean(c.TogglePauseHotkeys)
 	c.PushToTalkExtra = clean(c.PushToTalkExtra)
 	if len(c.PushToTalkKeys) == 0 && len(c.PushToTalkExtra) > 0 {
 		c.PushToTalkKeys, c.PushToTalkExtra = c.PushToTalkExtra[0], c.PushToTalkExtra[1:]
@@ -33,7 +34,7 @@ func (c *Config) cleanKeybinds() {
 			continue
 		}
 		seen[a.Exe] = true
-		for _, o := range []**KeyOverride{&a.PushToTalk, &a.Pause, &a.Stop, &a.Overlay, &a.Launchpad} {
+		for _, o := range []**KeyOverride{&a.PushToTalk, &a.Pause, &a.Stop, &a.TogglePause, &a.Overlay, &a.Launchpad} {
 			if *o == nil {
 				continue
 			}

@@ -6,7 +6,8 @@ import (
 )
 
 // Hotkeys: keys and mouse buttons the user holds or presses anywhere in
-// Windows to pause or stop Resound's sounds, to open the in-game overlay, or
+// Windows to pause (while held, or until pressed again) or stop Resound's
+// sounds, to open the in-game overlay, or
 // to hold the launchpad (see Watcher). Each app can have bindings of its own (Keymap). The
 // matching is portable and tested; watching the keyboard and mouse is
 // Windows-only (hook_windows.go).
@@ -15,8 +16,9 @@ import (
 type Action int
 
 const (
-	ActionPause Action = iota // held: pause playback; released: resume
-	ActionStop                // pressed: stop all sounds
+	ActionPause       Action = iota // held: pause playback; released: resume
+	ActionStop                      // pressed: stop all sounds
+	ActionTogglePause               // pressed: pause playback, or resume it
 
 	// The overlay's events (Filter): its key pressed while it is closed
 	// opens it, pressed again plays the highlighted sound, and the wheel
@@ -67,11 +69,12 @@ const (
 const EscHoldTime = 700 * time.Millisecond
 
 func (a Action) String() string {
-	return [...]string{"pause", "stop", "overlay open", "overlay select", "overlay close", "overlay scroll", "overlay Esc down", "overlay stop", "push-to-talk hand-over", "app", "talk",
+	return [...]string{"pause", "stop", "toggle pause", "overlay open", "overlay select", "overlay close", "overlay scroll", "overlay Esc down", "overlay stop", "push-to-talk hand-over", "app", "talk",
 		"launchpad", "launchpad key", "launchpad Space", "launchpad tab"}[a]
 }
 
-// HotkeyEvent is a hotkey becoming active (Down) or inactive. Stop keys and
+// HotkeyEvent is a hotkey becoming active (Down) or inactive. Stop and
+// toggle pause keys and
 // the overlay's events only report Down, as do the launchpad's but its own
 // and Space's.
 type HotkeyEvent struct {
@@ -87,6 +90,11 @@ type HotkeyEvent struct {
 // A combination may hold mouse buttons 3–5 as well as keys.
 type Bindings struct {
 	Pause, Stop []Combo
+	// TogglePause keys pause or resume when pressed. Unlike pause and stop
+	// keys they never take part in the push-to-talk hand-over (handsOver):
+	// they aren't a game's push-to-talk, so the app lets go of push-to-talk
+	// itself once the press arrives.
+	TogglePause []Combo
 	Overlay     Combo // opens the in-game overlay; empty = no overlay
 	Launchpad   Combo // held: the launchpad; empty = none
 	// Talk are the push-to-talk combinations Resound presses, while the
@@ -96,13 +104,13 @@ type Bindings struct {
 
 // Empty reports whether no hotkey is set.
 func (b Bindings) Empty() bool {
-	return len(b.Pause) == 0 && len(b.Stop) == 0 && len(b.Overlay) == 0 && len(b.Talk) == 0 && len(b.Launchpad) == 0
+	return len(b.Pause) == 0 && len(b.Stop) == 0 && len(b.TogglePause) == 0 && len(b.Overlay) == 0 && len(b.Talk) == 0 && len(b.Launchpad) == 0
 }
 
 // UsesMouse reports whether a combination holds a mouse button, which the
 // mouse hook must watch.
 func (b Bindings) UsesMouse() bool {
-	for _, list := range [][]Combo{b.Pause, b.Stop, {b.Overlay, b.Launchpad}, b.Talk} {
+	for _, list := range [][]Combo{b.Pause, b.Stop, b.TogglePause, {b.Overlay, b.Launchpad}, b.Talk} {
 		for _, c := range list {
 			if slices.ContainsFunc(c, IsMouse) {
 				return true
@@ -136,7 +144,9 @@ func (k *Keymap) For(app string) *Bindings {
 // own (whose foreground the app may follow, ActionApp).
 func (k Keymap) Empty() bool { return k.Global.Empty() && len(k.Apps) == 0 }
 
-// Hotkeys reports whether a pause or stop key is set for any app.
+// Hotkeys reports whether a pause or stop key is set for any app: a key
+// that lets go of lent push-to-talk keys (Watcher.LendPTT). Toggle pause
+// keys don't.
 func (k Keymap) Hotkeys() bool {
 	if len(k.Global.Pause) > 0 || len(k.Global.Stop) > 0 {
 		return true
@@ -224,9 +234,9 @@ func (m *Matcher) Key(b *Bindings, vk uint16, down bool) []HotkeyEvent {
 	} else {
 		delete(m.down, vk)
 	}
-	var pause, stop, talk []Combo
+	var pause, stop, toggle, talk []Combo
 	if b != nil {
-		pause, stop, talk = b.Pause, b.Stop, b.Talk
+		pause, stop, toggle, talk = b.Pause, b.Stop, b.TogglePause, b.Talk
 	}
 	var events []HotkeyEvent
 	if start, end, _ := m.step(&m.pause, pause, vk, press); start || end {
@@ -237,6 +247,9 @@ func (m *Matcher) Key(b *Bindings, vk uint16, down bool) []HotkeyEvent {
 	}
 	if press && m.completes(stop, vk) >= 0 {
 		events = append(events, HotkeyEvent{Action: ActionStop, Down: true})
+	}
+	if press && m.completes(toggle, vk) >= 0 {
+		events = append(events, HotkeyEvent{Action: ActionTogglePause, Down: true})
 	}
 	return events
 }
@@ -324,7 +337,8 @@ func (m *Matcher) hold(vk uint16) {
 
 // handsOver reports whether events start a pause or a stop: the moment the
 // push-to-talk keys Resound holds must go up, before the key that caused it
-// reaches the game (Watcher.LendPTT).
+// reaches the game (Watcher.LendPTT). A toggle pause key doesn't: it
+// passes at once, never held back, and the app lets go of push-to-talk.
 func handsOver(events []HotkeyEvent) bool {
 	for _, ev := range events {
 		if ev.Down && (ev.Action == ActionPause || ev.Action == ActionStop) {

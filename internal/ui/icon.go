@@ -60,6 +60,7 @@ const (
 	IconPause        Icon = "player-pause"
 	IconPencil       Icon = "pencil"
 	IconPlay         Icon = "player-play"
+	IconPlayPause    Icon = "play-pause"
 	IconPlus         Icon = "plus"
 	IconBan          Icon = "ban"
 	IconPower        Icon = "power"

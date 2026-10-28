@@ -357,7 +357,7 @@ func (a *App) audioFlow() ui.AudioFlow {
 	// the pipes run and only the label says what is held.
 	pb := &a.playback
 	if pb.pausedActive || pb.talkLive || pb.holdLive {
-		label, tip := "Paused", "Playback is paused from the phone."
+		label, tip := "Paused", "Playback is paused: by the phone's pause button, a toggle pause key or Space on the launchpad. The same resumes it."
 		var onClick func()
 		switch {
 		case pb.talkLive:

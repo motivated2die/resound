@@ -61,17 +61,20 @@ func keyInfo(fn keyFunc) string {
 	case fnPause:
 		return "While you hold one, sounds pause and Resound lets go of push-to-talk and your mic, so you can talk, e.g. on another channel. " +
 			"Letting go resumes them. The game still gets the key."
+	case fnTogglePause:
+		return "Pressing one pauses all sounds and lets go of push-to-talk and your mic, like the pause button on your phone. " +
+			"Pressing it again resumes them. The game still gets the key."
 	case fnStop:
 		return "Pressing one stops all sounds at once. The game still gets the key."
 	case fnLaunchpad:
 		return "Hold it: your phone shows a key on each button of its tab, and pressing one plays that sound. " +
-			"Space stops all sounds, the arrow keys and the wheel switch tabs. While you hold it, the game gets none of these keys."
+			"Space stops or pauses sounds, the arrow keys and the wheel switch tabs. While you hold it, the game gets none of these keys."
 	}
 	return "Opens the overlay in a game; again plays the highlighted sound."
 }
 
 func keyIcon(fn keyFunc) ui.Icon {
-	return [...]ui.Icon{ui.IconMic, ui.IconPause, ui.IconStop, ui.IconKeyboard, ui.IconLaunchpad}[fn]
+	return [...]ui.Icon{ui.IconMic, ui.IconPause, ui.IconStop, ui.IconKeyboard, ui.IconLaunchpad, ui.IconPlayPause}[fn]
 }
 
 // keybindCard is the card of t: its keys (an app's own, or the global ones

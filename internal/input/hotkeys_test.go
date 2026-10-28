@@ -54,6 +54,50 @@ func TestMatcherStopOncePerPress(t *testing.T) {
 	}
 }
 
+// A toggle pause key reports each press, once, like a stop key, and
+// neither its repeats nor its release; it is never swallowed or handed
+// over (the game gets it as it is), unlike a pause key.
+func TestMatcherTogglePause(t *testing.T) {
+	b := &Bindings{TogglePause: []Combo{{vkLCtrl, vkF}}, Pause: []Combo{{vkG}}}
+	var f Filter
+	toggle := []HotkeyEvent{{Action: ActionTogglePause, Down: true}}
+	steps := []struct {
+		vk   uint16
+		down bool
+		want []HotkeyEvent
+	}{
+		{vkF, true, nil}, // F alone is not Ctrl+F
+		{vkF, false, nil},
+		{vkRCtrl, true, nil},
+		{vkF, true, toggle},
+		{vkF, true, nil}, // auto-repeat
+		{vkF, false, nil},
+		{vkF, true, toggle}, // again
+		{vkG, true, []HotkeyEvent{{Action: ActionPause, Down: true}}},
+		{vkG, false, []HotkeyEvent{{Action: ActionPause}}},
+		{vkF, false, nil},
+		{vkRCtrl, false, nil},
+	}
+	for i, s := range steps {
+		got, swallow := f.Key(b, s.vk, s.down)
+		if !reflect.DeepEqual(got, s.want) || swallow {
+			t.Fatalf("step %d (vk %#x down=%v): got %v swallow=%v, want %v", i, s.vk, s.down, got, swallow, s.want)
+		}
+		if handsOver(got) != (len(got) > 0 && got[0].Action == ActionPause && got[0].Down) {
+			t.Fatalf("step %d: handsOver %v for %v", i, handsOver(got), got)
+		}
+	}
+	if (Bindings{TogglePause: []Combo{{vkF}}}).Empty() {
+		t.Fatal("toggle pause keys alone are bindings")
+	}
+	if !(Bindings{TogglePause: []Combo{{0x05}}}).UsesMouse() {
+		t.Fatal("a toggle pause mouse button needs the mouse hook")
+	}
+	if (Keymap{Global: Bindings{TogglePause: []Combo{{vkF}}}}).Hotkeys() {
+		t.Fatal("toggle pause keys alone lend nothing: they don't hand over")
+	}
+}
+
 // A pause lasts while its keys are held, also when the bindings change
 // meanwhile (another app comes to the foreground, or the settings change):
 // it never ends early or bounces, and it ends with its keys' release.

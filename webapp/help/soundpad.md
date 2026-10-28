@@ -55,7 +55,7 @@ Resound adds the folders your sounds are in, as they are. Nothing is copied or m
 | Auto keys that hold a key while a sound plays (push-to-talk) | Push-to-talk keys |
 | Mute microphone while playing | [Mute your microphone while sounds play](push-to-talk.md#mute-your-microphone-while-sounds-play), with **Minimum sound length** set to **Always**, as Soundpad muted it for every sound |
 | Stop | A [stop key](push-to-talk.md#stop-keys), with Ctrl, Alt, Shift or Win if you use them |
-| Pause/resume | A [pause key](push-to-talk.md#pause-keys). In Soundpad it switches between pause and play; in Resound, sounds pause while you hold it, so you can talk on another channel |
+| Pause/resume | A [toggle pause key](push-to-talk.md#pause-keys): it switches between pause and play, as in Soundpad |
 
 Soundpad only presses its auto keys for sounds you start with a hotkey, unless you changed that. Resound holds push-to-talk for every sound played for others.
 

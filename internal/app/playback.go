@@ -197,6 +197,19 @@ func (a *App) togglePause() bool {
 	return false
 }
 
+// tapPause is togglePause for a key the user taps (a toggle pause key,
+// Space on the launchpad): sounds pause, letting go of the mic and
+// push-to-talk, and the next tap resumes them, holding those again. With
+// nothing playing and nothing paused it does nothing (ok false): a pause
+// of nothing would only make the next tap seem to do nothing.
+func (a *App) tapPause() (paused, ok bool) {
+	pb := &a.playback
+	if !pb.pausedActive && !pb.holdResuming && len(pb.remaining) == 0 {
+		return false, false
+	}
+	return a.togglePause(), true
+}
+
 // setTalkThrough pauses playback, frees the mic and holds push-to-talk
 // while the user holds the talk button on the phone. The PTT reasons are
 // switched in an order that keeps the key down across the hand-over.

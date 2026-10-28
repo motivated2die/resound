@@ -78,10 +78,12 @@ type Config struct {
 	SetupFlow int `json:"setupFlow,omitempty"`
 	// PauseHotkeys are key combinations that, while held anywhere in
 	// Windows, pause playback and let go of push-to-talk and the mic.
-	// StopHotkeys stop all sounds when pressed. Each is a list of
-	// virtual-key combinations, like PushToTalkKeys.
-	PauseHotkeys [][]uint16 `json:"pauseHotkeys,omitempty"`
-	StopHotkeys  [][]uint16 `json:"stopHotkeys,omitempty"`
+	// StopHotkeys stop all sounds when pressed; TogglePauseHotkeys pause
+	// them, or resume them, when pressed. Each is a list of virtual-key
+	// combinations, like PushToTalkKeys.
+	PauseHotkeys       [][]uint16 `json:"pauseHotkeys,omitempty"`
+	StopHotkeys        [][]uint16 `json:"stopHotkeys,omitempty"`
+	TogglePauseHotkeys [][]uint16 `json:"togglePauseHotkeys,omitempty"`
 	// AppKeybinds are programs with keybinds of their own: while one is in
 	// the foreground, each of its overrides replaces the global keys above
 	// for that function; functions without one keep the global keys.
@@ -149,6 +151,8 @@ type AppKeybinds struct {
 	PushToTalk *KeyOverride `json:"pushToTalk,omitempty"`
 	Pause      *KeyOverride `json:"pause,omitempty"`
 	Stop       *KeyOverride `json:"stop,omitempty"`
+	// TogglePause replaces TogglePauseHotkeys.
+	TogglePause *KeyOverride `json:"togglePause,omitempty"`
 	// Overlay replaces OverlayKeys (one combination) or, Off, turns the
 	// overlay off in the program. Launchpad does the same for LaunchpadKeys.
 	Overlay   *KeyOverride `json:"overlay,omitempty"`

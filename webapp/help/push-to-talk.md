@@ -8,7 +8,7 @@ While a sound plays, Resound holds your push-to-talk key and, if you turn it on,
 
 ## The Keybinds page
 
-Each function has a card: **Push-to-talk**, **Pause** and **Stop**. The **Global** cards apply in every app; below them, **App keybinds** lists the games that have keys of their own.
+Each function has a card: **Push-to-talk**, **Hold to pause**, **Toggle pause** and **Stop**. The **Global** cards apply in every app; below them, **App keybinds** lists the games that have keys of their own.
 
 | On a card | Does |
 |---|---|
@@ -41,20 +41,25 @@ Pause and stop buttons work like keys: the game still gets the click.
 
 ## Pause keys
 
-On the **Pause** card, click **+** and press a key, a mouse button or a combination. While you hold it, sounds pause and Resound lets go of push-to-talk and your mic, for example so you can talk on another channel with that key. Letting go resumes the sounds and presses push-to-talk again.
+There are two kinds of pause keys. Use either, or both with different keys.
+
+- **Hold to pause**: on that card, click **+** and press a key, a mouse button or a combination. While you hold it, sounds pause and Resound lets go of push-to-talk and your mic, for example so you can talk on another channel with that key. Letting go resumes the sounds and presses push-to-talk again.
+- **Toggle pause**: press it once and sounds pause, and Resound lets go of push-to-talk and your mic, like the pause button on your phone. They stay paused until you press it again: then they carry on and Resound presses push-to-talk again. With nothing playing, the key does nothing.
+
+A hold-to-pause key is often your game's push-to-talk for another channel, so Resound lets go of its own push-to-talk a moment before your game sees that key. A toggle pause key reaches your game as it is.
 
 ## Stop keys
 
 On the **Stop** card, add a key or button that stops all sounds at once and lets go of push-to-talk. Useful when a sound has to end now.
 
-You can add up to 8 pause keys and 8 stop keys. Pause and stop keys work in any game; the game still gets the key as well.
+You can add up to 8 keys of each kind. Pause and stop keys work in any game; the game still gets the key as well.
 
 ## Keybinds for one app
 
 Games bind different keys: one game's push-to-talk may be <kbd>V</kbd>, another's Mouse 4. An app can have keys of its own, which work while it is in front.
 
 1. On the Keybinds page, open **Add a running app** and choose the game. Start the game first, so it's in the list.
-2. Its page shows the same three cards, and a fourth for the [overlay](overlay.md) key. Each one shows the **global** keys, greyed, until you give it keys of its own with **+**.
+2. Its page shows the same cards, and two more for the [overlay](overlay.md) and the [launchpad](launchpad.md) keys. Each one shows the **global** keys, greyed, until you give it keys of its own with **+**.
 
 For each function, the app either:
 
@@ -72,7 +77,7 @@ Good to know:
 
 - Resound follows the app in front. The Resound panel, the taskbar (also when you click the tray icon), Alt+Tab and the Start menu don't count: the keys of the app before them stay.
 - If you switch apps while a sound plays, Resound lets go of the old app's push-to-talk key and holds the new one's at once. A key both apps use stays held.
-- A pause key you hold while switching keeps the sounds paused until you let go of it.
+- A hold-to-pause key you hold while switching keeps the sounds paused until you let go of it.
 - While a game with its own keys runs, the home page says so under the logo, for example *Ready · Valorant keybinds*.
 - The trash button on an app's page removes its keys; the global ones apply there again.
 

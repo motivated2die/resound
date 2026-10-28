@@ -29,8 +29,8 @@ type Settings struct {
 	// play (Resound takes up to 4).
 	PushToTalk [][]uint16
 	Stop       []uint16
-	// Pause is Soundpad's pause/resume key. Soundpad toggles with it; in
-	// Resound sounds pause while it is held.
+	// Pause is Soundpad's pause/resume key, which toggles: a toggle pause
+	// key in Resound.
 	Pause []uint16
 	// Skipped says why keys that are set weren't taken.
 	Skipped []string

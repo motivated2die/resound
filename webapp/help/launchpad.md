@@ -33,10 +33,14 @@ Without a phone, the launchpad still plays the tab your phone showed last, Favor
 
 ## Space
 
-By default, <kbd>Space</kbd> stops all sounds. Turn on **Tap Space to pause** on the **Launchpad** page, and Space works like the pause button on your phone instead:
+Under **Space** on the **Launchpad** page, choose what <kbd>Space</kbd> does:
 
-- **Tap** <kbd>Space</kbd>: all sounds pause. Tap again: they carry on.
-- **Hold** <kbd>Space</kbd> for a moment (0.7 seconds): all sounds stop.
+- **Space to stop** (the default): a tap stops all playing sounds.
+- **Space to pause**: Space works like the pause button on your phone:
+
+
+  - **Tap** <kbd>Space</kbd>: all sounds pause. Tap again: they carry on.
+  - **Hold** <kbd>Space</kbd> for a moment (0.7 seconds): all sounds stop.
 
 ## The badge on your screen
 
