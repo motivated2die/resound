@@ -41,37 +41,7 @@ type overlayState struct {
 // Favorites tab (its custom order for its current layout, the rest after
 // it, or by name when the phone sorts it so), as overlay items.
 func (a *App) overlayFavorites() ([]uint64, []ui.OverlayItem) {
-	favs := a.lib.Favorites()
-	lay := a.lib.Layout(library.FavoritesKey)
-	mode := lay.Mode
-	if mode == "" {
-		mode = "grid-3" // the phone's default
-	}
-	pos := map[uint64]int{}
-	for i, id := range lay.Orders[mode] {
-		if _, dup := pos[id]; !dup {
-			pos[id] = i
-		}
-	}
-	slices.SortStableFunc(favs, func(x, y library.Sound) int {
-		px, okx := pos[x.ID]
-		py, oky := pos[y.ID]
-		switch {
-		case okx && oky:
-			return px - py
-		case okx:
-			return -1
-		case oky:
-			return 1
-		}
-		return 0
-	})
-	switch lay.Sort {
-	case library.SortNameAsc:
-		slices.SortStableFunc(favs, func(x, y library.Sound) int { return library.CompareNames(x.Name, y.Name) })
-	case library.SortNameDesc:
-		slices.SortStableFunc(favs, func(x, y library.Sound) int { return library.CompareNames(y.Name, x.Name) })
-	}
+	favs, _ := a.lib.ShownSounds(library.FavoritesKey)
 	ids := make([]uint64, len(favs))
 	items := make([]ui.OverlayItem, len(favs))
 	for i, s := range favs {
