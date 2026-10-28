@@ -834,11 +834,10 @@ h1 { font-size: clamp(32px, 5vw, 52px); line-height: 1.1; font-weight: 700; lett
 /* --- The demos in game (index.html #overlay, js/launchpad-demo.js) ---
    Tabs above two framed cards, the launchpad's and the overlay's, which lie
    on top of each other in one grid cell: both take the taller one's height,
-   so switching never moves the page. The selected tab's line fills up while
-   the demos switch by themselves. */
+   so switching never moves the page. The selected tab's pill fills up,
+   from left to right, while the demos switch by themselves. */
 .demo-tabs .icon { font-size: 19px; }
-/* Tabs of one width (the wider one's), their lines as wide, on the cards'
-   left edge. */
+/* Pills of one width (the wider one's), on the cards' left edge. */
 .demo-tabs {
     display: grid;
     grid-auto-flow: column;
@@ -855,8 +854,9 @@ h1 { font-size: clamp(32px, 5vw, 52px); line-height: 1.1; font-weight: 700; lett
     align-items: center;
     justify-content: center;
     gap: 8px;
-    padding: 9px 20px 17px;
+    padding: 9px 22px;
     border: 0;
+    border-radius: 999px;
     background: none;
     color: var(--muted);
     font: inherit;
@@ -866,41 +866,32 @@ h1 { font-size: clamp(32px, 5vw, 52px); line-height: 1.1; font-weight: 700; lett
     cursor: pointer;
     transition: color 0.2s ease;
 }
-/* The hover background: a pill above the line. */
-.demo-tab::before {
-    content: "";
-    position: absolute;
-    inset: 0 0 8px;
-    border-radius: 999px;
-    background: transparent;
-    z-index: -1;
-    transition: background-color 0.2s ease;
-}
 .demo-tab.lp { --tab-rgb: var(--launchpad-rgb); }
 .demo-tab:hover { color: var(--text); }
-.demo-tab:hover::before { background: rgba(255, 255, 255, 0.05); }
 .demo-tab[aria-selected="true"] { color: rgb(var(--tab-rgb)); }
-.demo-tab-line {
+/* The pill behind the label: grey on hover, faintly the tab's colour when
+   selected, and the progress, a lighter fill sliding in from the left. */
+.demo-tab-bg {
     position: absolute;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    height: 3px;
-    border-radius: 2px;
-    background: rgba(255, 255, 255, 0.08);
+    inset: 0;
+    z-index: -1;
+    border-radius: inherit;
     overflow: hidden;
+    background: transparent;
+    transition: background-color 0.2s ease;
 }
+.demo-tab:hover .demo-tab-bg { background: rgba(255, 255, 255, 0.05); }
+.demo-tab[aria-selected="true"] .demo-tab-bg { background: rgba(var(--tab-rgb), 0.07); }
 .demo-tab-fill {
     position: absolute;
     inset: 0;
-    background: rgb(var(--tab-rgb));
-    transform-origin: left;
-    transform: scaleX(0);
+    background: rgba(var(--tab-rgb), 0.13);
+    transform: translateX(-100%);
 }
-.demo-tab[aria-selected="true"] .demo-tab-fill { transform: scaleX(1); }
+.demo-tab[aria-selected="true"] .demo-tab-fill { transform: none; }
 .demo-tabs.cycling .demo-tab[aria-selected="true"] .demo-tab-fill { animation: demo-fill var(--demo-cycle, 5s) linear forwards; }
 .demo-tabs.cycling.paused .demo-tab[aria-selected="true"] .demo-tab-fill { animation-play-state: paused; }
-@keyframes demo-fill { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+@keyframes demo-fill { from { transform: translateX(-100%); } to { transform: none; } }
 
 .demo-stack { display: grid; }
 .demo-stack > .ovl-card {
@@ -913,6 +904,12 @@ h1 { font-size: clamp(32px, 5vw, 52px); line-height: 1.1; font-weight: 700; lett
 .demo-stack > .ovl-card.on { opacity: 1; visibility: visible; transition: opacity 0.3s ease; }
 @media (prefers-reduced-motion: reduce) {
     .demo-stack > .ovl-card, .demo-stack > .ovl-card.on { transition: none; }
+}
+
+/* Tablets: the overlay's text runs to three lines, the launchpad's to two;
+   both take three, so the titles and boxes stay put. */
+@media (min-width: 721px) and (max-width: 960px) {
+    .demo-stack .ovl-copy .section-lead { min-height: calc(3 * 1.55em); }
 }
 
 /* The launchpad's card: the overlay's, in yellow, with six of the phone's
@@ -970,6 +967,10 @@ h1 { font-size: clamp(32px, 5vw, 52px); line-height: 1.1; font-weight: 700; lett
 .lp-tabs .icon { font-size: 11px; }
 .lp-tab { color: var(--accent); box-shadow: inset 0 -2px 0 currentColor; padding-bottom: 2px; transition: color 0.2s ease; }
 .lp-phone.held .lp-tab { color: var(--launchpad); }
+/* The room of the overlay's status line (.ovl-status), so both cards'
+   texts and boxes stand at the same height and nothing moves when they
+   switch. Not on phones, where the box is centred on the picture. */
+.lp-card .ovl-action::after { content: ""; display: block; min-height: 1.6em; margin-top: 14px; font-size: 15px; }
 .lp-callout { border-color: rgba(var(--launchpad-rgb), 0.35); background: rgba(var(--launchpad-rgb), 0.07); }
 .lp-callout:hover, .lp-callout[aria-pressed="true"] { border-color: rgba(var(--launchpad-rgb), 0.6); background: rgba(var(--launchpad-rgb), 0.11); }
 .lp-callout .kbd-big {
@@ -1530,9 +1531,10 @@ h3 { font-size: 18px; line-height: 1.3; margin-bottom: 6px; }
     .ovl-callout { width: 100%; flex-direction: column; align-items: flex-start; gap: 12px; padding: 14px; font-size: 14px; }
     .ovl-status { font-size: 14px; }
     .demo-tabs { width: 100%; margin-bottom: 22px; }
-    .demo-tab { padding: 8px 10px 16px; font-size: 14px; }
+    .demo-tab { padding: 8px 12px; font-size: 14px; }
     /* The picture and the box beside it, centred on each other. */
     .lp-card .ovl-visual, .lp-card .ovl-action { align-self: center; }
+    .lp-card .ovl-action::after { display: none; }
     .lp-visual { width: 168px; }
     .lp-phone { padding: 6px 6px 3px; border-radius: 14px; }
     .lp-pads { gap: 4px; }

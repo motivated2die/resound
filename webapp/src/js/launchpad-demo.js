@@ -14,7 +14,7 @@
 // The demos are two cards on top of each other, so they take the same
 // height. While nobody plays with them, has the mouse over a card or the
 // section out of view, the tabs above switch to the other one every
-// CYCLE_MS, the selected tab's line filling up meanwhile. Using a demo's key
+// CYCLE_MS, the selected tab's pill filling up meanwhile. Using a demo's key
 // shows its card.
 (() => {
     'use strict';
@@ -206,10 +206,10 @@
         cycle.touched();
     }
 
-    // cycle switches to the other demo when the selected tab's line has
+    // cycle switches to the other demo when the selected tab's pill has
     // filled up (a CSS animation of CYCLE_MS), which stands still while the
     // section is out of view, hovered or focused, or a demo is in use. Any
-    // use starts the line again from the beginning.
+    // use starts the fill again from the beginning.
     const cycle = (() => {
         let list, visible = false, hovered = false, focused = false;
         const busy = () => held || altDown || !!window.overlayDemo?.isOpen();
@@ -218,7 +218,7 @@
                 list = section.querySelector('[data-demo-tabs]');
                 if (!list) return;
                 list.style.setProperty('--demo-cycle', CYCLE_MS + 'ms');
-                if (still) return; // no switching by itself: the line stays full
+                if (still) return; // no switching by itself: the pill stays full
                 list.classList.add('cycling');
                 tabs.forEach((tab) => tab.querySelector('.demo-tab-fill')?.addEventListener('animationend', () => {
                     if (tab.dataset.demoTab !== current) return;
@@ -230,7 +230,7 @@
                     card.addEventListener('pointerenter', (e) => { if (e.pointerType === 'mouse') { hovered = true; this.sync(); } });
                     card.addEventListener('pointerleave', () => { hovered = false; this.sync(); });
                 });
-                // Keyboard focus only: a clicked tab keeps the focus, but not the line.
+                // Keyboard focus only: a clicked tab keeps the focus, but doesn't hold the fill.
                 section.addEventListener('focusin', (e) => { focused = e.target.matches(':focus-visible'); this.sync(); });
                 section.addEventListener('focusout', (e) => {
                     if (!section.contains(e.relatedTarget)) { focused = false; this.sync(); }
@@ -242,11 +242,11 @@
                 }
                 this.restart();
             },
-            // sync holds the line while it shouldn't fill.
+            // sync holds the fill while it shouldn't fill.
             sync() {
                 list?.classList.toggle('paused', !visible || hovered || focused || busy());
             },
-            // restart fills the selected tab's line from the beginning.
+            // restart fills the selected tab's pill from the beginning.
             restart() {
                 if (!list?.classList.contains('cycling')) return;
                 tabs.forEach((tab) => {
