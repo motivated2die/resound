@@ -39,11 +39,11 @@ func (a *App) keysPage() []ui.Row {
 }
 
 // keybindCards are the cards of every function in one scope. The global
-// overlay key has its card on the overlay's page.
+// overlay and launchpad keys have their cards on their own pages.
 func (a *App) keybindCards(app string) []ui.Row {
 	var rows []ui.Row
 	for _, fn := range appKeyFuncs {
-		if fn == fnOverlay && app == "" {
+		if fn.single() && app == "" {
 			continue
 		}
 		t := keyTarget{app, fn}
@@ -63,12 +63,15 @@ func keyInfo(fn keyFunc) string {
 			"Letting go resumes them. The game still gets the key."
 	case fnStop:
 		return "Pressing one stops all sounds at once. The game still gets the key."
+	case fnLaunchpad:
+		return "Hold it: your phone shows a key on each button of its tab, and pressing one plays that sound. " +
+			"Space stops all sounds, the arrow keys and the wheel switch tabs. While you hold it, the game gets none of these keys."
 	}
 	return "Opens the overlay in a game; again plays the highlighted sound."
 }
 
 func keyIcon(fn keyFunc) ui.Icon {
-	return [...]ui.Icon{ui.IconMic, ui.IconPause, ui.IconStop, ui.IconKeyboard}[fn]
+	return [...]ui.Icon{ui.IconMic, ui.IconPause, ui.IconStop, ui.IconKeyboard, ui.IconLaunchpad}[fn]
 }
 
 // keybindCard is the card of t: its keys (an app's own, or the global ones
@@ -230,6 +233,50 @@ func (a *App) appKeysPage() []ui.Row {
 		ui.Paragraph("Each function keeps the global keys until you add its own. ⊘ turns it off here, ↺ brings the global keys back.", ui.ToneMuted))
 	rows = append(rows, a.keybindCards(exe)...)
 	return append(rows, ui.Spacer(4))
+}
+
+// appsWithOwn are the apps with a setting of their own for fn: keys, or fn
+// turned off there.
+func (a *App) appsWithOwn(fn keyFunc) []string {
+	var exes []string
+	for i := range a.cfg.AppKeybinds {
+		if e := &a.cfg.AppKeybinds[i]; *override(e, fn) != nil {
+			exes = append(exes, e.Exe)
+		}
+	}
+	return exes
+}
+
+// keyUsed reports whether fn has a key anywhere.
+func (a *App) keyUsed(fn keyFunc) bool {
+	if len(a.globalKeys(fn)) > 0 {
+		return true
+	}
+	for i := range a.cfg.AppKeybinds {
+		if o := *override(&a.cfg.AppKeybinds[i], fn); o != nil && len(o.Keys) > 0 {
+			return true
+		}
+	}
+	return false
+}
+
+// appKeysNote is the note under the global card of a function set on its
+// own page (the overlay, the launchpad): text says apps can have their own
+// key or none, and which do, with a link to the app keybinds.
+func (a *App) appKeysNote(fn keyFunc, text string) ui.Row {
+	if exes := a.appsWithOwn(fn); len(exes) > 0 {
+		parts := make([]string, len(exes))
+		for i, exe := range exes {
+			state := "off"
+			if kb := a.keybind(keyTarget{exe, fn}); !kb.off {
+				state = keysText(kb.keys)
+			}
+			parts[i] = a.appName(exe) + " (" + state + ")"
+		}
+		text = "Own setting in " + strings.Join(parts, ", ") + ": it replaces this key while that app is in front."
+	}
+	return ui.ParagraphLink(text, "Set it in App keybinds", "Opens the Keybinds page with the apps that have keys of their own",
+		func() { a.openPage(pageKeys) })
 }
 
 // refreshWindowApps lists, off the UI thread, the programs with a window,

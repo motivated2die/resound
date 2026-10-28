@@ -58,8 +58,9 @@ const (
 	pageApp
 	pageBackup
 	pageDiagnostics
-	pageOverlay // the in-game overlay
-	pageAppKeys // one app's keybinds (App.keysApp)
+	pageOverlay   // the in-game overlay
+	pageLaunchpad // the launchpad
+	pageAppKeys   // one app's keybinds (App.keysApp)
 )
 
 // App holds the running host state. Everything except the event pump and
@@ -99,17 +100,18 @@ type App struct {
 
 	// normalize mirrors !cfg.NoNormalize for plays on HTTP goroutines.
 	normalize   atomic.Bool
-	overlay     overlayState  // the in-game overlay (overlay.go)
-	removing    string        // folder awaiting the remove confirmation
-	libNote     string        // result of the last refresh or add, shown for a moment (setLibNote)
-	libSeq      int           // identifies the current libNote, so an old timer leaves a newer one
-	keepNote    bool          // reopening after a dialog: keep libNote and backupNote
-	imports     importsState  // sounds dropped onto folders (import.go)
-	lists       soundLists    // the library page's opened folders (sounds.go)
-	soundux     sounduxState  // Soundux's settings to carry over (soundux.go)
-	soundpad    soundpadState // Soundpad's sounds and keys to carry over (soundpad.go)
-	muteEdit    bool          // the mute threshold's field is open (mutemic.go)
-	muteEditErr string        // why the typed threshold wasn't taken
+	overlay     overlayState   // the in-game overlay (overlay.go)
+	launchpad   launchpadState // keys play the phone's buttons (launchpad.go)
+	removing    string         // folder awaiting the remove confirmation
+	libNote     string         // result of the last refresh or add, shown for a moment (setLibNote)
+	libSeq      int            // identifies the current libNote, so an old timer leaves a newer one
+	keepNote    bool           // reopening after a dialog: keep libNote and backupNote
+	imports     importsState   // sounds dropped onto folders (import.go)
+	lists       soundLists     // the library page's opened folders (sounds.go)
+	soundux     sounduxState   // Soundux's settings to carry over (soundux.go)
+	soundpad    soundpadState  // Soundpad's sounds and keys to carry over (soundpad.go)
+	muteEdit    bool           // the mute threshold's field is open (mutemic.go)
+	muteEditErr string         // why the typed threshold wasn't taken
 
 	backupNote       string // result of the last backup action
 	backupFailed     bool

@@ -204,6 +204,7 @@ func (a *App) startServer() {
 	auth.OnChange = func() { a.tray.Post(a.render) }
 	a.srv = server.New(a.lib, remotePlayer{a}, auth, logx.Printf)
 	a.srv.Name, _ = os.Hostname() // the app shows it in its list of PCs
+	a.srv.OnView = func() { a.tray.Post(a.onRemoteView) }
 	a.restartServer()
 }
 

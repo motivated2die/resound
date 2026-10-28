@@ -114,6 +114,20 @@ type Config struct {
 	// OverlayLast is the sound last highlighted in the overlay, highlighted
 	// again when it opens. 0 = the middle one.
 	OverlayLast uint64 `json:"overlayLast,omitempty"`
+	// LaunchpadKeys is held for the launchpad (a key combination, like
+	// PushToTalkKeys): the phone labels the buttons of the tab it shows with
+	// keys, which play them while it is held. Empty = no launchpad.
+	LaunchpadKeys []uint16 `json:"launchpadKeys,omitempty"`
+	// NoLaunchpadBadge hides the round badge that shows on the screen while
+	// the launchpad is held; NoLaunchpadTabName and NoLaunchpadSoundName
+	// leave the open tab's name, and a played sound's, out of it.
+	NoLaunchpadBadge     bool `json:"noLaunchpadBadge,omitempty"`
+	NoLaunchpadTabName   bool `json:"noLaunchpadTabName,omitempty"`
+	NoLaunchpadSoundName bool `json:"noLaunchpadSoundName,omitempty"`
+	// LaunchpadBadgeAt is where the badge shows on the primary screen:
+	// "top-left", "top-right", "bottom-left", "bottom-center",
+	// "bottom-right"; "" = top center.
+	LaunchpadBadgeAt string `json:"launchpadBadgeAt,omitempty"`
 	// PanelPos is where the user moved the panel by its tab: its top left
 	// corner in screen pixels. nil = docked next to the tray icon. It is
 	// only used while that point is on a screen, kept inside its work area.
@@ -132,8 +146,9 @@ type AppKeybinds struct {
 	Pause      *KeyOverride `json:"pause,omitempty"`
 	Stop       *KeyOverride `json:"stop,omitempty"`
 	// Overlay replaces OverlayKeys (one combination) or, Off, turns the
-	// overlay off in the program.
-	Overlay *KeyOverride `json:"overlay,omitempty"`
+	// overlay off in the program. Launchpad does the same for LaunchpadKeys.
+	Overlay   *KeyOverride `json:"overlay,omitempty"`
+	Launchpad *KeyOverride `json:"launchpad,omitempty"`
 }
 
 // KeyOverride replaces a global keybind in one program: with key

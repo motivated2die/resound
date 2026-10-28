@@ -86,7 +86,7 @@ func TestKeybindsLoad(t *testing.T) {
 	write(`{"pushToTalkKeys": [], "pushToTalkExtra": [[145], [96]],
 		"appKeybinds": [
 			{"exe": " Game.EXE ", "name": "Game", "pause": {"off": true, "keys": [[1]]}, "stop": {"keys": []}, "pushToTalk": {"keys": [[5]]},
-				"overlay": {"keys": [[119], [120]]}},
+				"overlay": {"keys": [[119], [120]]}, "launchpad": {"keys": [[20], [21]]}},
 			{"exe": "game.exe", "name": "twice"},
 			{"exe": "", "name": "nameless"}
 		]}`)
@@ -109,5 +109,7 @@ func TestKeybindsLoad(t *testing.T) {
 		t.Errorf("push-to-talk %+v", a.PushToTalk)
 	case a.Overlay == nil || len(a.Overlay.Keys) != 1 || a.Overlay.Keys[0][0] != 119:
 		t.Errorf("overlay %+v, want its first key only", a.Overlay)
+	case a.Launchpad == nil || len(a.Launchpad.Keys) != 1 || a.Launchpad.Keys[0][0] != 20:
+		t.Errorf("launchpad %+v, want its first key only", a.Launchpad)
 	}
 }

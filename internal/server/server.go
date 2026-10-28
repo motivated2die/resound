@@ -191,6 +191,23 @@ func (s *Server) LibraryChanged() {
 	}()
 }
 
+// Played tells the connected apps about a sound the PC started itself (the
+// launchpad, the in-game overlay), so they show it playing as if it had
+// been tapped: the event carries what a play request answers.
+func (s *Server) Played(soundID uint64, started Started) {
+	rtc := s.currentRTC()
+	if rtc == nil {
+		return
+	}
+	stopped := started.Replaced
+	if stopped == nil {
+		stopped = []uint64{}
+	}
+	ev := map[string]any{"t": "event", "e": "played", "id": soundID, "playingId": started.PlayingID,
+		"lengthInMs": started.Length.Milliseconds(), "stopped": stopped}
+	go rtc.broadcast(ev)
+}
+
 // Status reports the port and whether the app can connect.
 func (s *Server) Status() (port int, running bool, err error) {
 	s.mu.Lock()
