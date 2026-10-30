@@ -33,10 +33,10 @@
 <body>
     <!-- Top status/action bar -->
     <div class="top-bar" id="top-bar">
-        <!-- Placeholder for left alignment -->
-        <div class="top-bar-placeholder"></div>
+        <!-- The bar's two sides; top-bar.js places the buttons on them -->
+        <div class="top-bar-side" id="top-bar-start"></div>
         <!-- Centred while installing works (install.js); moves aside for the buttons -->
-        <button id="install-pill" class="install-pill" type="button" hidden>
+        <button id="install-pill" class="install-pill" type="button" aria-label="Install app" hidden>
             <span class="icon" data-icon="install_mobile" aria-hidden="true"></span>
             <span>Install app</span>
         </button>
@@ -48,8 +48,7 @@
         <div class="search-mode-info hidden" id="search-mode-info">
             <span>SEARCH</span>
         </div>
-        <!-- Action Buttons -->
-        <div class="action-buttons" id="top-bar-action-buttons">
+        <div class="top-bar-side" id="top-bar-end">
             <button id="play-pause-toggle-button" class="icon-button top-bar-button hidden" aria-label="Toggle Play/Pause">
                 <span class="icon" data-icon="play_arrow" aria-hidden="true"></span>
             </button>
@@ -299,11 +298,15 @@
                         <span class="slider"></span>
                         Vibrate on Tap
                     </label>
-                    <label class="toggle-switch">
-                        <input type="checkbox" id="swap-button-position-toggle">
-                        <span class="slider"></span>
-                        Menu Buttons on the Left
-                    </label>
+                    <!-- Three layouts, to stay clear of the phone's camera (top-bar.js) -->
+                    <div class="top-bar-layout-setting">
+                        <span id="top-bar-layout-label">Top Bar Buttons</span>
+                        <div class="segmented" role="radiogroup" aria-labelledby="top-bar-layout-label">
+                            <label><input type="radio" name="top-bar-layout" value="left"><span>Left</span></label>
+                            <label><input type="radio" name="top-bar-layout" value="split"><span>Split</span></label>
+                            <label><input type="radio" name="top-bar-layout" value="right"><span>Right</span></label>
+                        </div>
+                    </div>
                 </div>
                 <div class="divider"></div>
 
@@ -390,6 +393,7 @@
     <script src="js/persistence.js" defer></script>
     <script src="js/screen-wake.js" defer></script>
     <script src="js/fullscreen.js" defer></script>
+    <script src="js/top-bar.js" defer></script>
     <script src="js/device.js" defer></script>
     <script src="js/install.js" defer></script>
     <script src="js/editMode.js" defer></script>
