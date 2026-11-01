@@ -176,6 +176,9 @@ func (a *App) refreshRunning() {
 		a.running = nil
 		return
 	}
+	if a.tray == nil {
+		return
+	}
 	go func() {
 		running := input.RunningApps()
 		a.tray.Post(func() {
