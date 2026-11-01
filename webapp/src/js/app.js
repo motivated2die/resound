@@ -40,7 +40,6 @@ const appSettingsButton = document.getElementById('app-settings-button');
 const appSettingsModalOverlay = document.getElementById('app-settings-modal-overlay');
 const closeAppSettingsButton = document.getElementById('close-app-settings-button');
 const autoFullscreenToggle = document.getElementById('auto-fullscreen-toggle'); // Added for completeness
-const swapButtonPositionToggle = document.getElementById('swap-button-position-toggle'); // NEW Toggle
 // Reset Buttons
 const resetCurrentPageVisualsButton = document.getElementById('reset-current-page-visuals');
 const resetCurrentPageLayoutButton = document.getElementById('reset-current-page-layout');
@@ -89,8 +88,8 @@ function init() {
     // ---> LOAD PERSISTENCE FIRST <---
     state.settings = persistence.load();
     console.log("Initial settings loaded:", state.settings);
-    // Apply initial top bar alignment BEFORE setting up listeners that might depend on it
-    applyButtonPositionSetting();
+    // Arrange the top bar BEFORE setting up listeners that might depend on it
+    topBarLayout.init();
     setupEventListeners();
     state.isAnythingPlayingUnpaused = false;
     state.isTalkThroughButtonPressed = false;
@@ -555,13 +554,6 @@ function setupEventListeners() {
      // Setup long press listeners for reset buttons
      setupLongPressResetButtons();
 
-     // NEW: Listener for Swap Button Position Toggle
-     if (swapButtonPositionToggle) {
-         swapButtonPositionToggle.addEventListener('change', handleSwapButtonPositionChange);
-     } else {
-         console.error("Swap Button Position toggle not found for event listener setup.");
-     }
-
      window.playbackStateChanged = (newState) => {
         console.log("Playback state changed notification received:", newState);
         const isNowPlaying = (newState === 'playing');
@@ -596,36 +588,10 @@ function setupEventListeners() {
             if (autoFullscreenToggle) autoFullscreenToggle.disabled = true; // Disable if manager missing
         }
 
-        // Swap Button Position Toggle Check
-        if (swapButtonPositionToggle) {
-            swapButtonPositionToggle.checked = state.settings?.swapButtonPosition ?? false;
-            // Listener is attached in setupEventListeners
-        } else {
-            console.error("App ready, Swap Button Position toggle button not found!");
-        }
-
     }, { once: true });
     // --- END Defer toggle checks ---
 
 
-}
-
-// --- NEW Function to apply button position ---
-function applyButtonPositionSetting() {
-    if (!topBarEl) return;
-    const swapEnabled = state.settings?.swapButtonPosition ?? false;
-    topBarEl.classList.toggle('buttons-left', swapEnabled);
-    console.log(`Top bar button position set to: ${swapEnabled ? 'left' : 'right'}`);
-}
-
-// --- NEW Handler for Swap Button Position Toggle ---
-function handleSwapButtonPositionChange(event) {
-    const isEnabled = event.target.checked;
-    console.log(`Swap Button Position toggled: ${isEnabled}`);
-    if (!state.settings) state.settings = {}; // Ensure settings object exists
-    state.settings.swapButtonPosition = isEnabled;
-    persistence.save(state.settings); // Save the new setting
-    applyButtonPositionSetting(); // Apply the change immediately
 }
 
 async function handleTogglePlayPause() {
@@ -920,6 +886,7 @@ async function resetAllSettings() {
 
     // Update UI elements tied to settings
     if (window.fullscreenManager) fullscreenManager.reset();
+    topBarLayout.apply();
 
     // Reload tabs and sounds completely
     console.log("Reloading tabs after resetting all settings.");

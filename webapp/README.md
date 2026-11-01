@@ -22,6 +22,7 @@ Nothing here is embedded into `Resound.exe`.
 | `css/scrollbar.css` | Scrollbars on every page, the help center's too: no track or arrows, a slim thumb that widens on hover |
 | `js/screen-wake.js` | Keeps the screen on (Screen Wake Lock API), on by default |
 | `js/fullscreen.js` | Fullscreen in a browser tab, on by default on phones and tablets only; the installed app opens fullscreen by itself (`manifest.json`) |
+| `js/top-bar.js` | Where the top bar's buttons stand (right, left or split, to stay clear of the camera): the layouts as groups of buttons per side, the setting, and the sheet that asks the first time in fullscreen on Android, with the tour's offer in it |
 | `js/platform.js` | What kind of device this is, before the first paint: iPhones and iPads (their status bar never hides, so the top bar moves below it) and phones and tablets in general (fullscreen by default) |
 | `js/device.js` | Vibration on play and stop, persistent storage for the pairing keys |
 | `js/sort.js` | Sorting a tab in edit mode (custom order, A–Z, Z–A by name), saved per tab on the PC; the custom order is never changed by it |

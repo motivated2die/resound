@@ -24,12 +24,12 @@ const persistence = (() => {
     const CUSTOM_SORT = ''; // the PC's value for a tab in its custom order
 
     // fullscreen is only stored once chosen; until then the device decides
-    // (fullscreen.js).
+    // (fullscreen.js). So is topBarLayout, whose absence also means the first
+    // time in fullscreen will ask for it (top-bar.js).
     const getDefaultSettings = () => ({
         version: CURRENT_VERSION,
         keepScreenOn: true,
         haptics: true,
-        swapButtonPosition: false,
         // Mirror of the PC's data (also cached here for a fast first paint).
         soundSettings: {}, // key: sound ID (string) -> { color, emoji, favorite, hasCustomVolume, volumeDown }
         tabLayouts: {},    // key: tab ID (string) | 'favorites' -> { currentLayoutMode, sortMode }
@@ -63,6 +63,9 @@ const persistence = (() => {
             // so only false was a choice. Without it the device decides.
             if (settings.autoFullscreenEnabled === false && settings.fullscreen === undefined) settings.fullscreen = false;
             delete settings.autoFullscreenEnabled;
+            // The earlier "Menu Buttons on the Left" switch: on was a choice.
+            if (settings.swapButtonPosition === true && settings.topBarLayout === undefined) settings.topBarLayout = 'left';
+            delete settings.swapButtonPosition;
             return settings;
         }
         // First start after the update: keep this phone's device preferences.
@@ -70,7 +73,7 @@ const persistence = (() => {
             const old = readJSON(key);
             if (old && typeof old === 'object') {
                 if (old.autoFullscreenEnabled === false) defaults.fullscreen = false;
-                if (typeof old.swapButtonPosition === 'boolean') defaults.swapButtonPosition = old.swapButtonPosition;
+                if (old.swapButtonPosition === true) defaults.topBarLayout = 'left';
                 break;
             }
         }

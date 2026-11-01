@@ -39,10 +39,10 @@ The settings open as a sheet from the bottom, or, on a PC, a tablet or a phone t
 In edit mode:
 
 - the layout button at the top switches this tab between 3 columns, 2 columns and a list (one line per sound, in its color, with the emoji before the name);
-- the sort button, left of it, switches this tab between your **custom order**, **A–Z** and **Z–A** by name;
+- the sort button, next to it, switches this tab between your **custom order**, **A–Z** and **Z–A** by name;
 - in the custom order, drag buttons to put them where you want them. New sounds are added at the end.
 
-The top bar briefly shows what you switched to. Each tab keeps its own layout and sorting, on all your devices. Sorting by name never changes your custom order: switch back to it, and your buttons are where you left them. A tab sorted by name can't be rearranged by dragging.
+The top bar briefly shows what you switched to (with its buttons split, just below the bar). Each tab keeps its own layout and sorting, on all your devices. Sorting by name never changes your custom order: switch back to it, and your buttons are where you left them. A tab sorted by name can't be rearranged by dragging.
 
 Tap ✅ to leave edit mode.
 
@@ -55,7 +55,7 @@ The gear at the top opens the app's settings:
 | Keep Screen On | The screen doesn't turn off while the app is open (on by default) |
 | Fullscreen | Hides the browser's bars with your next tap (on by default on phones and tablets, off on computers); the installed app is fullscreen anyway |
 | Vibrate on Tap | A short vibration on play and stop (Android) |
-| Menu Buttons on the Left | Moves the top bar's buttons to the left |
+| Top Bar Buttons | Where the top bar's buttons stand, to keep them clear of your phone's camera: **Left** (the row mirrored), **Split** (on both sides, with the middle free, for a camera in the middle) or **Right**. On Android, the first time in fullscreen also asks with small pictures of each |
 | Reset | Page colours, Page layout, or All colours and layouts. Hold until it fills, then tap to confirm. Applies to all devices |
 | PC | **Switch PC**, **Tour** (a short walk through the app, also offered from the ? at the top on first start), **Install the app** |
 

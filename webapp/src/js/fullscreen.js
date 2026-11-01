@@ -86,7 +86,14 @@ const fullscreenManager = (() => {
         document.addEventListener('pointerdown', handleInteraction, { capture: true, passive: true });
     };
 
-    const publicInterface = { init, reset, setEnabled, isEnabled: () => isEnabled };
+    // The page fills the screen now: by the setting, or as the installed app.
+    const isFullscreen = () => !!(document.fullscreenElement || document.webkitFullscreenElement)
+        || window.matchMedia('(display-mode: fullscreen)').matches;
+
+    // The next tap will take the page to fullscreen.
+    const willEnter = () => active && isEnabled && !isFullscreen();
+
+    const publicInterface = { init, reset, setEnabled, isEnabled: () => isEnabled, isFullscreen, willEnter };
     window.fullscreenManager = publicInterface;
     return publicInterface;
 })();

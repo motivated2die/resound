@@ -248,8 +248,6 @@ body {
   color: rgba(255, 255, 255, 0.8);
   margin-right: 10px;
   /* Space before buttons */
-  order: 1;
-  /* Default order (before buttons) */
 }
 
 /* --- Icons ---
@@ -316,46 +314,25 @@ body {
   display: none;
 }
 
-/* Placeholder - Takes up space on the opposite side of buttons */
-.top-bar .top-bar-placeholder {
-  flex-grow: 1;
-  /* Take up remaining space */
-  order: 0;
-  /* Default order (left side) */
-}
-
-/* Top Bar Action Buttons - Default right alignment */
-.top-bar .action-buttons {
+/* The bar's two sides, which hold the buttons (top-bar.js). The install pill
+   (install.js) and the mode's name stand between them, centred on the screen:
+   the sides grow alike (flex-basis 0), so those stay in the middle until the
+   buttons need more than half the bar, then move aside. The buttons never
+   shrink below their own width. */
+.top-bar-side {
   display: flex;
   align-items: center;
   gap: 7px;
-  flex-shrink: 0;
-  height: 100%;
-  order: 2;
-  /* Default order (right side) */
-}
-
-/* The install pill (install.js), centred on the screen: the space before it
-   and the buttons after it grow alike (flex-basis 0), so it stays in the
-   middle until the buttons need more than half the bar, then moves aside.
-   The buttons never shrink below their own width. */
-.top-bar .top-bar-placeholder,
-.top-bar .action-buttons {
   flex: 1 1 0;
-  min-width: 0;
+  min-width: max-content;
+  height: 100%;
 }
 
-.top-bar .action-buttons {
-  min-width: max-content;
+#top-bar-end {
   justify-content: flex-end;
 }
 
-.top-bar.buttons-left .action-buttons {
-  justify-content: flex-start;
-}
-
 .install-pill {
-  order: 1;
   flex-shrink: 0;
   margin: 0 8px;
   display: inline-flex;
@@ -390,36 +367,47 @@ body {
   display: none;
 }
 
-/* --- NEW: Left Alignment Styles --- */
-.top-bar.buttons-left .top-bar-placeholder {
-  order: 2;
-  /* Placeholder moves to the right */
-}
-
-.top-bar.buttons-left .search-mode-info,
-.top-bar.buttons-left .edit-mode-info {
-  order: 1;
-  /* Edit info stays before buttons */
+/* Buttons on the left: the mode's name after them. */
+.top-bar[data-layout="left"] .search-mode-info,
+.top-bar[data-layout="left"] .edit-mode-info {
   margin-right: 0;
-  /* Remove right margin */
   margin-left: 10px;
-  /* Add left margin */
 }
 
-.top-bar.buttons-left .action-buttons {
-  order: 0;
-  /* Buttons move to the left */
+/* Split: the bar's middle belongs to the camera, so nothing stands there. The
+   install pill is a round button after the left side's. The mode's name goes:
+   the bar's colour and the ✓ say edit mode, the search field says search. What
+   a button just switched to (editMode.flash) shows just below the bar. */
+.top-bar[data-layout="split"] #top-bar-start {
+  flex: 0 0 auto;
 }
 
-/* Adjust play indicator position when buttons are left */
-.top-bar.buttons-left .play-indicator {
-  left: auto;
-  /* Remove fixed left */
-  right: 10px;
-  /* Position on the right */
+.top-bar[data-layout="split"] .install-pill {
+  justify-content: center;
+  width: 28px;
+  margin: 0 0 0 9px;
+  padding: 0;
 }
 
-/* --- END Left Alignment Styles --- */
+.top-bar[data-layout="split"] .install-pill span:not(.icon),
+.top-bar[data-layout="split"] .search-mode-info,
+.top-bar[data-layout="split"] .edit-mode-info:not(.flashing) {
+  display: none;
+}
+
+.top-bar[data-layout="split"] .edit-mode-info.flashing {
+  position: fixed;
+  top: calc(var(--top-chrome) + 6px);
+  left: 50%;
+  transform: translateX(-50%);
+  margin: 0;
+  padding: 3px 10px;
+  border-radius: 12px;
+  background-color: var(--edit-mode-color);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+  white-space: nowrap;
+  pointer-events: none;
+}
 
 /* 32 px to tap, but the circle is drawn 28 px: the height of the install
    pill (the background stays inside the padding, so it stays round). */
@@ -1782,6 +1770,167 @@ body.search-mode .sounds-grid {
   font-weight: 600;
 }
 
+/* --- The top bar's first-run sheet (top-bar.js) ---
+   Below the top bar, not above it as other sheets are: the real bar stays lit,
+   and follows the choice, beside the phone's camera. */
+.top-bar-setup {
+  z-index: 105;
+}
+
+.top-bar-setup .install-card {
+  max-height: calc(100dvh - var(--top-chrome) - 8px);
+  padding-top: 20px;
+  gap: 14px;
+  outline: none; /* focused to bring keyboards and screen readers here */
+}
+
+/* Its longer label on one line. */
+.top-bar-setup .install-actions .action-button.top-bar-setup-tour-start {
+  flex: 1.7;
+  padding: 0 8px;
+  white-space: nowrap;
+}
+
+.top-bar-setup h2 {
+  font-size: 1.25rem;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.top-bar-setup p {
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+}
+
+.top-bar-options {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+
+.top-bar-option {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 0;
+  padding: 10px 6px;
+  border: 2px solid var(--v-secondary-base);
+  border-radius: 12px;
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+  line-height: 1.25;
+  text-align: center;
+  cursor: pointer;
+  transition: border-color var(--transition-speed) ease, background-color var(--transition-speed) ease;
+}
+
+.top-bar-option input,
+.segmented input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.top-bar-option strong {
+  margin-top: 8px;
+  color: var(--text-primary);
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.top-bar-option:has(input:checked) {
+  border-color: var(--v-primary-base);
+  background-color: rgba(var(--accent-rgb), 0.1);
+}
+
+.top-bar-option:has(input:focus-visible),
+.segmented label:has(input:focus-visible) {
+  outline: 2px solid var(--text-primary);
+  outline-offset: 2px;
+}
+
+/* A small phone's top: the bar with the buttons that are always there, the
+   camera in the bar's strip, and the start of the grid. */
+.mini-phone {
+  position: relative;
+  display: block;
+  width: 100%;
+  max-width: 104px;
+  height: 58px;
+  overflow: hidden;
+  border: 2px solid var(--text-secondary);
+  border-bottom: 0;
+  border-radius: 10px 10px 0 0;
+  background-color: var(--v-background-dark);
+}
+
+.mini-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  height: 18px;
+  padding: 0 4px;
+  background-color: var(--v-secondary-base);
+  color: var(--text-primary);
+}
+
+.mini-bar > span {
+  display: flex;
+  gap: 2px;
+}
+
+.mini-bar .icon {
+  font-size: 10px;
+}
+
+.mini-camera {
+  position: absolute;
+  z-index: 1;
+  top: 5px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background-color: #000;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.45);
+}
+
+.mini-phone[data-camera="left"] .mini-camera { left: 7px; }
+.mini-phone[data-camera="middle"] .mini-camera { left: calc(50% - 4px); }
+.mini-phone[data-camera="right"] .mini-camera { right: 7px; }
+
+.mini-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 3px;
+  padding: 4px 5px;
+}
+
+.mini-grid i {
+  height: 12px;
+  border-radius: 2px;
+  background-color: var(--v-secondary-darken1);
+}
+
+.top-bar-setup .top-bar-setup-tour {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--text-primary);
+}
+
+.top-bar-setup-tour .icon {
+  color: var(--v-primary-base);
+  font-size: 20px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .top-bar-setup .install-card,
+  .top-bar-setup .install-backdrop {
+    transition: none;
+  }
+}
+
 /* The sound's button, floating above the sheet as a live preview
    (sound-settings.js). The stage carries the page's grid layout, so the copy
    looks like the card in the grid; its card is placed by transform. */
@@ -2491,6 +2640,45 @@ emoji-picker section#favorites {
 /* Add gap for icons in horizontal buttons too */
 #app-settings-modal .modal-actions.horizontal .action-button {
   gap: 8px;
+}
+
+/* Settings → Top Bar Buttons: one choice of three, in an outlined group. */
+.top-bar-layout-setting {
+  padding: 8px 0 4px;
+  color: var(--text-primary);
+  font-size: 0.9rem;
+}
+
+.segmented {
+  display: flex;
+  gap: 2px;
+  margin-top: 8px;
+  padding: 2px;
+  border: 1px solid var(--v-secondary-base);
+  border-radius: 10px;
+}
+
+.segmented label {
+  position: relative;
+  flex: 1;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.segmented span {
+  display: block;
+  padding: 8px 4px;
+  border-radius: 8px;
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+  text-align: center;
+  transition: background-color var(--transition-speed) ease;
+}
+
+.segmented input:checked + span {
+  background-color: var(--v-primary-base);
+  color: var(--on-primary);
+  font-weight: 600;
 }
 
 /* Toggle Switch Styles */

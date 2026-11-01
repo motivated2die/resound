@@ -4,7 +4,9 @@
 // Until the tour was started once (localStorage tutorialCompleted), the help
 // button shows in the top bar, and shortly after the app has loaded a callout
 // below it offers the tour: Start tour, or Later (asks again next time the
-// app is opened; the help button stays).
+// app is opened; the help button stays). Where the first time in fullscreen
+// asks for the top bar's layout, that sheet makes the offer instead, so the two
+// don't compete (top-bar.js).
 //
 // Each step says what is open for it: search, edit mode, the sound sheet
 // (tourStep), and entering the step sets that, so Next and Previous both
@@ -109,6 +111,7 @@ const tourCallout = (() => {
         el.remove();
         el = null;
         window.removeEventListener('resize', place);
+        document.removeEventListener('topBarLayoutChanged', place);
         document.removeEventListener('keydown', onKey);
     };
 
@@ -117,10 +120,15 @@ const tourCallout = (() => {
         hide();
     };
 
+    // The tour is still to be offered: not taken, and not put off for now.
+    const wanted = () => {
+        if (tourDone() || isTutorialRunning) return false;
+        try { return !sessionStorage.getItem(TOUR_LATER_KEY); } catch (e) { return true; }
+    };
+
     const show = () => {
         anchor = document.getElementById('tutorial-help-button');
-        if (el || !anchor || anchor.classList.contains('hidden') || tourDone() || isTutorialRunning) return;
-        try { if (sessionStorage.getItem(TOUR_LATER_KEY)) return; } catch (e) { /* show it */ }
+        if (el || !anchor || anchor.classList.contains('hidden') || !wanted()) return;
         // Not over the connection help, a search or edit mode.
         if (state.searching || (typeof editMode !== 'undefined' && editMode.isActive())) return;
         if (document.getElementById('connection-help')?.hidden === false) return;
@@ -144,10 +152,11 @@ const tourCallout = (() => {
         document.body.append(el);
         place();
         window.addEventListener('resize', place);
+        document.addEventListener('topBarLayoutChanged', place);
         document.addEventListener('keydown', onKey);
     };
 
-    return { show, hide };
+    return { show, hide, later, wanted };
 })();
 
 // --- Starting -----------------------------------------------------------------
@@ -162,8 +171,11 @@ function initializeTutorialTrigger() {
     }
     startTutorialButton?.addEventListener('click', handleStartTutorialClick);
 
-    // The callout, once the board is there; it steps aside for edit mode.
-    document.addEventListener('appReady', () => setTimeout(tourCallout.show, 1500), { once: true });
+    // The callout, once the board is there, unless the top bar's sheet brings
+    // the offer; it steps aside for edit mode.
+    document.addEventListener('appReady', () => setTimeout(() => {
+        if (!topBarSetup.pending()) tourCallout.show();
+    }, 1500), { once: true });
     document.addEventListener('editModeChanged', () => tourCallout.hide());
 }
 
@@ -259,7 +271,10 @@ const tourStep = ({ edit = false, sheet = false, search = false, element, ...ste
 // On the whole grid: in the middle, clear of the tab bar (styles.css).
 const MIDDLE = 'soundux-driver-popover tour-popover-middle';
 
-const tourSteps = () => [
+const tourSteps = () => {
+    // The buttons mirror when they are on the left (top-bar.js).
+    const mirrored = topBarLayout.current() === 'left';
+    return [
     tourStep({
         popover: { title: 'Welcome to Resound', description: 'Here\'s a quick tour of your soundboard and the tricks that make it yours. It takes about a minute.' },
     }),
@@ -292,7 +307,7 @@ const tourSteps = () => [
     tourStep({
         edit: true,
         element: ['#sort-mode-button', '#layout-mode-button'],
-        popover: { title: 'Sorting and layout', description: '<b>Sorting</b> (left) sorts this tab A–Z or Z–A, or back to your own order, which is always kept. <b>Layout</b> (right) switches between 3 columns, 2 columns and a list.', side: 'bottom', align: 'center' },
+        popover: { title: 'Sorting and layout', description: `<b>Sorting</b> (${mirrored ? 'right' : 'left'}) sorts this tab A–Z or Z–A, or back to your own order, which is always kept. <b>Layout</b> (${mirrored ? 'left' : 'right'}) switches between 3 columns, 2 columns and a list.`, side: 'bottom', align: 'center' },
     }),
     tourStep({
         edit: true,
@@ -312,9 +327,10 @@ const tourSteps = () => [
     tourStep({
         edit: true,
         element: '#edit-mode-button',
-        popover: { title: 'You\'re all set', description: 'You\'re still in edit mode, so go ahead and try things out. Tap <b>✓</b> to leave it. The tour is under Settings → <b>Tour</b> whenever you want it again.', side: 'bottom', align: 'end' },
+        popover: { title: 'You\'re all set', description: 'You\'re still in edit mode, so go ahead and try things out. Tap <b>✓</b> to leave it. The tour is under Settings → <b>Tour</b> whenever you want it again.', side: 'bottom', align: mirrored ? 'start' : 'end' },
     }),
-];
+    ];
+};
 
 function startTour() {
     if (isTutorialRunning || document.documentElement.classList.contains('driver-active')) return;
