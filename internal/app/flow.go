@@ -205,8 +205,8 @@ func (a *App) routeKey() string {
 	if st.Mic != nil {
 		mic = fmt.Sprintf("%s/%v", st.Mic.ID, st.Mic.Muted)
 	}
-	return fmt.Sprintf("%v|%v|%s|%d|%v|%v|%v", st.CableInstalled(), st.MicRouted, mic, len(st.Inputs), a.routeErr != nil,
-		st.Voicemeeter, a.appsMic() != nil)
+	return fmt.Sprintf("%v|%v|%s|%d|%v|%v|%v|%v", st.CableInstalled(), st.MicRouted, mic, len(st.Inputs), a.routeErr != nil,
+		st.Voicemeeter, a.appsMic() != nil, st.CableRatesDiffer())
 }
 
 // --- the animation ticker ------------------------------------------------------------
@@ -673,7 +673,7 @@ func (a *App) cableLine() ui.Pipe {
 			Tip: "VB-Cable is being installed. Please confirm the Windows prompts."}}
 	case a.cable.state == cableRestart:
 		return ui.Pipe{State: ui.PipeBroken, Badge: &ui.Badge{Icon: ui.IconAlert, Label: "Restart needed", Tone: ui.ToneWarning,
-			Tip: "VB-Cable is installed. Restart your PC to finish; Resound reopens afterwards.", OnClick: a.flowFix(func() {})}}
+			Tip: "Restart your PC to finish setting up VB-Cable; Resound reopens afterwards.", OnClick: a.flowFix(func() {})}}
 	case a.ownRouting() && a.appsMic() == nil:
 		return ui.Pipe{State: ui.PipeBroken, Badge: &ui.Badge{Icon: ui.IconAlert, Label: "Choose output", Tone: ui.ToneWarning,
 			Tip:     "Choose the device your mixer sends your voice and sounds to (e.g. Voicemeeter Out B1), under Advanced in Settings → Audio & voice chat.",

@@ -36,6 +36,33 @@ func TestVerifySignerRejectsOthers(t *testing.T) {
 	}
 }
 
+// ReadDriver only reads, so it runs on every PC: with VB-Cable's device or
+// without one, it must not fail.
+func TestReadDriver(t *testing.T) {
+	d, err := ReadDriver()
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Logf("%+v", d)
+	if d.Present && d.Instance == "" {
+		t.Error("a device without an ID")
+	}
+}
+
+// The wake restarts the cable's own device and never Windows' audio.
+func TestWakeSteps(t *testing.T) {
+	steps := wakeSteps(`ROOT\MEDIA\0003`)
+	last := steps[len(steps)-1]
+	if last[0] != "/restart-device" || last[1] != `ROOT\MEDIA\0003` {
+		t.Errorf("last step %q", last)
+	}
+	for _, s := range steps {
+		if s[0] != "/scan-devices" && s[0] != "/restart-device" {
+			t.Errorf("unexpected step %q", s)
+		}
+	}
+}
+
 // TestDownload fetches the real pack (no install): VBCABLE_DOWNLOAD=1.
 func TestDownload(t *testing.T) {
 	if os.Getenv("VBCABLE_DOWNLOAD") != "1" {

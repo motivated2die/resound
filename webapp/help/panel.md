@@ -41,7 +41,7 @@ Markers on the lines show what's going on. Hover over one to see why, click it t
 |---|---|
 | **Not routed** | Your voice doesn't reach the cable. Click it to turn on Listen to this device |
 | **VB-Cable missing** | Voice chat needs VB-Cable. Click it to install it |
-| **Restart needed** | VB-Cable is installed; restart your PC to finish |
+| **Restart needed** | Windows needs a restart to finish setting up VB-Cable |
 | **Muted for sounds** | On purpose: Resound mutes your mic while a long sound plays, see [mic mute](push-to-talk.md#mute-your-microphone-while-sounds-play) |
 | **Muted** | Your microphone is muted in Windows or on your headset |
 | **Holding …** | Resound holds your push-to-talk key while sounds play |

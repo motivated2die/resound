@@ -27,6 +27,10 @@ const (
 	// ARM64), linked from vb-audio.com/Cable.
 	PackURL = "https://download.vb-audio.com/Download_CABLE/VBCABLE_Driver_Pack45.zip"
 
+	// pageURL is the official page that links the current driver pack.
+	pageURL      = "https://vb-audio.com/Cable/"
+	maxPageBytes = 2 << 20
+
 	// SetupArgs install silently (-i -h). Windows still shows its own
 	// prompts: UAC, and on some PCs "Install this device software?".
 	SetupArgs = "-i -h"
@@ -58,18 +62,60 @@ func setupExe() string {
 func Dir(dataDir string) string { return filepath.Join(dataDir, "vbcable") }
 
 // Download fetches the driver pack into dir, unpacks it and checks the
-// setup's signature. It returns the setup's path. progress (may be nil) is
-// called from this goroutine with the bytes received and the total (-1 when
-// unknown).
+// setup's signature. It returns the setup's path. A newer pack linked on
+// VB-Audio's page is tried first and must pass the same checks; if anything
+// goes wrong with it, the known pack is used. progress (may be nil) is called
+// from this goroutine with the bytes received and the total (-1 when unknown).
 func Download(ctx context.Context, dir string, progress func(done, total int64)) (string, error) {
+	if newer := findNewerPack(ctx); newer != "" {
+		setup, err := downloadPack(ctx, newer, dir, progress)
+		if err == nil {
+			return setup, nil
+		}
+		logx.Printf("vbcable: %s: %v; using the known pack", newer, err)
+		if ctx.Err() != nil {
+			return "", ctx.Err()
+		}
+	}
+	return downloadPack(ctx, PackURL, dir, progress)
+}
+
+// findNewerPack looks for a newer pack on VB-Audio's page. "" when there is
+// none or the page can't be read: the known pack still works then.
+func findNewerPack(ctx context.Context) string {
+	ctx, cancel := context.WithTimeout(ctx, 15*time.Second)
+	defer cancel()
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, pageURL, nil)
+	if err != nil {
+		return ""
+	}
+	resp, err := vbAudioClient().Do(req)
+	if err != nil {
+		logx.Printf("vbcable: reading %s: %v", pageURL, err)
+		return ""
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		logx.Printf("vbcable: reading %s: %s", pageURL, resp.Status)
+		return ""
+	}
+	page, err := io.ReadAll(io.LimitReader(resp.Body, maxPageBytes))
+	if err != nil {
+		logx.Printf("vbcable: reading %s: %v", pageURL, err)
+		return ""
+	}
+	return newestPack(string(page))
+}
+
+func downloadPack(ctx context.Context, packURL, dir string, progress func(done, total int64)) (string, error) {
 	if err := os.RemoveAll(dir); err != nil {
 		return "", fmt.Errorf("clearing %s: %w", dir, err)
 	}
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return "", err
 	}
-	zipPath := filepath.Join(dir, filepath.Base(PackURL))
-	if err := fetch(ctx, PackURL, zipPath, progress); err != nil {
+	zipPath := filepath.Join(dir, filepath.Base(packURL))
+	if err := fetch(ctx, packURL, zipPath, progress); err != nil {
 		return "", err
 	}
 	pack := filepath.Join(dir, "pack")
@@ -88,10 +134,9 @@ func Download(ctx context.Context, dir string, progress func(done, total int64))
 	return setup, nil
 }
 
-// fetch downloads u to path over HTTPS, following redirects only within
-// vb-audio.com.
-func fetch(ctx context.Context, u, path string, progress func(done, total int64)) error {
-	client := &http.Client{
+// vbAudioClient follows redirects only within vb-audio.com.
+func vbAudioClient() *http.Client {
+	return &http.Client{
 		Timeout: 5 * time.Minute,
 		CheckRedirect: func(req *http.Request, via []*http.Request) error {
 			if len(via) >= 5 {
@@ -103,11 +148,15 @@ func fetch(ctx context.Context, u, path string, progress func(done, total int64)
 			return nil
 		},
 	}
+}
+
+// fetch downloads u to path over HTTPS.
+func fetch(ctx context.Context, u, path string, progress func(done, total int64)) error {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
 	if err != nil {
 		return err
 	}
-	resp, err := client.Do(req)
+	resp, err := vbAudioClient().Do(req)
 	if err != nil {
 		return fmt.Errorf("downloading VB-CABLE: %w", err)
 	}

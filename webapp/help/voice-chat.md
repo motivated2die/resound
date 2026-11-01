@@ -17,11 +17,16 @@ Click **Install VB-Cable**. Resound downloads VB-Audio's original package, check
 
 If the automatic install fails, choose **Install manually**: it opens VB-Audio's website. Unzip the download, right-click `VBCABLE_Setup_x64.exe`, choose **Run as administrator** and click **Install Driver**. Then click **Check again** in Resound.
 
-## Restart your PC
+## Usually no restart
 
-VB-Cable is ready after a restart. Resound shows “Restart your PC to finish” with a **Restart now** button: save your work first, then confirm. After you sign in again, Resound starts by itself and continues where you left off.
+When the setup ends, Resound sends a short, quiet test tone through the cable. You don't hear it. If it comes through, VB-Cable is ready and you can go on.
 
-If the cable already shows up before the restart, Resound also offers **Not now**. VB-Audio still recommends restarting.
+## If Windows needs a restart
+
+Otherwise Resound asks you to restart, with a **Restart now** button: save your work first, then confirm. After you sign in again, Resound starts by itself and continues where you left off.
+
+- **Try without restart** appears while Windows is still waiting to start the driver. It restarts only VB-Cable's device, after your approval; your other sound keeps playing. If it doesn't help, restart your PC.
+- **Not now** appears if the cable is there but the test couldn't confirm it works. Restart if your sounds don't reach others.
 
 :::note Your speakers stay your speakers
 Windows sometimes makes VB-Cable the default playback or recording device when it is installed, and suddenly you hear nothing. Resound puts your previous default devices back afterwards.

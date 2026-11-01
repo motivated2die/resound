@@ -48,10 +48,41 @@ type Status struct {
 	// Voicemeeter is true when Voicemeeter's virtual devices are present,
 	// i.e. the mixer is installed. Its own settings are never read.
 	Voicemeeter bool
+	// CableInputRate and CableOutputRate are the sample rates set for the
+	// cable's two ends in Windows, 0 = unknown.
+	CableInputRate, CableOutputRate int
 }
+
+// CableRate is VB-Cable's internal rate by default: at this rate on both
+// ends, audio passes through it without conversion.
+const CableRate = 48000
 
 // CableInstalled reports whether both ends of VB-Cable were found.
 func (s Status) CableInstalled() bool { return s.CableInput != nil && s.CableOutput != nil }
+
+// CableRatesDiffer reports whether the cable's ends run at different sample
+// rates, which Windows can cause by itself. Two equal rates are left alone,
+// whatever they are: a user may have set VB-Cable's internal rate on purpose.
+func (s Status) CableRatesDiffer() bool {
+	return s.CableInstalled() && s.CableInputRate != 0 && s.CableOutputRate != 0 && s.CableInputRate != s.CableOutputRate
+}
+
+// SetCableRates puts both ends of the cable on CableRate. Streams open on
+// them fail and have to be opened again. No admin rights needed.
+func SetCableRates(s Status) error {
+	if !s.CableInstalled() {
+		return errors.New("VB-Cable isn't installed")
+	}
+	return wincom.Run(func() error {
+		if err := wincom.SetDeviceRate(s.CableInput.ID, CableRate); err != nil {
+			return fmt.Errorf("%s: %w", s.CableInput.Name, err)
+		}
+		if err := wincom.SetDeviceRate(s.CableOutput.ID, CableRate); err != nil {
+			return fmt.Errorf("%s: %w", s.CableOutput.Name, err)
+		}
+		return nil
+	})
+}
 
 // IsCableName matches VB-Cable's main pair ("CABLE Input"/"CABLE Output",
 // "(VB-Audio Virtual Cable)"), not the 16-channel or A/B variants.
@@ -104,6 +135,12 @@ func Check(micID, appsMicID string) (Status, error) {
 				dev.Release()
 			}
 			st.Inputs = append(st.Inputs, in)
+			if st.CableOutputRate == 0 && strings.HasPrefix(strings.ToLower(ep.Name), "cable output") {
+				st.CableOutputRate, _ = wincom.DeviceRate(ep.ID)
+			}
+		}
+		if st.CableInput != nil {
+			st.CableInputRate, _ = wincom.DeviceRate(st.CableInput.ID)
 		}
 		return nil
 	})

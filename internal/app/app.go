@@ -22,6 +22,7 @@ import (
 	"github.com/motivated2die/resound/internal/routing"
 	"github.com/motivated2die/resound/internal/server"
 	"github.com/motivated2die/resound/internal/ui"
+	"github.com/motivated2die/resound/internal/vbcable"
 )
 
 // Version is set at build time with -ldflags "-X .../internal/app.Version=...".
@@ -84,6 +85,10 @@ type App struct {
 	routeErr error
 	busy     string // non-empty while waiting for the elevated helper
 	cable    cableInstall
+	// What Windows says about VB-Cable (syncCableHealth), and that a restart
+	// didn't help, so it isn't asked for again.
+	cableHealth vbcable.Health
+	cableStuck  bool
 
 	playback   playbackState
 	ptt        pttState
@@ -166,6 +171,8 @@ func Run() int {
 		switch args[0] {
 		case routing.ApplyCommand: // elevated
 			return routing.RunApplyCommand(args[1:])
+		case vbcable.WakeCommand: // elevated
+			return vbcable.RunWakeCommand()
 		case install.FirewallCommand: // elevated
 			return install.RunFirewallCommand()
 		case install.UninstallCommand:
@@ -266,6 +273,7 @@ func Run() int {
 	logx.Printf("startup: checking routing")
 	a.refreshRouting(true)
 	cableTitle, cableNote, cableConfirm := a.resumeCableInstall()
+	a.syncCableHealth()
 	logx.Printf("startup: opening outputs")
 	a.applyVolumes()
 	a.openOutputs()
@@ -312,6 +320,7 @@ func (a *App) onPanelOpen() {
 	}
 	a.refreshDevices(false)
 	a.refreshRouting(false)
+	a.syncCableHealth()
 	a.addresses = server.LocalAddresses()
 	a.wasPlaying = len(a.engine.Voices()) > 0
 	a.render()
