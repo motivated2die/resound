@@ -9,7 +9,7 @@
 // VB-Audio product and can donate; the app shows both. The package is never
 // bundled or modified: it comes straight from VB-Audio's server.
 //
-// A driver install needs a Windows restart to finish. Pending records an
+// A driver install may need a Windows restart to finish. Pending records an
 // install across that restart, so the app can continue its setup.
 package vbcable
 
@@ -44,6 +44,9 @@ type Pending struct {
 	ReturnTo   string    `json:"returnTo"`
 	WizardStep int       `json:"wizardStep,omitempty"`
 	Defaults   Defaults  `json:"defaults"`
+	// Detected: Resound didn't install anything, it found the cable waiting
+	// for a restart. The restart then needs no page or notice.
+	Detected bool `json:"detected,omitempty"`
 }
 
 // Rebooted reports whether Windows has restarted since the install, given

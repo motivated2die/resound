@@ -172,7 +172,6 @@ func (a *App) wizardAudio() []ui.Row {
 				"can break that setup. Click to check first, or to use Voicemeeter instead.",
 			func() { a.openHelpAt(helpBeforeVBCable) }))
 	}
-	rows = append(rows, a.cableNoteRows()...)
 	rows = append(rows, a.flowRows()...)
 	if a.ownRouting() {
 		rows = append(rows, a.cableOutputHint()...)
@@ -180,6 +179,8 @@ func (a *App) wizardAudio() []ui.Row {
 		rows = append(rows, ui.Section("Install VB-Cable"))
 		rows = append(rows, a.cableInstallRows()...)
 	} else {
+		rows = append(rows, a.cableNoteRows()...)
+		rows = append(rows, a.cableRateRows()...)
 		rows = append(rows, a.connectRows()...)
 		rows = append(rows, a.cableOutputHint()...)
 	}

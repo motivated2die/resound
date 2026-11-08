@@ -5,8 +5,10 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"strings"
 	"time"
 
+	"github.com/motivated2die/resound/internal/audio"
 	"github.com/motivated2die/resound/internal/config"
 	"github.com/motivated2die/resound/internal/install"
 	"github.com/motivated2die/resound/internal/logx"
@@ -17,9 +19,11 @@ import (
 
 // Installing VB-Cable for the user (see package vbcable): download the
 // official pack, run its setup silently with administrator approval, put
-// back default devices Windows moved to the cable, then offer the restart
-// the driver needs. A RunOnce entry and the pending-install file bring the
-// app back after the restart, on the page the install started from.
+// back default devices Windows moved to the cable, then test the cable with a
+// quiet tone. If the tone comes through, it's done. If not, the panel offers
+// the restart the driver may need, and, while the device itself waits, a try
+// without one. A RunOnce entry and the pending-install file bring the app back
+// after the restart, on the page the install started from.
 
 const vbDonateURL = "https://vb-audio.com/Services/licensing.htm"
 
@@ -29,8 +33,9 @@ const (
 	cableIdle        cableState = iota
 	cableDownloading            // fetching and checking the driver pack
 	cableInstalling             // the setup runs (UAC and driver prompts)
-	cableChecking               // waiting for the devices to appear
-	cableRestart                // installed; a restart is needed or recommended
+	cableChecking               // waiting for the devices to appear, testing the cable
+	cableWaking                 // restarting the cable's device (UAC prompt)
+	cableRestart                // a restart is needed or recommended
 )
 
 type cableInstall struct {
@@ -39,16 +44,24 @@ type cableInstall struct {
 	err     string // why the last attempt failed, shown with the manual way
 	note    string // what the install did, e.g. restored default devices
 	confirm bool   // the restart confirmation is shown
-	cancel  context.CancelFunc
+	// detected: nothing was installed from here, the cable was found waiting
+	// for a restart. wakeFailed: restarting the device didn't help.
+	detected, wakeFailed bool
+	cancel               context.CancelFunc
 }
 
 func (c cableInstall) busy() bool {
-	return c.state == cableDownloading || c.state == cableInstalling || c.state == cableChecking
+	return c.state == cableDownloading || c.state == cableInstalling || c.state == cableChecking || c.state == cableWaking
 }
 
 // installCable starts the automatic install.
 func (a *App) installCable() {
 	if a.cable.state != cableIdle {
+		return
+	}
+	a.syncCableHealth() // never install over a cable that waits for a restart
+	if a.cable.state != cableIdle {
+		a.render()
 		return
 	}
 	returnTo, step := vbcable.ReturnVoice, 0
@@ -137,19 +150,159 @@ func (a *App) installCable() {
 			time.Sleep(time.Second) // Windows may switch defaults right after the devices appear
 		}
 		restored := restoreDefaults(defaults)
-		a.armResume()
+		a.armResume() // taken back if the cable turns out to work
 		logx.Printf("vbcable: setup done, cable found=%v", found)
-
-		a.tray.Post(func() {
-			a.cable = cableInstall{state: cableRestart, note: restoredNote(restored)}
-			a.refreshDevices(true)
-			a.refreshRouting(true)
-			a.render()
-			if !a.tray.Popup().Visible() { // the UAC prompt took the focus and closed the panel
-				go a.showNotice("VB-Cable is installed", "Restart your PC to finish. Resound reopens afterwards.", "Open panel")
-			}
-		})
+		a.settleCable(found, restored)
 	}()
+}
+
+// settleCable ends an install or wake: with the cable's devices up and a tone
+// coming through, no restart is needed; otherwise the panel offers it. Off the
+// UI thread.
+func (a *App) settleCable(found bool, restored []string) {
+	opened := make(chan string, 1)
+	a.tray.Post(func() {
+		a.refreshDevices(true)
+		a.refreshRouting(true) // opens the automatic cable output
+		a.render()
+		far := ""
+		if a.cableSelected() && a.route.CableOutput != nil {
+			far = a.route.CableOutput.ID
+		}
+		opened <- far
+	})
+	far := <-opened
+	works := found && far != "" && probeCable(a.engine, far)
+	a.tray.Post(func() {
+		note := restoredNote(restored)
+		a.readCableHealth()
+		if works && a.cableHealth == vbcable.HealthReady {
+			a.cableDone(note)
+			return
+		}
+		a.cable = cableInstall{state: cableRestart, note: note}
+		a.render()
+		if !a.tray.Popup().Visible() { // the UAC prompt took the focus and closed the panel
+			go a.showNotice("VB-Cable is installed", "Restart your PC to finish. Resound reopens afterwards.", "Open panel")
+		}
+	})
+}
+
+// probeCable tests the cable with its quiet tone, twice if it stays silent:
+// the driver can take a moment after its devices appear. A test that can't
+// tell doesn't count as working: the restart stays on offer, optional.
+func probeCable(engine *audio.Engine, far string) bool {
+	for try := 0; ; try++ {
+		result, err := engine.ProbeCable(far)
+		logx.Printf("vbcable: test tone: result %d, %v", result, err)
+		switch {
+		case result == audio.ProbePassed:
+			return true
+		case result == audio.ProbeUnknown || try == 1:
+			return false
+		}
+		time.Sleep(2 * time.Second)
+	}
+}
+
+// cableDone finishes without a restart: nothing waits for one any more.
+func (a *App) cableDone(note string) {
+	_ = vbcable.ClearPending(config.Dir())
+	if err := install.SetResumeOnce(false); err != nil {
+		logx.Printf("vbcable: %v", err)
+	}
+	install.UnregisterRestart()
+	logx.Printf("vbcable: working, no restart needed")
+	a.cable = cableInstall{note: strings.TrimSpace("VB-Cable is ready. No restart needed. " + note)}
+	a.render()
+	if !a.tray.Popup().Visible() { // the UAC prompt took the focus and closed the panel
+		go a.showNotice("VB-Cable is ready", "No restart needed. Open the panel to connect voice chat.", "Open panel")
+	}
+}
+
+// wakeCable tries to bring up a cable that waits for a restart by restarting
+// only its own device (Windows asks for approval). Nothing else is touched;
+// if it doesn't help, the restart is still there.
+func (a *App) wakeCable() {
+	if a.cable.state != cableRestart {
+		return
+	}
+	note, detected := a.cable.note, a.cable.detected
+	a.cable = cableInstall{state: cableWaking, note: note, detected: detected}
+	a.render()
+	logx.Printf("vbcable: waking the device")
+	go func() {
+		err := vbcable.Wake()
+		found := err == nil && waitForCable(20*time.Second)
+		if !found {
+			logx.Printf("vbcable: wake: %v, cable found=%v", err, found)
+			a.tray.Post(func() {
+				a.readCableHealth()
+				a.cable = cableInstall{state: cableRestart, note: note, detected: detected,
+					wakeFailed: !errors.Is(err, vbcable.ErrCancelled)}
+				if a.cable.wakeFailed {
+					a.cable.err = "That didn't help. Please restart your PC."
+				}
+				a.render()
+			})
+			return
+		}
+		time.Sleep(time.Second) // Windows may switch defaults right after the devices appear
+		var restored []string
+		if p, ok := vbcable.LoadPending(config.Dir()); ok {
+			restored = restoreDefaults(p.Defaults)
+		}
+		a.settleCable(true, restored)
+	}()
+}
+
+// readCableHealth asks Windows how the cable is.
+func (a *App) readCableHealth() { a.cableHealth = vbcable.CheckHealth(a.route.CableInstalled()) }
+
+// syncCableHealth notices a cable that waits for a restart without an install
+// from here (one installed by hand, or just removed), so the panel says so
+// instead of offering an install over it, and notices when that ended.
+func (a *App) syncCableHealth() {
+	if a.cable.busy() || a.ownRouting() {
+		return
+	}
+	a.readCableHealth()
+	wasDetected := a.cable.detected
+	if !a.applyCableHealth() {
+		return
+	}
+	dataDir := config.Dir()
+	if a.cable.detected {
+		logx.Printf("vbcable: found waiting for a restart (%d)", a.cableHealth)
+		if _, ok := vbcable.LoadPending(dataDir); !ok {
+			if err := vbcable.SavePending(dataDir, vbcable.Pending{Started: time.Now(), BootTime: vbcable.BootTime(), Detected: true}); err != nil {
+				logx.Printf("vbcable: saving the install state: %v", err)
+			}
+		}
+	} else if wasDetected {
+		_ = vbcable.ClearPending(dataDir)
+		_ = install.SetResumeOnce(false)
+	}
+}
+
+// applyCableHealth updates the panel's state from a.cableHealth and reports
+// whether it changed. After a restart that didn't help (cableStuck) a restart
+// is not asked for again: the install is offered, with what went wrong.
+func (a *App) applyCableHealth() bool {
+	waits := a.cableHealth == vbcable.HealthPending || a.cableHealth == vbcable.HealthRemoved
+	switch {
+	case a.cableStuck:
+		if !waits {
+			a.cableStuck = false
+		}
+	case a.cable.state == cableIdle && waits:
+		a.cable = cableInstall{state: cableRestart, detected: true}
+		return true
+	case a.cable.state == cableRestart && a.cable.detected && !waits:
+		a.cable = cableInstall{}
+		return true
+	}
+	return false
 }
 
 func (a *App) cableFailed(err error) {
@@ -163,7 +316,7 @@ func (a *App) cableFailed(err error) {
 // waitForCable polls until both cable devices are active. Off the UI thread.
 func waitForCable(timeout time.Duration) bool {
 	for deadline := time.Now().Add(timeout); ; time.Sleep(time.Second) {
-		if st, err := routing.Check("", ""); err == nil && st.CableInstalled() {
+		if st, err := routing.Check("", ""); err == nil && vbcable.CheckHealth(st.CableInstalled()) == vbcable.HealthReady {
 			return true
 		}
 		if time.Now().After(deadline) {
@@ -257,7 +410,24 @@ func (a *App) resumeCableInstall() (title, msg, confirm string) {
 	if !ok {
 		return "", "", ""
 	}
+	if p.Detected {
+		// Only found here, so nothing to continue and nothing to tell.
+		a.readCableHealth()
+		if !p.Rebooted(vbcable.BootTime()) {
+			a.cable = cableInstall{state: cableRestart, detected: true}
+			return "", "", ""
+		}
+		logx.Printf("vbcable: restarted after finding the cable waiting")
+		_ = vbcable.ClearPending(dataDir)
+		_ = install.SetResumeOnce(false)
+		if a.cableHealth != vbcable.HealthReady && a.cableHealth != vbcable.HealthMissing {
+			a.cableStuck = true
+			a.cable = cableInstall{err: "VB-Cable still isn't working after the restart. Try installing it again."}
+		}
+		return "", "", ""
+	}
 	a.returnTo(p)
+	a.readCableHealth()
 	if !p.Rebooted(vbcable.BootTime()) {
 		// Only the app restarted: Windows still has to.
 		logx.Printf("vbcable: install from %s still waits for a Windows restart", p.Started.Format(time.DateTime))
@@ -279,6 +449,7 @@ func (a *App) resumeCableInstall() (title, msg, confirm string) {
 		a.refreshRouting(true)
 	}
 	if !a.route.CableInstalled() {
+		a.cableStuck = true
 		a.cable = cableInstall{err: "VB-Cable wasn't found. Try again, or install it manually."}
 		return "VB-Cable wasn't found", "The installation didn't finish.", "Open panel"
 	}
@@ -305,7 +476,7 @@ func (a *App) returnTo(p vbcable.Pending) {
 // cableStepInfo is step 1's status text while VB-Cable is missing.
 func (a *App) cableStepInfo() string {
 	switch a.cable.state {
-	case cableDownloading, cableInstalling, cableChecking:
+	case cableDownloading, cableInstalling, cableChecking, cableWaking:
 		return "Installing…"
 	case cableRestart:
 		return "Restart needed"
@@ -317,24 +488,10 @@ func (a *App) cableStepInfo() string {
 // its progress.
 func (a *App) cableInstallRows() []ui.Row {
 	c := a.cable
-	switch c.state {
-	case cableDownloading:
-		pct := ""
-		if c.percent >= 0 {
-			pct = fmt.Sprintf("%d%%", c.percent)
-		}
-		return []ui.Row{
-			ui.Text("Downloading VB-Cable…", pct, ui.ToneWarning),
-			ui.Button("Cancel", ui.ButtonNormal, false, a.cancelCableDownload),
-		}
-	case cableInstalling:
-		return []ui.Row{
-			ui.Text("Installing VB-Cable…", "", ui.ToneWarning),
-			ui.Text("Please confirm the Windows prompts.", "", ui.ToneMuted),
-		}
-	case cableChecking:
-		return []ui.Row{ui.Text("Finishing up…", "", ui.ToneWarning)}
-	case cableRestart:
+	if c.busy() {
+		return a.cableProgressRows()
+	}
+	if c.state == cableRestart {
 		return a.cableRestartRows()
 	}
 	rows := []ui.Row{
@@ -351,14 +508,45 @@ func (a *App) cableInstallRows() []ui.Row {
 	))
 }
 
-// cableRestartRows offer the restart after an install: needed while the
-// cable isn't visible yet, recommended by VB-Audio once it is.
+// cableProgressRows show what the install or wake is doing.
+func (a *App) cableProgressRows() []ui.Row {
+	c := a.cable
+	switch c.state {
+	case cableDownloading:
+		pct := ""
+		if c.percent >= 0 {
+			pct = fmt.Sprintf("%d%%", c.percent)
+		}
+		return []ui.Row{
+			ui.Text("Downloading VB-Cable…", pct, ui.ToneWarning),
+			ui.Button("Cancel", ui.ButtonNormal, false, a.cancelCableDownload),
+		}
+	case cableInstalling:
+		return []ui.Row{
+			ui.Text("Installing VB-Cable…", "", ui.ToneWarning),
+			ui.Text("Please confirm the Windows prompts.", "", ui.ToneMuted),
+		}
+	case cableWaking:
+		return []ui.Row{
+			ui.Text("Starting VB-Cable…", "", ui.ToneWarning),
+			ui.Text("Please confirm the Windows prompt.", "", ui.ToneMuted),
+		}
+	}
+	return []ui.Row{ui.Text("Checking VB-Cable…", "", ui.ToneWarning)}
+}
+
+// cableRestartRows offer the restart: needed while the driver waits for one
+// or was just removed, optional once the cable's devices are up. While the
+// driver's device itself waits, restarting just it may do.
 func (a *App) cableRestartRows() []ui.Row {
 	c := a.cable
-	found := a.route.CableInstalled()
-	text := "Restart your PC to finish. Resound reopens afterwards."
-	if found {
-		text = "VB-Cable is installed. Restart your PC to finish; Resound reopens afterwards."
+	found := a.cableHealth == vbcable.HealthReady
+	text := "Windows needs a restart to finish setting up VB-Cable. Resound reopens afterwards."
+	switch {
+	case found:
+		text = "VB-Cable is installed, but Resound couldn't confirm it works yet. A restart finishes the setup; Resound reopens afterwards."
+	case a.cableHealth == vbcable.HealthRemoved:
+		text = "VB-Cable was removed. Windows needs a restart to finish. Resound reopens afterwards."
 	}
 	rows := []ui.Row{ui.Paragraph(text, ui.ToneWarning)}
 	if c.note != "" {
@@ -376,14 +564,53 @@ func (a *App) cableRestartRows() []ui.Row {
 			))
 	}
 	restart := ui.Action{Label: "Restart now", Icon: ui.IconPower, Style: ui.ButtonPrimary, OnClick: func() { a.cable.confirm = true; a.render() }}
-	if !found {
+	if found {
+		return append(rows, ui.Buttons(restart, ui.Action{Label: "Not now", OnClick: a.skipCableRestart}))
+	}
+	if a.cableHealth != vbcable.HealthPending || c.wakeFailed {
 		return append(rows, ui.Buttons(restart))
 	}
-	return append(rows, ui.Buttons(restart, ui.Action{Label: "Not now", OnClick: a.skipCableRestart}))
+	return append(rows,
+		ui.Buttons(restart, ui.Action{Label: "Try without restart", OnClick: a.wakeCable}),
+		ui.Text("Windows asks for approval before trying.", "", ui.ToneMuted))
+}
+
+// cableRateRows warn while the cable's two ends run at different sample rates.
+func (a *App) cableRateRows() []ui.Row {
+	st := a.route
+	if a.cable.busy() || !st.CableRatesDiffer() {
+		return nil
+	}
+	return []ui.Row{ui.Warning("VB-Cable's sample rates differ: click to fix",
+		fmt.Sprintf("CABLE Input runs at %.1f kHz and CABLE Output at %.1f kHz, so the sound is converted inside the cable. "+
+			"Click to set both to %d kHz. Apps using the cable may reconnect for a moment.",
+			float64(st.CableInputRate)/1000, float64(st.CableOutputRate)/1000, routing.CableRate/1000),
+		a.fixCableRates)}
+}
+
+// fixCableRates puts both ends of the cable on the same rate. Streams on them
+// end when the format changes, so the cable output opens again.
+func (a *App) fixCableRates() {
+	if err := routing.SetCableRates(a.route); err != nil {
+		logx.Printf("vbcable: setting the sample rates: %v", err)
+		a.routeErr = fmt.Errorf("couldn't change VB-Cable's sample rates: %w", err)
+		a.render()
+		return
+	}
+	logx.Printf("vbcable: both ends set to %d Hz", routing.CableRate)
+	a.refreshRouting(true)
+	if a.cableSelected() {
+		a.openCableOutput()
+	}
+	a.closeLevels() // reopened by the flow, as they recorded the old format
+	a.render()
 }
 
 // cableNoteRows show what a finished install did, once VB-Cable works.
 func (a *App) cableNoteRows() []ui.Row {
+	if a.cable.busy() {
+		return a.cableProgressRows()
+	}
 	if a.cable.state == cableRestart {
 		return a.cableRestartRows()
 	}

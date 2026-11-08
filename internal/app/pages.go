@@ -12,6 +12,7 @@ import (
 	"github.com/motivated2die/resound/internal/library"
 	"github.com/motivated2die/resound/internal/logx"
 	"github.com/motivated2die/resound/internal/ui"
+	"github.com/motivated2die/resound/internal/vbcable"
 )
 
 const vbCableURL = "https://vb-audio.com/Cable/"
@@ -288,6 +289,7 @@ func (a *App) audioPage() []ui.Row {
 		rows = append(rows, a.cableInstallRows()...)
 	} else {
 		rows = append(rows, a.cableNoteRows()...)
+		rows = append(rows, a.cableRateRows()...)
 		rows = append(rows, a.connectRows()...)
 		rows = append(rows, a.cableOutputHint()...)
 	}
@@ -421,6 +423,8 @@ func (a *App) connectRows() []ui.Row {
 	switch {
 	case a.busy != "":
 		rows = append(rows, ui.Text(a.busy, "", ui.ToneWarning))
+	case a.cable.busy() || (a.cable.state == cableRestart && a.cableHealth == vbcable.HealthRemoved):
+		// nothing to connect yet, or any more
 	case !a.cableSelected() || (!st.MicRouted && st.Mic != nil):
 		rows = append(rows,
 			ui.Button("Connect to VB-Cable", ui.ButtonPrimary, false, a.connectCable),
@@ -451,6 +455,7 @@ func (a *App) cableOutputHint() []ui.Row {
 func (a *App) recheckCable() {
 	a.refreshDevices(true)
 	a.refreshRouting(true)
+	a.syncCableHealth()
 	a.render()
 }
 

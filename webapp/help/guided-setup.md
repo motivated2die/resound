@@ -23,7 +23,7 @@ Below the cards:
 
 ## Interrupted?
 
-Resound remembers the step you were on. If you close the panel, quit, or restart Windows (VB-Cable needs a restart), the setup continues where you left it.
+Resound remembers the step you were on. If you close the panel, quit, or restart Windows (VB-Cable may need a restart), the setup continues where you left it.
 
 ## Run it again
 

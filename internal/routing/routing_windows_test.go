@@ -2,6 +2,25 @@ package routing
 
 import "testing"
 
+func TestCableRatesDiffer(t *testing.T) {
+	in, out := &Endpoint{ID: "in"}, &Input{ID: "out"}
+	for _, c := range []struct {
+		name string
+		st   Status
+		want bool
+	}{
+		{"both at 48 kHz", Status{CableInput: in, CableOutput: out, CableInputRate: 48000, CableOutputRate: 48000}, false},
+		{"both at a rate set on purpose", Status{CableInput: in, CableOutput: out, CableInputRate: 96000, CableOutputRate: 96000}, false},
+		{"a clash", Status{CableInput: in, CableOutput: out, CableInputRate: 48000, CableOutputRate: 44100}, true},
+		{"one end unknown", Status{CableInput: in, CableOutput: out, CableInputRate: 48000}, false},
+		{"no cable", Status{CableInputRate: 48000, CableOutputRate: 44100}, false},
+	} {
+		if got := c.st.CableRatesDiffer(); got != c.want {
+			t.Errorf("%s: %v, want %v", c.name, got, c.want)
+		}
+	}
+}
+
 func TestLooksLikeEndpointID(t *testing.T) {
 	good := []string{
 		"{0.0.0.00000000}.{6ff3afb9-1d07-46fd-b5db-257004dccf4f}",

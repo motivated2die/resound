@@ -278,8 +278,25 @@ func TestTrackIconClearsKnob(t *testing.T) {
 // TestWarningRender saves the Warning row and checks that the app's texts
 // (the Advanced section's in pages.go, the setup's in wizard.go: keep them
 // in sync) fit beside the icon and the chevron.
+func TestCableRestartRender(t *testing.T) {
+	rows := []Row{
+		Paragraph("Windows needs a restart to finish setting up VB-Cable. Resound reopens afterwards.", ToneWarning),
+		Buttons(
+			Action{Label: "Restart now", Icon: IconPower, Style: ButtonPrimary, OnClick: func() {}},
+			Action{Label: "Try without restart", OnClick: func() {}}),
+		Text("Windows asks for approval before trying.", "", ToneMuted),
+	}
+	for _, scale := range []float64{1, 1.5} {
+		name := "cable-restart"
+		if scale == 1.5 {
+			name += "@1.5x"
+		}
+		savePNG(t, renderRowsMeasured(t, rows, scale), name)
+	}
+}
+
 func TestWarningRender(t *testing.T) {
-	texts := []string{"Non-standard setup: click for help", "Voicemeeter: VB-Cable may break routing"}
+	texts := []string{"Non-standard setup: click for help", "Voicemeeter: VB-Cable may break routing", "VB-Cable's sample rates differ: click to fix"}
 	rows := []Row{Separator(), Section("Advanced"),
 		Dropdown("cable-target", "Sounds for others play into", "", []Option{{Label: "Voicemeeter AUX Input (VB-Audio Voicemeeter VAIO)", Detail: "Voicemeeter"}}, 0, func(int) {})}
 	for _, s := range texts {

@@ -7,6 +7,10 @@ As soon as an app uses a Bluetooth headset's microphone, Windows switches the he
 - Best: use a separate microphone (USB, webcam or your headset's USB dongle) and keep the Bluetooth headset for listening only.
 - In Resound choose that microphone under **Your microphone**, and the headset's **Headphones** (stereo) device under **You hear**.
 
+## VB-Cable's sample rates differ
+
+Windows can change one end of VB-Cable to another sample rate by itself. The sound is then converted inside the cable. Settings → Audio & voice chat warns about it: click the warning to set both ends to 48 kHz. Apps using the cable may reconnect for a moment.
+
 ## Sounds are distorted for others
 
 - Lower **Others hear** in the audio flow. Sounds far louder than your voice clip in voice chat.
